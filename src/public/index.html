@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MAFL+ Favicon API</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #faf6f1;
+      color: #2d2a26;
+      min-height: 100vh;
+      padding: 2rem 1rem;
+    }
+
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+    }
+
+    .site-logo {
+      display: block;
+      margin: 0 auto 0.8rem;
+      width: 64px;
+      height: 64px;
+    }
+
+    h1 {
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: 2.4rem;
+      font-weight: 700;
+      text-align: center;
+      color: #2d2a26;
+      margin-bottom: 0.25rem;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: #6b6560;
+      font-size: 0.95rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .tip {
+      background: #e8f5e9;
+      border: 1px solid #c8e6c9;
+      border-radius: 8px;
+      padding: 0.85rem 1.1rem;
+      margin-bottom: 2rem;
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+
+    .tip strong { display: block; margin-bottom: 2px; }
+    .tip .icon { margin-right: 0.4rem; }
+    .tip code {
+      background: rgba(0,0,0,0.06);
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      font-size: 0.85rem;
+    }
+
+    .search-section { margin-bottom: 2rem; }
+
+    .search-section label {
+      display: block;
+      font-weight: 600;
+      font-size: 1rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .search-bar {
+      display: flex;
+      gap: 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 2px solid #d4cfc9;
+      background: #fff;
+      transition: border-color 0.2s;
+    }
+
+    .search-bar:focus-within { border-color: #5b2e7e; }
+
+    .search-bar input {
+      flex: 1;
+      border: none;
+      padding: 0.8rem 1rem;
+      font-size: 1rem;
+      background: transparent;
+      outline: none;
+      color: #2d2a26;
+    }
+
+    .search-bar button {
+      border: none;
+      background: #5b2e7e;
+      color: #fff;
+      padding: 0.8rem 1.6rem;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .search-bar button:hover { background: #7b3fa8; }
+    .search-bar button:disabled { background: #a08aaf; cursor: wait; }
+
+    .quick-links {
+      margin-top: 0.5rem;
+      font-size: 0.85rem;
+      color: #8a8480;
+    }
+
+    .quick-links span { margin-right: 0.3rem; }
+
+    .quick-links a {
+      color: #5b2e7e;
+      text-decoration: none;
+      margin-right: 0.6rem;
+      cursor: pointer;
+    }
+
+    .quick-links a:hover { text-decoration: underline; }
+
+    .results {
+      display: none;
+      gap: 1.2rem;
+      margin-top: 1rem;
+    }
+
+    .results.visible {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+    }
+
+    .card {
+      background: #fff;
+      border: 1px solid #e0dbd5;
+      border-radius: 10px;
+      padding: 1.1rem;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .card h3 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-bottom: 0.8rem;
+      color: #2d2a26;
+    }
+
+    .favicon-display {
+      background: #f5f0ea;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 140px;
+      margin-bottom: 0.8rem;
+      cursor: pointer;
+      position: relative;
+      transition: background 0.15s;
+    }
+
+    .favicon-display:hover { background: #ece6de; }
+
+    .favicon-display img {
+      image-rendering: pixelated;
+      max-width: 100%;
+      max-height: 128px;
+    }
+
+    .favicon-display .copied-toast {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0,0,0,0.75);
+      color: #fff;
+      padding: 0.3rem 0.8rem;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .favicon-display .copied-toast.show { opacity: 1; }
+
+    .size-buttons {
+      display: flex;
+      gap: 0.4rem;
+      margin-bottom: 0.6rem;
+      flex-wrap: wrap;
+    }
+
+    .size-btn {
+      border: 1px solid #5b2e7e;
+      background: transparent;
+      color: #5b2e7e;
+      padding: 0.3rem 0.7rem;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.15s;
+    }
+
+    .size-btn:hover, .size-btn.active {
+      background: #5b2e7e;
+      color: #fff;
+    }
+
+    .meta {
+      font-size: 0.75rem;
+      color: #8a8480;
+      word-break: break-all;
+      line-height: 1.4;
+    }
+
+    .meta .dimensions {
+      font-weight: 600;
+      color: #6b6560;
+      margin-right: 0.4rem;
+    }
+
+    .spinner {
+      width: 28px;
+      height: 28px;
+      border: 3px solid #e0dbd5;
+      border-top-color: #5b2e7e;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .error-text { color: #c0392b; font-size: 0.85rem; }
+
+    @media (max-width: 700px) {
+      .results.visible { grid-template-columns: 1fr; }
+      h1 { font-size: 1.8rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <img src="/logo.png" alt="Favicon Fetcher" class="site-logo">
+    <h1>MAFL+ Favicon API</h1>
+    <p class="subtitle">Get the highest resolution favicon for any domain from three public services.</p>
+
+    <div class="tip">
+      <strong><span class="icon">&#9881;</span> Tip</strong>
+      Use the favicon directly via <code id="api-example">https://&lt;this-host&gt;/{domain}</code>
+      &mdash; click any image to copy its URL.
+    </div>
+
+    <div class="search-section">
+      <label for="domain-input">Domain</label>
+      <div class="search-bar">
+        <input type="text" id="domain-input" placeholder="example.com" value="nos.nl" autofocus>
+        <button id="fetch-btn" onclick="fetchFavicons()">Fetch</button>
+      </div>
+      <div class="quick-links">
+        <span>Try:</span>
+        <a onclick="quickFetch('github.com')">github.com</a>
+        <a onclick="quickFetch('reddit.com')">reddit.com</a>
+        <a onclick="quickFetch('proton.me')">proton.me</a>
+        <a onclick="quickFetch('apple.com')">apple.com</a>
+      </div>
+    </div>
+
+    <div class="results" id="results">
+      <!-- Google -->
+      <div class="card">
+        <h3>Google</h3>
+        <div class="favicon-display" id="google-display" onclick="copyImage(this)">
+          <div class="spinner" id="google-spinner" style="display:none"></div>
+          <img id="google-img" style="display:none" alt="Google favicon">
+          <span class="copied-toast">URL copied!</span>
+        </div>
+        <div class="size-buttons" id="google-sizes">
+          <button class="size-btn" onclick="switchGoogleSize(128)">128</button>
+          <button class="size-btn" onclick="switchGoogleSize(64)">64</button>
+          <button class="size-btn active" onclick="switchGoogleSize(32)">32</button>
+          <button class="size-btn" onclick="switchGoogleSize(16)">16</button>
+        </div>
+        <div class="meta" id="google-meta"></div>
+      </div>
+
+      <!-- DuckDuckGo -->
+      <div class="card">
+        <h3>DuckDuckGo</h3>
+        <div class="favicon-display" id="ddg-display" onclick="copyImage(this)">
+          <div class="spinner" id="ddg-spinner" style="display:none"></div>
+          <img id="ddg-img" style="display:none" alt="DuckDuckGo favicon">
+          <span class="copied-toast">URL copied!</span>
+        </div>
+        <div class="meta" id="ddg-meta"></div>
+      </div>
+
+      <!-- Yandex -->
+      <div class="card">
+        <h3>Yandex</h3>
+        <div class="favicon-display" id="yandex-display" onclick="copyImage(this)">
+          <div class="spinner" id="yandex-spinner" style="display:none"></div>
+          <img id="yandex-img" style="display:none" alt="Yandex favicon">
+          <span class="copied-toast">URL copied!</span>
+        </div>
+        <div class="meta" id="yandex-meta"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.getElementById('api-example').textContent = `${location.origin}/{domain}`;
+
+    let currentDomain = '';
+    let currentGoogleSize = 32;
+
+    const input = document.getElementById('domain-input');
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') fetchFavicons();
+    });
+
+    function quickFetch(domain) {
+      input.value = domain;
+      fetchFavicons();
+    }
+
+    function fetchFavicons() {
+      const raw = input.value.trim();
+      if (!raw) return;
+      const domain = raw.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+      if (!domain || !domain.includes('.')) return;
+
+      currentDomain = domain;
+      currentGoogleSize = 32;
+      document.getElementById('api-example').textContent = `${location.origin}/${domain}`;
+      document.getElementById('results').classList.add('visible');
+
+      setActiveSize(32);
+      loadGoogle(domain, 32);
+      loadDavicon('ddg', `/d/${domain}`, `https://icons.duckduckgo.com/ip3/${domain}.ico`);
+      loadFavicon('yandex', `/y/${domain}`, `https://favicon.yandex.net/favicon/${domain}`);
+    }
+
+    function loadGoogle(domain, size) {
+      loadFavicon('google', `/g/${size}/${domain}`, `https://www.google.com/s2/favicons?domain=${domain}&sz=${size}`);
+    }
+
+    function loadFavicon(id, proxyUrl, sourceUrl) {
+      const img = document.getElementById(`${id}-img`);
+      const spinner = document.getElementById(`${id}-spinner`);
+      const meta = document.getElementById(`${id}-meta`);
+
+      img.style.display = 'none';
+      spinner.style.display = 'block';
+      meta.textContent = '';
+
+      const imgEl = new Image();
+      imgEl.crossOrigin = 'anonymous';
+      imgEl.onload = () => {
+        img.src = imgEl.src;
+        img.style.display = 'block';
+        spinner.style.display = 'none';
+        const fullProxyUrl = `${location.origin}${proxyUrl}`;
+        img.closest('.favicon-display').dataset.proxyUrl = fullProxyUrl;
+        meta.innerHTML = `<span class="dimensions">${imgEl.naturalWidth}x${imgEl.naturalHeight}</span> ${sourceUrl}`;
+      };
+      imgEl.onerror = () => {
+        spinner.style.display = 'none';
+        meta.innerHTML = '<span class="error-text">Failed to load</span>';
+      };
+      imgEl.src = proxyUrl;
+    }
+
+    function loadDavicon(id, proxyUrl, sourceUrl) {
+      loadFavicon(id, proxyUrl, sourceUrl);
+    }
+
+    function switchGoogleSize(size) {
+      if (!currentDomain) return;
+      currentGoogleSize = size;
+      setActiveSize(size);
+      loadGoogle(currentDomain, size);
+    }
+
+    function setActiveSize(size) {
+      document.querySelectorAll('#google-sizes .size-btn').forEach((btn) => {
+        btn.classList.toggle('active', parseInt(btn.textContent) === size);
+      });
+    }
+
+    async function copyImage(display) {
+      const url = display.dataset.proxyUrl;
+      if (!url) return;
+
+      try {
+        await navigator.clipboard.writeText(url);
+        const toast = display.querySelector('.copied-toast');
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 1200);
+      } catch {
+        /* clipboard API not available */
+      }
+    }
+  </script>
+</body>
+</html>
