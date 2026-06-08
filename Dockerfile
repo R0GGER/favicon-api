@@ -11,7 +11,7 @@ COPY package.json ./
 COPY src ./src
 RUN mkdir -p /cache && chown app:app /cache
 COPY docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
+RUN sed -i 's/\r$//' /docker-entrypoint.sh && chmod +x /docker-entrypoint.sh
 USER app
 ENV NODE_ENV=production
 ENV CACHE_DIR=/cache
