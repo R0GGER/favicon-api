@@ -1,0 +1,1 @@
+# maflplus-favicon-api
