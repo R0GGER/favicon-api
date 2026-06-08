@@ -40,6 +40,22 @@ volumes:
   favicon-cache:
 ```
 
+### Using a host path for the cache volume
+
+If you prefer to use a full host path instead of a named volume, set the correct ownership so the container's `app` user (UID 100) can write to it:
+
+```bash
+mkdir -p /path/to/cache
+chown 100:101 /path/to/cache
+```
+
+Then use the host path in your `docker-compose.yml`:
+
+```yaml
+    volumes:
+      - /path/to/cache:/cache
+```
+
 ## Environment Variables
 
 | Variable | Default | Description |
