@@ -62,29 +62,21 @@
       border-radius: 4px;
       font-size: 0.85rem;
       cursor: pointer;
-      position: relative;
       transition: background 0.15s;
     }
 
     .tip code:hover { background: rgba(0,0,0,0.12); }
 
-    .tip code .tip-toast {
-      position: absolute;
-      top: -2rem;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(0,0,0,0.75);
-      color: #fff;
-      padding: 0.2rem 0.6rem;
-      border-radius: 4px;
-      font-size: 0.75rem;
-      white-space: nowrap;
-      pointer-events: none;
+    .tip .tip-copied {
+      display: inline;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #2e7d32;
       opacity: 0;
-      transition: opacity 0.2s;
+      transition: opacity 0.25s;
     }
 
-    .tip code .tip-toast.show { opacity: 1; }
+    .tip .tip-copied.show { opacity: 1; }
 
     .search-section { margin-bottom: 2rem; }
 
@@ -277,8 +269,8 @@
 
     <div class="tip">
       <strong><span class="icon">&#9881;</span> Tip</strong>
-      Use the favicon directly via <code id="api-example" onclick="copyApiUrl(this)">https://&lt;this-host&gt;/{domain}<span class="tip-toast">Copied!</span></code>
-      &mdash; click any image to copy its URL.
+      Use the favicon directly via <code id="api-example" onclick="copyApiUrl()">https://&lt;this-host&gt;/{domain}</code>
+      &mdash; click any image to copy its URL. <span class="tip-copied" id="tip-copied">&#10003; URL copied to clipboard</span>
     </div>
 
     <div class="search-section">
@@ -418,14 +410,15 @@
       });
     }
 
-    async function copyApiUrl(code) {
-      const text = code.childNodes[0].textContent;
+    async function copyApiUrl() {
+      const code = document.getElementById('api-example');
+      const text = code.textContent;
       if (!text) return;
       try {
         await navigator.clipboard.writeText(text);
-        const toast = code.querySelector('.tip-toast');
-        toast.classList.add('show');
-        setTimeout(() => toast.classList.remove('show'), 1200);
+        const msg = document.getElementById('tip-copied');
+        msg.classList.add('show');
+        setTimeout(() => msg.classList.remove('show'), 2000);
       } catch {}
     }
 
