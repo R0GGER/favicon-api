@@ -20,14 +20,21 @@ A lightweight favicon proxy that fetches favicons from Google, DuckDuckGo, and Y
 
 ```yaml
 services:
-  favicon-api:
-    image: r0gger/maflplus-favicon-api:latest
-    container_name: favicon-api
+  maflplus-favicon-api:
+    image: ghcr.io/r0gger/maflplus-favicon-api:latest
+    container_name: maflplus-favicon-api
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "3100:3000"
     volumes:
       - favicon-cache:/cache
+    environment:
+      - PORT=3000
+      - CACHE_DIR=/cache
+      - MEMORY_CACHE_MAX=500
+      - MEMORY_CACHE_TTL=3600
+      - DISK_CACHE_TTL=86400
+      - UPSTREAM_TIMEOUT=5000
 
 volumes:
   favicon-cache:
