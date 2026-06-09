@@ -1,6 +1,7 @@
 services:
   maflplus-favicon-api:
-    image: ghcr.io/r0gger/maflplus-favicon-api:latest
+    #image: ghcr.io/r0gger/maflplus-favicon-api:latest
+    build: . # local build
     container_name: maflplus-favicon-api
     restart: unless-stopped
     ports:
