@@ -7,6 +7,8 @@ const cache = require('./cache');
 const app = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
 
+app.set('trust proxy', true);
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 const VALID_GOOGLE_SIZES = new Set([16, 32, 64, 128]);
@@ -128,6 +130,38 @@ app.get('/p/:domain', async (req, res) => {
     console.error('Favicon-3j1 proxy error:', err.message);
     res.status(500).json({ error: 'Internal error.' });
   }
+});
+
+// JSON list of all favicon endpoint URLs for a domain: /:domain/json
+app.get('/:domain/json', (req, res) => {
+  const domain = extractDomain(req.params.domain);
+  if (!domain) return res.status(400).json({ error: 'Invalid domain.' });
+
+  const host = `${req.protocol}://${req.get('host')}`;
+  const encoded = encodeURIComponent(domain);
+
+  res.set('Cache-Control', CACHE_CONTROL);
+  res.json({
+    domain,
+    endpoints: {
+      best: `${host}/${encoded}`,
+      google: {
+        '16': `${host}/g/16/${encoded}`,
+        '32': `${host}/g/32/${encoded}`,
+        '64': `${host}/g/64/${encoded}`,
+        '128': `${host}/g/128/${encoded}`,
+      },
+      duckduckgo: `${host}/d/${encoded}`,
+      yandex: `${host}/y/${encoded}`,
+      faviconso: `${host}/f/${encoded}`,
+      vemetric: {
+        default: `${host}/v/${encoded}`,
+        sized: `${host}/v/${encoded}?size=64`,
+        webp: `${host}/v/${encoded}?format=webp`,
+      },
+      favicondev: `${host}/p/${encoded}`,
+    },
+  });
 });
 
 // Direct / best-pick favicon: /:domain

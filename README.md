@@ -18,8 +18,11 @@ A lightweight favicon proxy that fetches favicons from multiple providers (Googl
 | `/v/{domain}?size=64` | Vemetric favicon resized |
 | `/v/{domain}?format=webp` | Vemetric favicon in webp/png/jpg |
 | `/p/{domain}` | Favicon-3j1 favicon |
+| `/{domain}/json` | JSON list of every endpoint URL for the domain |
 
 **Example:** `https://your-host/github.com`
+
+**JSON example:** `https://your-host/github.com/json`
 
 ## Docker
 
