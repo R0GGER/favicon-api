@@ -67,6 +67,44 @@
 
     .tip code:hover { background: rgba(0,0,0,0.12); }
 
+    .bookmarklet-tip {
+      background: #f3eaf7;
+      border-color: #d9c2e6;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-top: 2.5rem;
+    }
+
+    .bookmarklet-tip .bm-text { flex: 1 1 320px; }
+
+    .bookmarklet-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.55rem 1rem;
+      background: #5b2e7e;
+      color: #fff;
+      border-radius: 6px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: grab;
+      user-select: none;
+      transition: background 0.15s, transform 0.1s;
+      white-space: nowrap;
+    }
+
+    .bookmarklet-btn:hover { background: #7b3fa8; }
+    .bookmarklet-btn:active { cursor: grabbing; transform: scale(0.97); }
+
+    .bookmarklet-btn svg {
+      width: 14px;
+      height: 14px;
+      fill: currentColor;
+    }
+
     .json-button-wrap {
       display: none;
       margin-top: 1.5rem;
@@ -455,10 +493,33 @@
         <span class="url" id="json-link-url">https://&lt;this-host&gt;/{domain}/json</span>
       </a>
     </div>
+
+    <div class="tip bookmarklet-tip">
+      <div class="bm-text">
+        <strong><span class="icon">&#9733;</span> Bookmarklet</strong>
+        <span style="color:#5b2e7e;font-weight:700">Drag</span> the button to your bookmarks bar (don't click &amp; copy &mdash; the name will only auto-fill when dragging).<br>Click the saved bookmark on any page to copy that site's favicon URL.
+      </div>
+      <a class="bookmarklet-btn" id="bookmarklet-link" href="#" draggable="true" title="Drag me to your bookmarks bar" onclick="bookmarkletClicked(event)">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v13.5a.5.5 0 0 1-.777.416L8 13.101l-5.223 2.815A.5.5 0 0 1 2 15.5V2z"/></svg>
+        Mafl+ Favicon Copy
+      </a>
+    </div>
   </div>
 
   <script>
     document.getElementById('api-example').textContent = `${location.origin}/{domain}`;
+
+    (function setupBookmarklet() {
+      const link = document.getElementById('bookmarklet-link');
+      if (!link) return;
+      const code = `javascript:(function(){var H='${location.origin}';var d=location.hostname;if(!d){alert('No domain on this page.');return;}var u=H+'/'+d;navigator.clipboard.writeText(u).then(function(){var t=document.createElement('div');t.textContent='\\u2713 Favicon URL copied: '+u;t.style.cssText='position:fixed;top:20px;right:20px;z-index:2147483647;background:#5b2e7e;color:#fff;padding:12px 16px;border-radius:8px;font:14px system-ui,sans-serif;box-shadow:0 4px 12px rgba(0,0,0,.3);max-width:90vw;word-break:break-all';document.body.appendChild(t);setTimeout(function(){t.remove();},2500);},function(e){alert('Copy failed: '+e);});})();`;
+      link.setAttribute('href', code);
+    })();
+
+    function bookmarkletClicked(e) {
+      e.preventDefault();
+      alert('Drag this button to your bookmarks bar (the name will auto-fill as "Mafl+ Favicon Copy"). Then click the saved bookmark on any website to copy that site\u2019s favicon URL.\n\nTip: if you copy-paste the URL into a manual "Add bookmark" dialog instead, browsers can\u2019t pre-fill the name for security reasons \u2014 you\u2019ll have to type it yourself.');
+    }
 
     let currentDomain = '';
     let currentGoogleSize = 32;
