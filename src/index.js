@@ -1,6 +1,6 @@
 const express = require('express');
 const path = require('path');
-const { fetchGoogle, fetchDuckDuckGo, fetchYandex, fetchFaviconSo, fetchVemetric, fetchFaviconDev } = require('./providers');
+const { fetchGoogle, fetchDuckDuckGo, fetchYandex, fetchFaviconSo, fetchVemetric, fetchFaviconDev, PROVIDERS } = require('./providers');
 const { pickBest, fetchWithCache } = require('./bestPick');
 const cache = require('./cache');
 
@@ -144,22 +144,37 @@ app.get('/:domain/json', (req, res) => {
   res.json({
     domain,
     endpoints: {
-      best: `${host}/${encoded}`,
+      best: {
+        proxy: `${host}/${encoded}`,
+        source: null,
+      },
       google: {
-        '16': `${host}/g/16/${encoded}`,
-        '32': `${host}/g/32/${encoded}`,
-        '64': `${host}/g/64/${encoded}`,
-        '128': `${host}/g/128/${encoded}`,
+        '16': { proxy: `${host}/g/16/${encoded}`, source: PROVIDERS.google(domain, 16) },
+        '32': { proxy: `${host}/g/32/${encoded}`, source: PROVIDERS.google(domain, 32) },
+        '64': { proxy: `${host}/g/64/${encoded}`, source: PROVIDERS.google(domain, 64) },
+        '128': { proxy: `${host}/g/128/${encoded}`, source: PROVIDERS.google(domain, 128) },
       },
-      duckduckgo: `${host}/d/${encoded}`,
-      yandex: `${host}/y/${encoded}`,
-      faviconso: `${host}/f/${encoded}`,
+      duckduckgo: {
+        proxy: `${host}/d/${encoded}`,
+        source: PROVIDERS.duckduckgo(domain),
+      },
+      yandex: {
+        proxy: `${host}/y/${encoded}`,
+        source: PROVIDERS.yandex(domain),
+      },
+      faviconso: {
+        proxy: `${host}/f/${encoded}`,
+        source: PROVIDERS.faviconSo(domain),
+      },
       vemetric: {
-        default: `${host}/v/${encoded}`,
-        sized: `${host}/v/${encoded}?size=64`,
-        webp: `${host}/v/${encoded}?format=webp`,
+        default: { proxy: `${host}/v/${encoded}`, source: PROVIDERS.vemetric(domain) },
+        sized: { proxy: `${host}/v/${encoded}?size=64`, source: PROVIDERS.vemetric(domain, 64) },
+        webp: { proxy: `${host}/v/${encoded}?format=webp`, source: PROVIDERS.vemetric(domain, null, 'webp') },
       },
-      favicondev: `${host}/p/${encoded}`,
+      favicondev: {
+        proxy: `${host}/p/${encoded}`,
+        source: PROVIDERS.faviconDev(domain),
+      },
     },
   });
 });

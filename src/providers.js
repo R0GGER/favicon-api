@@ -81,4 +81,4 @@ async function fetchFaviconDev(domain) {
   return result ? { ...result, provider: 'favicondev' } : null;
 }
 
-module.exports = { fetchGoogle, fetchDuckDuckGo, fetchYandex, fetchFaviconSo, fetchVemetric, fetchFaviconDev };
+module.exports = { fetchGoogle, fetchDuckDuckGo, fetchYandex, fetchFaviconSo, fetchVemetric, fetchFaviconDev, PROVIDERS };
