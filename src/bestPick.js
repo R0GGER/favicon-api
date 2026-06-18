@@ -1,5 +1,16 @@
 const sharp = require('sharp');
-const { fetchGoogle, fetchDuckDuckGo, fetchYandex, fetchFaviconSo, fetchVemetric, fetchFaviconDev } = require('./providers');
+const {
+  fetchGoogle,
+  fetchGoogleV2,
+  fetchDuckDuckGo,
+  fetchYandex,
+  fetchFaviconSo,
+  fetchVemetric,
+  fetchFaviconDev,
+  fetchFaviconkit,
+  fetchLogoDev,
+  fetchScraper,
+} = require('./providers');
 const cache = require('./cache');
 
 const TRANSPARENT_1X1_PNG = Buffer.from(
@@ -47,13 +58,22 @@ async function pickBest(domain) {
   if (cached) return cached;
 
   const fallbacks = [
+    () => fetchWithCache('scraper', domain, null, () => fetchScraper(domain)),
+    () => fetchWithCache('googlev2', domain, 128, () => fetchGoogleV2(domain, 128)),
     () => fetchWithCache('duckduckgo', domain, null, () => fetchDuckDuckGo(domain)),
     () => fetchWithCache('google', domain, 32, () => fetchGoogle(domain, 32)),
+    () => fetchWithCache('faviconkit', domain, 128, () => fetchFaviconkit(domain, 128)),
     () => fetchWithCache('faviconso', domain, null, () => fetchFaviconSo(domain)),
     () => fetchWithCache('vemetric', domain, null, () => fetchVemetric(domain)),
     () => fetchWithCache('favicondev', domain, null, () => fetchFaviconDev(domain)),
     () => fetchWithCache('yandex', domain, null, () => fetchYandex(domain)),
   ];
+
+  if (process.env.LOGODEV_TOKEN) {
+    fallbacks.splice(2, 0, () =>
+      fetchWithCache('logodev', domain, null, () => fetchLogoDev(domain))
+    );
+  }
 
   for (const fetcher of fallbacks) {
     const result = await fetcher();

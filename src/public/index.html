@@ -199,6 +199,36 @@
     .search-bar button:hover { background: #7b3fa8; }
     .search-bar button:disabled { background: #a08aaf; cursor: wait; }
 
+    .search-options {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-top: 0.6rem;
+      font-size: 0.88rem;
+      color: #4a4642;
+      user-select: none;
+    }
+
+    .search-options input[type="checkbox"] {
+      accent-color: #5b2e7e;
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+    }
+
+    .search-options label {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      cursor: pointer;
+      font-weight: 500;
+    }
+
+    .search-options .hint {
+      color: #8a8480;
+      font-size: 0.8rem;
+    }
+
     .quick-links {
       margin-top: 0.5rem;
       font-size: 0.85rem;
@@ -224,7 +254,7 @@
 
     .results.visible {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       grid-template-rows: auto;
     }
 
@@ -258,6 +288,20 @@
     }
 
     .favicon-display:hover { background: #ece6de; }
+
+    .favicon-display.variant-light { background: #2d2a26; }
+    .favicon-display.variant-light:hover { background: #1f1c19; }
+    .favicon-display.variant-dark { background: #ffffff; }
+    .favicon-display.variant-dark:hover { background: #f0eee9; }
+
+    .favicon-display .unavailable {
+      color: #8a8480;
+      font-size: 0.85rem;
+      font-style: italic;
+      text-align: center;
+      padding: 0 0.5rem;
+    }
+    .favicon-display.variant-light .unavailable { color: #b8b1aa; }
 
     .favicon-display img {
       image-rendering: pixelated;
@@ -307,16 +351,63 @@
     }
 
     .meta {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
       font-size: 0.75rem;
       color: #8a8480;
-      word-break: break-all;
       line-height: 1.4;
+      min-width: 0;
     }
 
     .meta .dimensions {
       font-weight: 600;
       color: #6b6560;
-      margin-right: 0.4rem;
+      flex: 0 0 auto;
+    }
+
+    .meta .src-url {
+      flex: 1 1 auto;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: #8a8480;
+      text-decoration: none;
+    }
+
+    .meta .src-url:hover {
+      color: #5b2e7e;
+      text-decoration: underline;
+    }
+
+    .meta .copy-btn {
+      flex: 0 0 auto;
+      background: transparent;
+      border: none;
+      padding: 2px 4px;
+      cursor: pointer;
+      color: #8a8480;
+      border-radius: 3px;
+      transition: background 0.15s, color 0.15s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .meta .copy-btn:hover {
+      background: rgba(91, 46, 126, 0.1);
+      color: #5b2e7e;
+    }
+
+    .meta .copy-btn.copied {
+      color: #2e7d32;
+    }
+
+    .meta .copy-btn svg {
+      width: 12px;
+      height: 12px;
+      fill: currentColor;
     }
 
     .spinner {
@@ -361,13 +452,61 @@
     }
 
     @media (max-width: 700px) {
-      .results.visible { grid-template-columns: 1fr; }
+      .results.visible { grid-template-columns: minmax(0, 1fr); }
       h1 { font-size: 1.8rem; }
       .top-nav {
         position: static;
         justify-content: center;
         margin-bottom: 1rem;
       }
+    }
+
+    .global-toast {
+      position: fixed;
+      right: 1.25rem;
+      bottom: 1.25rem;
+      background: #2d2a26;
+      color: #fff;
+      padding: 0.7rem 1rem 0.7rem 0.85rem;
+      border-radius: 8px;
+      font-size: 0.88rem;
+      font-weight: 500;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      max-width: min(420px, calc(100vw - 2.5rem));
+      transform: translateY(20px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      z-index: 9999;
+    }
+
+    .global-toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .global-toast .check {
+      color: #6ee7a8;
+      font-weight: 700;
+      flex: 0 0 auto;
+    }
+
+    .global-toast .toast-text {
+      flex: 0 0 auto;
+      white-space: nowrap;
+    }
+
+    .global-toast .toast-url {
+      font-family: monospace;
+      font-size: 0.8rem;
+      color: #d8d3cd;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
     }
   </style>
 </head>
@@ -389,32 +528,53 @@
   <div class="container">
     <img src="/logo.png" alt="Favicon Fetcher" class="site-logo">
     <h1>MAFL+ Favicon API</h1>
-    <p class="subtitle">Get the highest resolution favicon for any domain from six public services.</p>
+    <p class="subtitle">Get the highest resolution favicon for any domain &mdash; or look up a service icon by name.</p>
 
     <div class="tip">
       <strong><span class="icon">&#9881;</span> Tip</strong>
-      Use the favicon directly via <code id="api-example" onclick="copyApiUrl()">https://&lt;this-host&gt;/{domain}</code>
-      &mdash; click any image to copy its URL. <span class="tip-copied" id="tip-copied">&#10003; URL copied to clipboard</span>
+      Use the favicon directly via <code id="api-example" onclick="copyApiUrl()">https://&lt;this-host&gt;/{domain}</code>,
+      or look up a self-hosted by app name (e.g. firefox, immich, jellyfin, etc.).<br>
+      Click any image to copy its URL. <span class="tip-copied" id="tip-copied">&#10003; URL copied to clipboard</span>
     </div>
 
     <div class="search-section">
-      <label for="domain-input">Domain</label>
+      <label for="domain-input">Domain or service name</label>
       <div class="search-bar">
-        <input type="text" id="domain-input" placeholder="example.com" autofocus>
+        <input type="text" id="domain-input" placeholder="example.com  or  radarr" autofocus>
         <button id="fetch-btn" onclick="fetchFavicons()">Fetch</button>
+      </div>
+      <div class="search-options">
+        <label for="selfhst-toggle">
+          <input type="checkbox" id="selfhst-toggle" checked onchange="toggleSelfhst()">
+          Also include selfhst icon lookup when searching a domain
+        </label>
+        <span class="hint" id="selfhst-hint"></span>
       </div>
       <div class="quick-links">
         <span>Try:</span>
         <a onclick="quickFetch('github.com')">github.com</a>
         <a onclick="quickFetch('reddit.com')">reddit.com</a>
         <a onclick="quickFetch('proton.me')">proton.me</a>
-        <a onclick="quickFetch('apple.com')">apple.com</a>
+        <a onclick="quickFetch('firefox')">firefox</a>
+        <a onclick="quickFetch('immich')">immich</a>  
+        <a onclick="quickFetch('jellyfin')">jellyfin</a>
       </div>
     </div>
 
     <div class="results" id="results">
-      <!-- Google -->
-      <div class="card">
+      <!-- Scraper -->
+      <div class="card" data-card-type="domain">
+        <h3>HTML Scraper</h3>
+        <div class="favicon-display" id="scraper-display" onclick="copyImage(this)">
+          <div class="spinner" id="scraper-spinner" style="display:none"></div>
+          <img id="scraper-img" style="display:none" alt="Scraped favicon">
+          <span class="copied-toast">URL copied!</span>
+        </div>
+        <div class="meta" id="scraper-meta"></div>
+      </div>
+
+      <!-- Google (v1 + v2 combined) -->
+      <div class="card" data-card-type="domain">
         <h3>Google</h3>
         <div class="favicon-display" id="google-display" onclick="copyImage(this)">
           <div class="spinner" id="google-spinner" style="display:none"></div>
@@ -422,16 +582,17 @@
           <span class="copied-toast">URL copied!</span>
         </div>
         <div class="size-buttons" id="google-sizes">
-          <button class="size-btn" onclick="switchGoogleSize(128)">128</button>
+          <button class="size-btn" onclick="switchGoogleSize(256)">256</button>
+          <button class="size-btn active" onclick="switchGoogleSize(128)">128</button>
           <button class="size-btn" onclick="switchGoogleSize(64)">64</button>
-          <button class="size-btn active" onclick="switchGoogleSize(32)">32</button>
+          <button class="size-btn" onclick="switchGoogleSize(32)">32</button>
           <button class="size-btn" onclick="switchGoogleSize(16)">16</button>
         </div>
         <div class="meta" id="google-meta"></div>
       </div>
 
       <!-- DuckDuckGo -->
-      <div class="card">
+      <div class="card" data-card-type="domain">
         <h3>DuckDuckGo</h3>
         <div class="favicon-display" id="ddg-display" onclick="copyImage(this)">
           <div class="spinner" id="ddg-spinner" style="display:none"></div>
@@ -442,7 +603,7 @@
       </div>
 
       <!-- Yandex -->
-      <div class="card">
+      <div class="card" data-card-type="domain">
         <h3>Yandex</h3>
         <div class="favicon-display" id="yandex-display" onclick="copyImage(this)">
           <div class="spinner" id="yandex-spinner" style="display:none"></div>
@@ -453,7 +614,7 @@
       </div>
 
       <!-- Favicon.so -->
-      <div class="card">
+      <div class="card" data-card-type="domain">
         <h3>Favicon.so</h3>
         <div class="favicon-display" id="faviconso-display" onclick="copyImage(this)">
           <div class="spinner" id="faviconso-spinner" style="display:none"></div>
@@ -464,7 +625,7 @@
       </div>
 
       <!-- Vemetric -->
-      <div class="card">
+      <div class="card" data-card-type="domain">
         <h3>Vemetric.com</h3>
         <div class="favicon-display" id="vemetric-display" onclick="copyImage(this)">
           <div class="spinner" id="vemetric-spinner" style="display:none"></div>
@@ -475,7 +636,7 @@
       </div>
 
       <!-- Favicon-3j1 -->
-      <div class="card">
+      <div class="card" data-card-type="domain">
         <h3>Favicon Downloader</h3>
         <div class="favicon-display" id="favicondev-display" onclick="copyImage(this)">
           <div class="spinner" id="favicondev-spinner" style="display:none"></div>
@@ -483,6 +644,52 @@
           <span class="copied-toast">URL copied!</span>
         </div>
         <div class="meta" id="favicondev-meta"></div>
+      </div>
+
+      <!-- Faviconkit -->
+      <div class="card" data-card-type="domain">
+        <h3>Faviconkit</h3>
+        <div class="favicon-display" id="faviconkit-display" onclick="copyImage(this)">
+          <div class="spinner" id="faviconkit-spinner" style="display:none"></div>
+          <img id="faviconkit-img" style="display:none" alt="Faviconkit favicon">
+          <span class="copied-toast">URL copied!</span>
+        </div>
+        <div class="size-buttons" id="faviconkit-sizes">
+          <button class="size-btn" onclick="switchFaviconkitSize(256)">256</button>
+          <button class="size-btn active" onclick="switchFaviconkitSize(128)">128</button>
+          <button class="size-btn" onclick="switchFaviconkitSize(64)">64</button>
+          <button class="size-btn" onclick="switchFaviconkitSize(32)">32</button>
+          <button class="size-btn" onclick="switchFaviconkitSize(16)">16</button>
+        </div>
+        <div class="meta" id="faviconkit-meta"></div>
+      </div>
+
+      <!-- logo.dev -->
+      <div class="card" id="logodev-card" data-card-type="domain" style="display:none">
+        <h3>logo.dev</h3>
+        <div class="favicon-display" id="logodev-display" onclick="copyImage(this)">
+          <div class="spinner" id="logodev-spinner" style="display:none"></div>
+          <img id="logodev-img" style="display:none" alt="logo.dev favicon">
+          <span class="copied-toast">URL copied!</span>
+        </div>
+        <div class="meta" id="logodev-meta"></div>
+      </div>
+
+      <!-- selfhst (service-based) -->
+      <div class="card" id="selfhst-card" data-card-type="service">
+        <h3>selfhst icons</h3>
+        <div class="size-buttons" id="selfhst-variants">
+          <button class="size-btn active" data-variant="color" onclick="switchSelfhstVariant('color')">Color</button>
+          <button class="size-btn" data-variant="light" style="display:none" onclick="switchSelfhstVariant('light')">Light</button>
+          <button class="size-btn" data-variant="dark" style="display:none" onclick="switchSelfhstVariant('dark')">Dark</button>
+        </div>
+        <div class="favicon-display" id="selfhst-display" onclick="copyImage(this)">
+          <div class="spinner" id="selfhst-spinner" style="display:none"></div>
+          <img id="selfhst-img" style="display:none" alt="selfhst icon">
+          <span class="unavailable" id="selfhst-unavailable" style="display:none">variant not available</span>
+          <span class="copied-toast">URL copied!</span>
+        </div>
+        <div class="meta" id="selfhst-meta"></div>
       </div>
     </div>
 
@@ -506,6 +713,12 @@
     </div>
   </div>
 
+  <div class="global-toast" id="global-toast" role="status" aria-live="polite">
+    <span class="check">&#10003;</span>
+    <span class="toast-text">URL copied</span>
+    <span class="toast-url" id="global-toast-url"></span>
+  </div>
+
   <script>
     document.getElementById('api-example').textContent = `${location.origin}/{domain}`;
 
@@ -522,26 +735,110 @@
     }
 
     let currentDomain = '';
-    let currentGoogleSize = 32;
+    let currentService = '';
+    let currentMode = '';
+    let currentGoogleSize = 128;
+    let currentFaviconkitSize = 128;
+    let currentSelfhstSlug = '';
+    let currentSelfhstVariant = 'color';
+    let providersConfig = { logoDev: false, logoDevToken: null };
+
+    function escapeHtml(s) {
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    const COPY_ICON_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/><path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/></svg>';
 
     const input = document.getElementById('domain-input');
+    const selfhstToggle = document.getElementById('selfhst-toggle');
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') fetchFavicons();
     });
+
+    fetch('/providers')
+      .then((r) => r.json())
+      .then((cfg) => {
+        providersConfig = cfg || providersConfig;
+        const card = document.getElementById('logodev-card');
+        if (providersConfig.logoDev) {
+          card.style.display = '';
+        }
+      })
+      .catch(() => {});
 
     function quickFetch(domain) {
       input.value = domain;
       fetchFavicons();
     }
 
+    function deriveServiceSlug(raw) {
+      if (!raw) return '';
+      const first = raw.trim().toLowerCase().replace(/^https?:\/\//, '').split('/')[0].split('.')[0];
+      return first.replace(/[^a-z0-9._-]/g, '');
+    }
+
+    function showCardsByType(type) {
+      document.querySelectorAll('[data-card-type="domain"]').forEach((card) => {
+        if (card.id === 'logodev-card' && !providersConfig.logoDev) return;
+        card.style.display = type === 'domain' ? '' : 'none';
+      });
+    }
+
+    function toggleSelfhst() {
+      const card = document.getElementById('selfhst-card');
+      const hint = document.getElementById('selfhst-hint');
+
+      if (currentMode === 'service') {
+        // In service-only mode, the selfhst card is always shown.
+        card.style.display = '';
+        return;
+      }
+
+      if (selfhstToggle.checked) {
+        card.style.display = '';
+        if (currentMode === 'domain' && currentDomain) {
+          const slug = deriveServiceSlug(currentDomain);
+          hint.textContent = slug ? `lookup as "${slug}"` : '';
+          if (slug) {
+            currentSelfhstSlug = slug;
+            currentSelfhstVariant = 'color';
+            resetSelfhstVariantButtons();
+            setActiveVariant('color');
+            loadSelfhst(slug, 'color', { hideOnError: true });
+            probeAndShowSelfhstVariants(slug);
+          }
+        }
+      } else {
+        card.style.display = 'none';
+        hint.textContent = '';
+      }
+    }
+
     function fetchFavicons() {
       const raw = input.value.trim();
       if (!raw) return;
-      const domain = raw.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
-      if (!domain || !domain.includes('.')) return;
+      const stripped = raw.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim();
+      if (!stripped) return;
 
+      if (stripped.includes('.')) {
+        runDomainSearch(stripped);
+      } else {
+        runServiceSearch(stripped);
+      }
+    }
+
+    function runDomainSearch(domain) {
+      currentMode = 'domain';
       currentDomain = domain;
-      currentGoogleSize = 32;
+      currentService = '';
+      currentGoogleSize = 128;
+      currentFaviconkitSize = 128;
+
       document.getElementById('api-example').textContent = `${location.origin}/${domain}`;
       const jsonUrl = `${location.origin}/${domain}/json`;
       document.getElementById('json-link').href = jsonUrl;
@@ -549,24 +846,198 @@
       document.getElementById('json-button-wrap').classList.add('visible');
       document.getElementById('results').classList.add('visible');
 
-      setActiveSize(32);
-      loadGoogle(domain, 32);
+      showCardsByType('domain');
+      setActiveSize('google-sizes', 128);
+      setActiveSize('faviconkit-sizes', 128);
+
+      loadFavicon('scraper', `/s/${domain}`, `https://${domain}/`);
+      loadGoogle(domain, 128);
       loadDavicon('ddg', `/d/${domain}`, `https://icons.duckduckgo.com/ip3/${domain}.ico`);
       loadFavicon('yandex', `/y/${domain}`, `https://favicon.yandex.net/favicon/${domain}`);
       loadFavicon('faviconso', `/f/${domain}`, `https://favicon.so/api/favicon?url=${domain}`);
       loadFavicon('vemetric', `/v/${domain}`, `https://favicon.vemetric.com/${domain}`);
       loadFavicon('favicondev', `/p/${domain}`, `https://favicon-3j1.pages.dev/favicon/${domain}`);
+      loadFaviconkit(domain, 128);
+
+      if (providersConfig.logoDev) {
+        // Show the proxy URL under the image instead of the upstream URL,
+        // so the token never leaks and users get the URL they should actually use.
+        loadFavicon('logodev', `/l/${domain}`, `${location.origin}/l/${domain}`);
+      }
+
+      const selfhstCard = document.getElementById('selfhst-card');
+      const selfhstHint = document.getElementById('selfhst-hint');
+      if (selfhstToggle.checked) {
+        selfhstCard.style.display = '';
+        const slug = deriveServiceSlug(domain);
+        selfhstHint.textContent = slug ? `lookup as "${slug}"` : '';
+        if (slug) {
+          currentSelfhstSlug = slug;
+          currentSelfhstVariant = 'color';
+          resetSelfhstVariantButtons();
+          setActiveVariant('color');
+          loadSelfhst(slug, 'color', { hideOnError: true });
+          probeAndShowSelfhstVariants(slug);
+        }
+      } else {
+        selfhstCard.style.display = 'none';
+        selfhstHint.textContent = '';
+      }
+    }
+
+    function runServiceSearch(rawSlug) {
+      const slug = deriveServiceSlug(rawSlug);
+      if (!slug) return;
+
+      currentMode = 'service';
+      currentService = slug;
+      currentDomain = '';
+
+      document.getElementById('api-example').textContent = `${location.origin}/sh/${slug}`;
+      document.getElementById('json-button-wrap').classList.remove('visible');
+      document.getElementById('results').classList.add('visible');
+
+      showCardsByType('service');
+
+      const selfhstCard = document.getElementById('selfhst-card');
+      selfhstCard.style.display = '';
+      document.getElementById('selfhst-hint').textContent = `service-only lookup`;
+
+      currentSelfhstSlug = slug;
+      currentSelfhstVariant = 'color';
+      resetSelfhstVariantButtons();
+      setActiveVariant('color');
+      loadSelfhst(slug, 'color', { hideOnError: false });
+      probeAndShowSelfhstVariants(slug);
     }
 
     function loadGoogle(domain, size) {
-      loadFavicon('google', `/g/${size}/${domain}`, `https://www.google.com/s2/favicons?domain=${domain}&sz=${size}`);
+      if (size === 256) {
+        const src = `https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${domain}&size=256`;
+        loadFavicon('google', `/g2/256/${domain}`, src);
+      } else {
+        loadFavicon('google', `/g/${size}/${domain}`, `https://www.google.com/s2/favicons?domain=${domain}&sz=${size}`);
+      }
+    }
+
+    function loadFaviconkit(domain, size) {
+      loadFavicon('faviconkit', `/k/${size}/${domain}`, `https://ico.faviconkit.net/favicon/${domain}?sz=${size}`);
+    }
+
+    function selfhstProxyPath(slug, variant) {
+      const base = `/sh/${slug}`;
+      return variant === 'color' ? base : `${base}?variant=${variant}`;
+    }
+
+    function selfhstSourceUrl(slug, variant) {
+      const suffix = variant === 'light' ? '-light' : variant === 'dark' ? '-dark' : '';
+      return `https://cdn.jsdelivr.net/gh/selfhst/icons/png/${slug}${suffix}.png`;
+    }
+
+    function loadSelfhst(slug, variant, opts) {
+      const hideOnError = !!(opts && opts.hideOnError);
+      const proxyUrl = selfhstProxyPath(slug, variant);
+      const sourceUrl = selfhstSourceUrl(slug, variant);
+
+      const img = document.getElementById('selfhst-img');
+      const spinner = document.getElementById('selfhst-spinner');
+      const meta = document.getElementById('selfhst-meta');
+      const card = document.getElementById('selfhst-card');
+      const display = document.getElementById('selfhst-display');
+      const unavailable = document.getElementById('selfhst-unavailable');
+
+      display.classList.remove('variant-light', 'variant-dark');
+      if (variant === 'light') display.classList.add('variant-light');
+      else if (variant === 'dark') display.classList.add('variant-dark');
+
+      card.style.display = '';
+      img.style.display = 'none';
+      unavailable.style.display = 'none';
+      spinner.style.display = 'block';
+      meta.textContent = '';
+
+      const imgEl = new Image();
+      imgEl.crossOrigin = 'anonymous';
+      imgEl.onload = () => {
+        if (currentSelfhstSlug !== slug || currentSelfhstVariant !== variant) return;
+        img.src = imgEl.src;
+        img.style.display = 'block';
+        spinner.style.display = 'none';
+        display.dataset.proxyUrl = `${location.origin}${proxyUrl}`;
+
+        const escapedUrl = escapeHtml(sourceUrl);
+        meta.innerHTML =
+          `<span class="dimensions">${imgEl.naturalWidth}x${imgEl.naturalHeight}</span>` +
+          `<a class="src-url" href="${escapedUrl}" target="_blank" rel="noopener" title="${escapedUrl}">${escapedUrl}</a>` +
+          `<button class="copy-btn" type="button" title="Copy source URL" aria-label="Copy source URL">${COPY_ICON_SVG}</button>`;
+        const copyBtn = meta.querySelector('.copy-btn');
+        copyBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          copySource(copyBtn, sourceUrl);
+        });
+      };
+      imgEl.onerror = () => {
+        if (currentSelfhstSlug !== slug || currentSelfhstVariant !== variant) return;
+        spinner.style.display = 'none';
+        if (hideOnError) {
+          card.style.display = 'none';
+        } else {
+          unavailable.textContent = variant === 'color' ? 'icon not available' : 'variant not available';
+          unavailable.style.display = 'block';
+          delete display.dataset.proxyUrl;
+        }
+      };
+      imgEl.src = proxyUrl;
+    }
+
+    function switchSelfhstVariant(variant) {
+      if (!currentSelfhstSlug) return;
+      currentSelfhstVariant = variant;
+      setActiveVariant(variant);
+      loadSelfhst(currentSelfhstSlug, variant, { hideOnError: false });
+    }
+
+    function setActiveVariant(variant) {
+      document.querySelectorAll('#selfhst-variants .size-btn').forEach((btn) => {
+        btn.classList.toggle('active', btn.dataset.variant === variant);
+      });
+    }
+
+    function resetSelfhstVariantButtons() {
+      document.querySelectorAll('#selfhst-variants .size-btn').forEach((btn) => {
+        btn.style.display = btn.dataset.variant === 'color' ? '' : 'none';
+      });
+    }
+
+    function probeSelfhstVariant(slug, variant) {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve(true);
+        img.onerror = () => resolve(false);
+        img.src = selfhstProxyPath(slug, variant);
+      });
+    }
+
+    async function probeAndShowSelfhstVariants(slug) {
+      const variants = ['light', 'dark'];
+      await Promise.all(
+        variants.map(async (variant) => {
+          const ok = await probeSelfhstVariant(slug, variant);
+          if (currentSelfhstSlug !== slug) return;
+          const btn = document.querySelector(`#selfhst-variants .size-btn[data-variant="${variant}"]`);
+          if (btn) btn.style.display = ok ? '' : 'none';
+        })
+      );
     }
 
     function loadFavicon(id, proxyUrl, sourceUrl) {
       const img = document.getElementById(`${id}-img`);
       const spinner = document.getElementById(`${id}-spinner`);
       const meta = document.getElementById(`${id}-meta`);
+      const card = img.closest('.card');
 
+      if (card) card.style.display = '';
       img.style.display = 'none';
       spinner.style.display = 'block';
       meta.textContent = '';
@@ -579,11 +1050,22 @@
         spinner.style.display = 'none';
         const fullProxyUrl = `${location.origin}${proxyUrl}`;
         img.closest('.favicon-display').dataset.proxyUrl = fullProxyUrl;
-        meta.innerHTML = `<span class="dimensions">${imgEl.naturalWidth}x${imgEl.naturalHeight}</span> ${sourceUrl}`;
+
+        const escapedUrl = escapeHtml(sourceUrl);
+        meta.innerHTML =
+          `<span class="dimensions">${imgEl.naturalWidth}x${imgEl.naturalHeight}</span>` +
+          `<a class="src-url" href="${escapedUrl}" target="_blank" rel="noopener" title="${escapedUrl}">${escapedUrl}</a>` +
+          `<button class="copy-btn" type="button" title="Copy source URL" aria-label="Copy source URL">${COPY_ICON_SVG}</button>`;
+        const copyBtn = meta.querySelector('.copy-btn');
+        copyBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          copySource(copyBtn, sourceUrl);
+        });
       };
       imgEl.onerror = () => {
         spinner.style.display = 'none';
-        meta.innerHTML = '<span class="error-text">Failed to load</span>';
+        if (card) card.style.display = 'none';
       };
       imgEl.src = proxyUrl;
     }
@@ -595,12 +1077,19 @@
     function switchGoogleSize(size) {
       if (!currentDomain) return;
       currentGoogleSize = size;
-      setActiveSize(size);
+      setActiveSize('google-sizes', size);
       loadGoogle(currentDomain, size);
     }
 
-    function setActiveSize(size) {
-      document.querySelectorAll('#google-sizes .size-btn').forEach((btn) => {
+    function switchFaviconkitSize(size) {
+      if (!currentDomain) return;
+      currentFaviconkitSize = size;
+      setActiveSize('faviconkit-sizes', size);
+      loadFaviconkit(currentDomain, size);
+    }
+
+    function setActiveSize(groupId, size) {
+      document.querySelectorAll(`#${groupId} .size-btn`).forEach((btn) => {
         btn.classList.toggle('active', parseInt(btn.textContent) === size);
       });
     }
@@ -627,6 +1116,30 @@
         const toast = display.querySelector('.copied-toast');
         toast.classList.add('show');
         setTimeout(() => toast.classList.remove('show'), 1200);
+      } catch {
+        /* clipboard API not available */
+      }
+    }
+
+    let globalToastTimer = null;
+    function showGlobalToast(url) {
+      const toast = document.getElementById('global-toast');
+      const urlEl = document.getElementById('global-toast-url');
+      if (!toast) return;
+      urlEl.textContent = url || '';
+      urlEl.style.display = url ? '' : 'none';
+      toast.classList.add('show');
+      if (globalToastTimer) clearTimeout(globalToastTimer);
+      globalToastTimer = setTimeout(() => toast.classList.remove('show'), 2000);
+    }
+
+    async function copySource(btn, url) {
+      if (!url) return;
+      try {
+        await navigator.clipboard.writeText(url);
+        btn.classList.add('copied');
+        setTimeout(() => btn.classList.remove('copied'), 1200);
+        showGlobalToast(url);
       } catch {
         /* clipboard API not available */
       }
