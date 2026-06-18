@@ -410,6 +410,44 @@
       fill: currentColor;
     }
 
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.8rem;
+    }
+
+    .card-header h3 { margin-bottom: 0; }
+
+    .refresh-btn {
+      background: transparent;
+      border: 1px solid #d4cfc9;
+      border-radius: 5px;
+      padding: 0.25rem 0.4rem;
+      cursor: pointer;
+      color: #8a8480;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    .refresh-btn:hover {
+      border-color: #5b2e7e;
+      color: #5b2e7e;
+      background: rgba(91, 46, 126, 0.06);
+    }
+
+    .refresh-btn svg {
+      width: 14px;
+      height: 14px;
+      fill: currentColor;
+    }
+
+    .refresh-btn.spinning svg {
+      animation: spin 0.7s linear infinite;
+    }
+
     .spinner {
       width: 28px;
       height: 28px;
@@ -563,7 +601,12 @@
     <div class="results" id="results">
       <!-- Scraper -->
       <div class="card" data-card-type="domain">
-        <h3>HTML Scraper</h3>
+        <div class="card-header">
+          <h3>HTML Scraper</h3>
+          <button class="refresh-btn" id="scraper-refresh-btn" onclick="refreshScraper()" title="Refresh icon (bypass cache)">
+            <svg viewBox="0 0 16 16"><path d="M11.534 7h3.932a.25.25 0 0 1 .192.41l-1.966 2.36a.25.25 0 0 1-.384 0l-1.966-2.36a.25.25 0 0 1 .192-.41zm-11 2H4.466a.25.25 0 0 0 .192-.41L2.692 6.23a.25.25 0 0 0-.384 0L.342 8.59A.25.25 0 0 0 .534 9z"/><path fill-rule="evenodd" d="M8 3c-1.552 0-2.94.707-3.857 1.818a.5.5 0 1 1-.771-.636A6.002 6.002 0 0 1 13.917 7H12.9A5.002 5.002 0 0 0 8 3zM3.1 9a5.002 5.002 0 0 0 8.757 2.182.5.5 0 1 1 .771.636A6.002 6.002 0 0 1 2.083 9H3.1z"/></svg>
+          </button>
+        </div>
         <div class="favicon-display" id="scraper-display" onclick="copyImage(this)">
           <div class="spinner" id="scraper-spinner" style="display:none"></div>
           <img id="scraper-img" style="display:none" alt="Scraped favicon">
@@ -1052,8 +1095,17 @@
       });
     }
 
-    function loadScraperFavicon(domain) {
-      loadFavicon('scraper', `/s/${domain}`, `${location.origin}/s/${domain}`);
+    function loadScraperFavicon(domain, refresh) {
+      const proxyUrl = refresh ? `/s/${domain}?refresh=1` : `/s/${domain}`;
+      loadFavicon('scraper', proxyUrl, `${location.origin}/s/${domain}`);
+    }
+
+    function refreshScraper() {
+      if (!currentDomain) return;
+      const btn = document.getElementById('scraper-refresh-btn');
+      btn.classList.add('spinning');
+      loadScraperFavicon(currentDomain, true);
+      setTimeout(() => btn.classList.remove('spinning'), 1200);
     }
 
     function loadFavicon(id, proxyUrl, sourceUrl) {
