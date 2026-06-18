@@ -17,4 +17,4 @@ ENV NODE_ENV=production
 ENV CACHE_DIR=/cache
 EXPOSE 3000
 ENTRYPOINT ["/docker-entrypoint.sh"]
-CMD ["node", "--dns-result-order=ipv4first", "src/index.js"]
+CMD ["node", "--dns-result-order=ipv4first", "src/cluster.js"]

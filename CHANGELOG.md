@@ -51,8 +51,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - HTML Scraper card shows the **proxy URL** (`/s/{domain}`) under the icon — the URL to use in apps — not the scraped site's homepage.
 - **`upstreamFetch` module** (`src/upstreamFetch.js`)
   - Shared IPv4-only undici `fetch` wrapper with an optional HTTP/1.1 dispatcher (`allowH2: false`) for scraper retries against origins that reject HTTP/2 from datacenter IPs.
+- **Cluster mode** (`src/cluster.js`)
+  - New entrypoint that forks one worker per CPU core using Node's built-in `cluster` module; the Docker `CMD` now boots `src/cluster.js` instead of `src/index.js`.
+  - Crashed workers are automatically respawned with a log line.
+  - Configurable via the new `WORKERS` environment variable; defaults to `os.cpus().length`. Set `WORKERS=1` to run as a single process (clustering disabled). Note: in Docker, `os.cpus()` reports the host's core count rather than the container's CPU limit — set `WORKERS` explicitly when constraining CPU.
+- **Performance / concurrency configuration**
+  - New `UV_THREADPOOL_SIZE` (default `16` in `docker-compose.yml` and `.env.example`) raises Node's libuv thread pool above the built-in default of `4`, giving more headroom for parallel disk I/O (cache reads/writes) and DNS lookups under load.
+  - New `PICK_HEAD_START_MS` (default `150` ms) controls the head-start given to the preferred provider in the new parallel `/{domain}` race (see "Changed" below).
+  - New `SCRAPER_PROBE_BATCH_SIZE` (default `4`) controls how many HTML scraper icon candidates are probed in parallel per batch.
 - **Configuration**
-  - New `DEFAULT_PROVIDER` environment variable to set the default (first-tried) provider for `/{domain}` requests. Valid values: `scraper`, `google`, `googlev2`, `duckduckgo`, `yandex`, `faviconso`, `vemetric`, `favicondev`, `faviconkit`, `logodev`, `selfhst`. Remaining providers are used as fallback in the standard order. Logs a warning at startup when an invalid value is supplied.
+  - New `DEFAULT_PROVIDER` environment variable to set the preferred provider for `/{domain}` requests. Valid values: `scraper`, `google`, `googlev2`, `duckduckgo`, `yandex`, `faviconso`, `vemetric`, `favicondev`, `faviconkit`, `logodev`, `selfhst`. Other providers race in parallel after the head-start window. Logs a warning at startup when an invalid value is supplied.
   - New `LOGODEV_TOKEN` environment variable, documented in `README.md`, `.env.example` and `docker-compose.yml`.
 - **Documentation**
   - `README.md` rewritten to cover all new endpoints, the size matrix per provider, the selfhst lookup, the `/providers` endpoint, and the `LOGODEV_TOKEN` variable.
@@ -65,6 +73,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `docker-compose.yml` supports local development via `build: .` (comment out for the published `ghcr.io/r0gger/maflplus-favicon-api:latest` image).
 - Best-pick (`/{domain}`) now scrapes the source site first, falling back to network providers only when scraping does not yield a usable icon — typically improving icon quality and resilience for self-hosted/private domains.
+- **Best-pick (`/{domain}`) races providers in parallel** instead of trying them strictly sequentially.
+  - The preferred provider (first in priority order, typically `DEFAULT_PROVIDER`) is started immediately; the remaining providers start after `PICK_HEAD_START_MS` (default 150 ms) — or sooner if the preferred provider has already failed.
+  - The first successful response wins via `Promise.any`. Cache-miss latency for `/{domain}` drops from "worst-case ~5–10 s across providers" to "roughly the fastest provider's response time".
+  - `DEFAULT_PROVIDER` is still honoured under good network conditions thanks to the head-start, but a slow or failing favorite no longer blocks the response.
+- **HTML scraper probes candidates in parallel** (`probeScraperCandidates` in `src/providers.js`).
+  - Variant groups (sorted `NxN` CDN paths) are processed concurrently, while the sequential size-jump heuristic inside each group is preserved.
+  - Loose candidates are probed in parallel batches (default 4 at a time, via `SCRAPER_PROBE_BATCH_SIZE`).
+- **`MEMORY_CACHE_MAX` default raised from `500` to `2000`** entries per worker — higher in-memory cache hit ratio for deployments serving many distinct domains. Memory cost is per-worker (each cluster worker has its own LRU).
 - Node process sets `dns.setDefaultResultOrder('ipv4first')` at startup; Docker image passes `--dns-result-order=ipv4first` for additional IPv4 preference on upstream DNS resolution.
 - **`/{domain}/json` scraper `source` field** — reports the cached upstream asset URL when available, instead of always `https://{domain}/`.
 - Static `index.html` is served with `Cache-Control: no-cache` so UI fixes apply immediately after redeploy without a hard browser refresh.
@@ -88,6 +104,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `cache.del()` added for per-entry cache invalidation (used by `/s/{domain}?refresh=1`).
 - HTML scraper upstream requests routed through `src/upstreamFetch.js` instead of global `fetch`.
 - Disk cache metadata now persists the upstream `url` for scraper entries (used by `X-Favicon-Url` and `/{domain}/json`).
+- New `runInBatches` helper in `src/providers.js` for bounded-parallel iteration with `Promise.allSettled` semantics.
+- Disk cache directory (`/cache`) is shared across cluster workers; each worker keeps its own in-process LRU memory cache.
 
 ---
 

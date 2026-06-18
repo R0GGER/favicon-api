@@ -3,7 +3,7 @@ const fs = require('fs/promises');
 const path = require('path');
 
 const CACHE_DIR = process.env.CACHE_DIR || './cache';
-const MEMORY_MAX = parseInt(process.env.MEMORY_CACHE_MAX || '500', 10);
+const MEMORY_MAX = parseInt(process.env.MEMORY_CACHE_MAX || '2000', 10);
 const MEMORY_TTL = parseInt(process.env.MEMORY_CACHE_TTL || '3600', 10) * 1000;
 const DISK_TTL = parseInt(process.env.DISK_CACHE_TTL || '86400', 10) * 1000;
 

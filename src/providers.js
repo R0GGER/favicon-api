@@ -135,6 +135,23 @@ function dedupeCandidates(candidates) {
 // (e.g. redditstatic.com/shreddit/assets/favicon/).
 const MAX_FAVICON_SIZE_JUMP = 2.5;
 
+const SCRAPER_PROBE_BATCH_SIZE = parseInt(
+  process.env.SCRAPER_PROBE_BATCH_SIZE || '4',
+  10
+);
+
+async function runInBatches(items, batchSize, worker) {
+  const results = [];
+  for (let i = 0; i < items.length; i += batchSize) {
+    const batch = items.slice(i, i + batchSize);
+    const settled = await Promise.allSettled(batch.map(worker));
+    for (const s of settled) {
+      if (s.status === 'fulfilled' && s.value) results.push(s.value);
+    }
+  }
+  return results;
+}
+
 function faviconVariantGroupKey(href) {
   const m = href.match(/^(.*\/)(\d+)x\2(\.(?:png|webp|jpe?g))(\?.*)?$/i);
   if (!m) return null;
@@ -195,24 +212,34 @@ async function probeScraperCandidates(candidates, referer, limit = 16) {
     }
   }
 
-  for (const group of variantGroups.values()) {
+  // Variant groups: process groups in parallel, but keep the sequential
+  // size-jump heuristic inside each group intact.
+  async function processGroup(group) {
     const sorted = [...group].sort(
       (a, b) => candidateDeclaredSize(a) - candidateDeclaredSize(b) || a.href.localeCompare(b.href)
     );
+    const hits = [];
     let lastWidth = 0;
     for (const candidate of sorted) {
       const hit = await probeOne(candidate);
       if (!hit) continue;
       if (lastWidth > 0 && hit.width > lastWidth * MAX_FAVICON_SIZE_JUMP) break;
       lastWidth = hit.width;
-      updateBest(hit.result, hit.width, hit.format);
+      hits.push(hit);
     }
+    return hits;
   }
 
-  for (const candidate of loose) {
-    const hit = await probeOne(candidate);
-    if (hit) updateBest(hit.result, hit.width, hit.format);
+  const groupResults = await Promise.all(
+    [...variantGroups.values()].map(processGroup)
+  );
+  for (const hits of groupResults) {
+    for (const hit of hits) updateBest(hit.result, hit.width, hit.format);
   }
+
+  // Loose candidates: probe in parallel batches.
+  const looseHits = await runInBatches(loose, SCRAPER_PROBE_BATCH_SIZE, probeOne);
+  for (const hit of looseHits) updateBest(hit.result, hit.width, hit.format);
 
   return best;
 }

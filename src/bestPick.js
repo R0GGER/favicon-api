@@ -42,6 +42,8 @@ const TRANSPARENT_1X1_PNG = Buffer.from(
   'base64'
 );
 
+const HEAD_START_MS = parseInt(process.env.PICK_HEAD_START_MS || '150', 10);
+
 async function analyzeImage(buffer) {
   try {
     const metadata = await sharp(buffer).metadata();
@@ -123,26 +125,61 @@ async function pickBest(domain) {
   if (cached) return cached;
 
   const fallbacks = buildFallbackFetchers(domain);
-
-  for (const fetcher of fallbacks) {
-    const result = await fetcher();
-    if (result && result.buffer && result.buffer.length > 0) {
-      const entry = {
-        buffer: result.buffer,
-        contentType: result.contentType,
-        provider: result.provider,
-      };
-      await cache.set('best', domain, 32, entry);
-      return entry;
-    }
+  if (fallbacks.length === 0) {
+    return {
+      buffer: TRANSPARENT_1X1_PNG,
+      contentType: 'image/png',
+      provider: 'none',
+      notFound: true,
+    };
   }
 
-  return {
-    buffer: TRANSPARENT_1X1_PNG,
-    contentType: 'image/png',
-    provider: 'none',
-    notFound: true,
-  };
+  const wrap = (fetcher) =>
+    Promise.resolve().then(fetcher).then((r) => {
+      if (!r || !r.buffer || r.buffer.length === 0) throw new Error('empty');
+      return r;
+    });
+
+  // Head-start strategy: kick off the preferred provider (first in priority
+  // order, e.g. DEFAULT_PROVIDER) immediately. Start the rest after
+  // HEAD_START_MS, or sooner if the preferred provider already failed.
+  const firstPromise = wrap(fallbacks[0]);
+  const racers = [firstPromise];
+
+  if (fallbacks.length > 1) {
+    const restTrigger = new Promise((resolve) => {
+      const timer = setTimeout(resolve, HEAD_START_MS);
+      firstPromise.then(
+        () => {},
+        () => {
+          clearTimeout(timer);
+          resolve();
+        }
+      );
+    });
+    const restPromise = restTrigger.then(() =>
+      Promise.any(fallbacks.slice(1).map(wrap))
+    );
+    racers.push(restPromise);
+  }
+
+  try {
+    const result = await Promise.any(racers);
+    const entry = {
+      buffer: result.buffer,
+      contentType: result.contentType,
+      provider: result.provider,
+    };
+    await cache.set('best', domain, 32, entry);
+    return entry;
+  } catch {
+    return {
+      buffer: TRANSPARENT_1X1_PNG,
+      contentType: 'image/png',
+      provider: 'none',
+      notFound: true,
+    };
+  }
 }
 
 async function fetchWithCache(provider, domain, size, fetcher) {
