@@ -8,16 +8,12 @@ const SCRAPER_USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 
 const STANDARD_FALLBACKS = [
-  '/favicon.ico',
   '/apple-touch-icon.png',
   '/apple-touch-icon-precomposed.png',
+  '/android-chrome-512x512.png',
 ];
 
-// CDN entry points for domains whose homepage HTML is blocked from datacenter IPs.
-const STATIC_CDN_HINTS = {
-  'reddit.com': 'https://www.redditstatic.com/shreddit/assets/favicon/64x64.png',
-  'www.reddit.com': 'https://www.redditstatic.com/shreddit/assets/favicon/64x64.png',
-};
+const STATIC_CDN_HINTS = {};
 
 const HTML_MIN_BYTES = 256;
 
@@ -44,7 +40,7 @@ function scraperDocumentHeaders(referer, dest = 'document') {
 function scraperImageHeaders(referer, url) {
   const headers = {
     'User-Agent': SCRAPER_USER_AGENT,
-    Accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+    Accept: 'image/avif,image/webp,image/apng,image/png,image/*;q=0.8',
     'Accept-Language': 'en-US,en;q=0.9',
     'Sec-Fetch-Dest': 'image',
     'Sec-Fetch-Mode': 'no-cors',
@@ -93,7 +89,7 @@ async function fetchScraperAsset(url, referer) {
 
   const minimal = {
     'User-Agent': SCRAPER_USER_AGENT,
-    Accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+    Accept: 'image/avif,image/webp,image/apng,image/png,image/*;q=0.8',
   };
   if (referer) minimal.Referer = referer;
 
@@ -364,28 +360,6 @@ function formatScore(format) {
   return 10;
 }
 
-// Probe well-known larger size variants for URLs that follow a NxN pattern,
-// e.g. .../favicon/64x64.png -> .../favicon/{128x128,192x192,256x256,512x512}.png
-// Many SPAs (Reddit, etc.) only expose a single small icon in SSR HTML while
-// larger variants exist on the same CDN path and are injected by client-side JS.
-const SIZE_VARIANTS = [128, 152, 180, 192, 256, 384, 512];
-
-function expandSizedVariants(href) {
-  const out = [];
-  const m = href.match(/^(.*\/)(\d+)x\2(\.(?:png|webp|jpe?g))(\?.*)?$/i);
-  if (!m) return out;
-  const [, prefix, currentSize, ext, qs = ''] = m;
-  const current = parseInt(currentSize, 10);
-  for (const size of SIZE_VARIANTS) {
-    if (size === current) continue;
-    out.push({
-      href: `${prefix}${size}x${size}${ext}${qs}`,
-      sizes: `${size}x${size}`,
-      type: '',
-    });
-  }
-  return out;
-}
 
 async function fetchManifestIcons(manifestUrl, referer) {
   const controller = new AbortController();
@@ -402,7 +376,11 @@ async function fetchManifestIcons(manifestUrl, referer) {
     const json = await res.json();
     if (!json || !Array.isArray(json.icons)) return [];
     return json.icons
-      .filter((icon) => icon && icon.src && !isMonochromeManifestIcon(icon))
+      .filter((icon) => {
+        if (!icon || !icon.src || isMonochromeManifestIcon(icon)) return false;
+        const size = parseSizesAttr(icon.sizes || '');
+        return size >= 512;
+      })
       .map((icon) => ({
         href: new URL(icon.src, manifestUrl).toString(),
         sizes: icon.sizes || '',
@@ -489,39 +467,6 @@ async function fetchScraperPage(domain) {
   return { html: null, finalBaseUrl: baseUrl, htmlFetchMethod: null };
 }
 
-// Some hosts (Reddit SSR from datacenter IPs) omit <link rel="icon"> but embed
-// favicon URLs in inline JSON/scripts — scan raw HTML as a fallback.
-function extractEmbeddedIconUrls(html, resolveBase) {
-  const candidates = [];
-  const seen = new Set();
-
-  function add(href, sizes = '', type = '') {
-    try {
-      const absolute = new URL(href, resolveBase).toString();
-      if (seen.has(absolute)) return;
-      seen.add(absolute);
-      candidates.push({ href: absolute, sizes, type });
-    } catch {
-      /* ignore invalid URLs */
-    }
-  }
-
-  const absRe =
-    /https?:\/\/[^\s"'<>)]+\.(?:png|webp|jpe?g|ico|svg)(?:\?[^\s"'<>)]*)?/gi;
-  for (const match of html.matchAll(absRe)) {
-    const href = match[0];
-    if (/favicon|apple-touch-icon|fluid-icon|\/icon/i.test(href)) {
-      add(href);
-    }
-  }
-
-  const nxnRe = /["']([^"']*(?:favicon|icon|assets)[^"']*\d+x\d+\.(?:png|webp|jpe?g))(?:\?[^"']*)?["']/gi;
-  for (const match of html.matchAll(nxnRe)) {
-    add(match[1]);
-  }
-
-  return candidates;
-}
 
 function parseIconCandidatesFromHtml(html, finalBaseUrl) {
   const linkCandidates = [];
@@ -538,13 +483,7 @@ function parseIconCandidatesFromHtml(html, finalBaseUrl) {
 
     const relTokens = rel.split(/\s+/);
     const isIcon = relTokens.some((r) =>
-      [
-        'icon',
-        'shortcut',
-        'apple-touch-icon',
-        'apple-touch-icon-precomposed',
-        'fluid-icon',
-      ].includes(r)
+      ['apple-touch-icon', 'apple-touch-icon-precomposed'].includes(r)
     );
     if (!isIcon) return;
 
@@ -559,13 +498,10 @@ function parseIconCandidatesFromHtml(html, finalBaseUrl) {
     }
   });
 
-  const embeddedCandidates = extractEmbeddedIconUrls(html, resolveBase);
-
   return {
-    primaryCandidates: [...linkCandidates, ...embeddedCandidates],
+    primaryCandidates: linkCandidates,
     resolveBase,
     linkCount: linkCandidates.length,
-    embeddedCount: embeddedCandidates.length,
   };
 }
 
@@ -611,12 +547,6 @@ async function buildScraperCandidates(domain, html, finalBaseUrl) {
       /* ignore */
     }
   }
-
-  const variantCandidates = [];
-  for (const c of primaryCandidates) {
-    variantCandidates.push(...expandSizedVariants(c.href));
-  }
-  primaryCandidates.push(...variantCandidates);
 
   return {
     rankedPrimary: rankCandidates(primaryCandidates),
