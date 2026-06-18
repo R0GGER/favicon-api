@@ -56,6 +56,7 @@ services:
       - MEMORY_CACHE_TTL=3600
       - DISK_CACHE_TTL=86400
       - UPSTREAM_TIMEOUT=5000
+      - LOGODEV_TOKEN=
 
 volumes:
   favicon-cache:
