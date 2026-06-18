@@ -7,7 +7,7 @@ A lightweight favicon proxy that fetches favicons from multiple providers (HTML 
 | Endpoint | Description |
 |---|---|
 | `/{domain}` | Best favicon (cascading fallback through all domain-based providers) |
-| `/s/{domain}` | HTML scraper: parses the site's `<link rel="icon">`, web manifest and standard fallbacks |
+| `/s/{domain}` | HTML scraper: parses the site's `<link rel="icon">`, web manifest and standard fallbacks. Append `?refresh=1` to bypass the cache and re-scrape (see below). |
 | `/g/{size}/{domain}` | Google favicon (sizes 16, 32, 64, 128) |
 | `/g2/{size}/{domain}` | Google v2 (`faviconV2`) favicon (sizes 16, 32, 64, 128, 256) |
 | `/d/{domain}` | DuckDuckGo favicon |
@@ -24,6 +24,12 @@ A lightweight favicon proxy that fetches favicons from multiple providers (HTML 
 | `/{domain}/json` | JSON list of every endpoint URL for the domain |
 
 **Example:** `https://your-host/github.com`
+
+**Scraper example:** `https://your-host/s/github.com`
+
+**Scraper cache bypass:** `https://your-host/s/{domain}?refresh=1`
+
+Forces a fresh scrape for that domain by clearing the cached scraper entry (memory and disk) before fetching again. Use this when a site has changed its favicon, after deploying scraper fixes, or when debugging stale results. `?nocache=1` is accepted as an alias for `?refresh=1`.
 
 **JSON example:** `https://your-host/github.com/json`
 
