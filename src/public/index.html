@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <title>MAFL+ Favicon API &ndash; Get high-resolution favicons for any domain</title>
-  <meta name="description" content="Free favicon API and web UI that fetches the highest-resolution favicon for any domain from 10+ providers (HTML scraper, Google, DuckDuckGo, Yandex, Favicon.so, Vemetric, Favicon Downloader, FaviconKit, logo.dev) plus selfh.st service icon lookup by name.">
-  <meta name="keywords" content="favicon, favicon api, favicon fetcher, favicon proxy, favicon downloader, get favicon, high resolution favicon, selfhst icons, MAFL, MAFL+, dashboard icons, homepage icons, self-hosted">
+  <meta name="description" content="Free favicon API and web UI that fetches the highest-resolution favicon for any domain from 10+ providers (HTML scraper, Google, DuckDuckGo, Yandex, Favicon.so, Vemetric, Favicon Downloader, FaviconKit, logo.dev) plus selfh.st and homarr-labs/dashboard-icons service icon lookups by name.">
+  <meta name="keywords" content="favicon, favicon api, favicon fetcher, favicon proxy, favicon downloader, get favicon, high resolution favicon, selfhst icons, homarr dashboard icons, MAFL, MAFL+, dashboard icons, homepage icons, self-hosted">
   <meta name="author" content="R0GGER">
   <meta name="robots" content="index, follow">
   <meta name="theme-color" content="#5b2e7e">
@@ -22,7 +22,7 @@
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="MAFL+ Favicon API">
   <meta property="og:title" content="MAFL+ Favicon API &ndash; Get high-resolution favicons for any domain">
-  <meta property="og:description" content="Free favicon API and web UI that fetches the highest-resolution favicon for any domain from 10+ providers, plus selfh.st service icon lookup by name.">
+  <meta property="og:description" content="Free favicon API and web UI that fetches the highest-resolution favicon for any domain from 10+ providers, plus selfh.st and homarr-labs/dashboard-icons service icon lookups by name.">
   <meta property="og:url" content="__BASE_URL__/">
   <meta property="og:image" content="__BASE_URL__/logo.png">
   <meta property="og:image:type" content="image/png">
@@ -34,7 +34,7 @@
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="MAFL+ Favicon API &ndash; Get high-resolution favicons for any domain">
-  <meta name="twitter:description" content="Free favicon API and web UI that fetches the highest-resolution favicon for any domain from 10+ providers, plus selfh.st service icon lookup by name.">
+  <meta name="twitter:description" content="Free favicon API and web UI that fetches the highest-resolution favicon for any domain from 10+ providers, plus selfh.st and homarr-labs/dashboard-icons service icon lookups by name.">
   <meta name="twitter:image" content="__BASE_URL__/logo.png">
   <meta name="twitter:image:alt" content="MAFL+ Favicon API logo">
 
@@ -45,7 +45,7 @@
     "@type": "WebApplication",
     "name": "MAFL+ Favicon API",
     "alternateName": "MAFL Plus Favicon API",
-    "description": "Free favicon API and web UI that fetches the highest-resolution favicon for any domain from 10+ providers (HTML scraper, Google, DuckDuckGo, Yandex, Favicon.so, Vemetric, Favicon Downloader, FaviconKit, logo.dev), plus selfh.st service icon lookup by name.",
+    "description": "Free favicon API and web UI that fetches the highest-resolution favicon for any domain from 10+ providers (HTML scraper, Google, DuckDuckGo, Yandex, Favicon.so, Vemetric, Favicon Downloader, FaviconKit, logo.dev), plus selfh.st and homarr-labs/dashboard-icons service icon lookups by name.",
     "url": "__BASE_URL__/",
     "image": "__BASE_URL__/logo.png",
     "applicationCategory": "DeveloperApplication",
@@ -680,8 +680,8 @@
       </div>
       <div class="search-options">
         <label for="selfhst-toggle">
-          <input type="checkbox" id="selfhst-toggle" checked onchange="toggleSelfhst()">
-          <span>Also include selfhst icon lookup<span class="hint" id="selfhst-hint"></span></span>
+          <input type="checkbox" id="selfhst-toggle" checked onchange="toggleServiceCards()">
+          <span>Also include service icon lookups (selfh.st &amp; dashboardicons.com)<span class="hint" id="selfhst-hint"></span></span>
         </label>
       </div>
       <div class="quick-links">
@@ -831,6 +831,23 @@
         </div>
         <div class="meta" id="selfhst-meta"></div>
       </div>
+
+      <!-- Dashboard Icons (homarr-labs, service-based) -->
+      <div class="card" id="dashboardicons-card" data-card-type="service">
+        <h3>Dashboard Icons (homarr)</h3>
+        <div class="favicon-display" id="dashboardicons-display" onclick="copyImage(this)">
+          <div class="spinner" id="dashboardicons-spinner" style="display:none"></div>
+          <img id="dashboardicons-img" style="display:none" alt="Dashboard Icons icon">
+          <span class="unavailable" id="dashboardicons-unavailable" style="display:none">variant not available</span>
+          <span class="copied-toast">URL copied!</span>
+        </div>
+        <div class="size-buttons" id="dashboardicons-variants">
+          <button class="size-btn active" data-variant="color" onclick="switchDashboardIconsVariant('color')">Color</button>
+          <button class="size-btn" data-variant="light" style="display:none" onclick="switchDashboardIconsVariant('light')">Light</button>
+          <button class="size-btn" data-variant="dark" style="display:none" onclick="switchDashboardIconsVariant('dark')">Dark</button>
+        </div>
+        <div class="meta" id="dashboardicons-meta"></div>
+      </div>
     </div>
 
     <div class="json-button-wrap" id="json-button-wrap">
@@ -881,6 +898,8 @@
     let currentFaviconkitSize = 128;
     let currentSelfhstSlug = '';
     let currentSelfhstVariant = 'color';
+    let currentDashboardIconsSlug = '';
+    let currentDashboardIconsVariant = 'color';
     let providersConfig = { logoDev: false, logoDevToken: null };
 
     function escapeHtml(s) {
@@ -919,7 +938,11 @@
     function deriveServiceSlug(raw) {
       if (!raw) return '';
       const first = raw.trim().toLowerCase().replace(/^https?:\/\//, '').split('/')[0].split('.')[0];
-      return first.replace(/[^a-z0-9._-]/g, '');
+      return first
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9._-]/g, '')
+        .replace(/-+/g, '-')
+        .replace(/^-+|-+$/g, '');
     }
 
     function showCardsByType(type) {
@@ -929,18 +952,21 @@
       });
     }
 
-    function toggleSelfhst() {
-      const card = document.getElementById('selfhst-card');
+    function toggleServiceCards() {
+      const selfhstCard = document.getElementById('selfhst-card');
+      const dashboardIconsCard = document.getElementById('dashboardicons-card');
       const hint = document.getElementById('selfhst-hint');
 
       if (currentMode === 'service') {
-        // In service-only mode, the selfhst card is always shown.
-        card.style.display = '';
+        // In service-only mode, both service cards are always shown.
+        selfhstCard.style.display = '';
+        dashboardIconsCard.style.display = '';
         return;
       }
 
       if (selfhstToggle.checked) {
-        card.style.display = '';
+        selfhstCard.style.display = '';
+        dashboardIconsCard.style.display = '';
         if (currentMode === 'domain' && currentDomain) {
           const slug = deriveServiceSlug(currentDomain);
           hint.textContent = slug ? `\u00a0\u2014 as "${slug}"` : '';
@@ -948,13 +974,21 @@
             currentSelfhstSlug = slug;
             currentSelfhstVariant = 'color';
             resetSelfhstVariantButtons();
-            setActiveVariant('color');
+            setActiveVariant('selfhst-variants', 'color');
             loadSelfhst(slug, 'color', { hideOnError: true });
             probeAndShowSelfhstVariants(slug);
+
+            currentDashboardIconsSlug = slug;
+            currentDashboardIconsVariant = 'color';
+            resetDashboardIconsVariantButtons();
+            setActiveVariant('dashboardicons-variants', 'color');
+            loadDashboardIcons(slug, 'color', { hideOnError: true });
+            probeAndShowDashboardIconsVariants(slug);
           }
         }
       } else {
-        card.style.display = 'none';
+        selfhstCard.style.display = 'none';
+        dashboardIconsCard.style.display = 'none';
         hint.textContent = '';
       }
     }
@@ -1006,21 +1040,31 @@
       }
 
       const selfhstCard = document.getElementById('selfhst-card');
+      const dashboardIconsCard = document.getElementById('dashboardicons-card');
       const selfhstHint = document.getElementById('selfhst-hint');
       if (selfhstToggle.checked) {
         selfhstCard.style.display = '';
+        dashboardIconsCard.style.display = '';
         const slug = deriveServiceSlug(domain);
         selfhstHint.textContent = slug ? `\u00a0\u2192 service name: "${slug}"` : '';
         if (slug) {
           currentSelfhstSlug = slug;
           currentSelfhstVariant = 'color';
           resetSelfhstVariantButtons();
-          setActiveVariant('color');
+          setActiveVariant('selfhst-variants', 'color');
           loadSelfhst(slug, 'color', { hideOnError: true });
           probeAndShowSelfhstVariants(slug);
+
+          currentDashboardIconsSlug = slug;
+          currentDashboardIconsVariant = 'color';
+          resetDashboardIconsVariantButtons();
+          setActiveVariant('dashboardicons-variants', 'color');
+          loadDashboardIcons(slug, 'color', { hideOnError: true });
+          probeAndShowDashboardIconsVariants(slug);
         }
       } else {
         selfhstCard.style.display = 'none';
+        dashboardIconsCard.style.display = 'none';
         selfhstHint.textContent = '';
       }
     }
@@ -1040,15 +1084,24 @@
       showCardsByType('service');
 
       const selfhstCard = document.getElementById('selfhst-card');
+      const dashboardIconsCard = document.getElementById('dashboardicons-card');
       selfhstCard.style.display = '';
+      dashboardIconsCard.style.display = '';
       document.getElementById('selfhst-hint').textContent = `\u00a0\u2192 service-only lookup`;
 
       currentSelfhstSlug = slug;
       currentSelfhstVariant = 'color';
       resetSelfhstVariantButtons();
-      setActiveVariant('color');
+      setActiveVariant('selfhst-variants', 'color');
       loadSelfhst(slug, 'color', { hideOnError: false });
       probeAndShowSelfhstVariants(slug);
+
+      currentDashboardIconsSlug = slug;
+      currentDashboardIconsVariant = 'color';
+      resetDashboardIconsVariantButtons();
+      setActiveVariant('dashboardicons-variants', 'color');
+      loadDashboardIcons(slug, 'color', { hideOnError: false });
+      probeAndShowDashboardIconsVariants(slug);
     }
 
     function loadGoogle(domain, size) {
@@ -1134,12 +1187,12 @@
     function switchSelfhstVariant(variant) {
       if (!currentSelfhstSlug) return;
       currentSelfhstVariant = variant;
-      setActiveVariant(variant);
+      setActiveVariant('selfhst-variants', variant);
       loadSelfhst(currentSelfhstSlug, variant, { hideOnError: false });
     }
 
-    function setActiveVariant(variant) {
-      document.querySelectorAll('#selfhst-variants .size-btn').forEach((btn) => {
+    function setActiveVariant(containerId, variant) {
+      document.querySelectorAll(`#${containerId} .size-btn`).forEach((btn) => {
         btn.classList.toggle('active', btn.dataset.variant === variant);
       });
     }
@@ -1166,6 +1219,107 @@
           const ok = await probeSelfhstVariant(slug, variant);
           if (currentSelfhstSlug !== slug) return;
           const btn = document.querySelector(`#selfhst-variants .size-btn[data-variant="${variant}"]`);
+          if (btn) btn.style.display = ok ? '' : 'none';
+        })
+      );
+    }
+
+    function dashboardIconsProxyPath(slug, variant) {
+      const base = `/di/${slug}`;
+      return variant === 'color' ? base : `${base}?variant=${variant}`;
+    }
+
+    function dashboardIconsSourceUrl(slug, variant) {
+      const suffix = variant === 'light' ? '-light' : variant === 'dark' ? '-dark' : '';
+      return `https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/${slug}${suffix}.png`;
+    }
+
+    function loadDashboardIcons(slug, variant, opts) {
+      const hideOnError = !!(opts && opts.hideOnError);
+      const proxyUrl = dashboardIconsProxyPath(slug, variant);
+      const sourceUrl = dashboardIconsSourceUrl(slug, variant);
+
+      const img = document.getElementById('dashboardicons-img');
+      const spinner = document.getElementById('dashboardicons-spinner');
+      const meta = document.getElementById('dashboardicons-meta');
+      const card = document.getElementById('dashboardicons-card');
+      const display = document.getElementById('dashboardicons-display');
+      const unavailable = document.getElementById('dashboardicons-unavailable');
+
+      display.classList.remove('variant-light', 'variant-dark');
+      if (variant === 'light') display.classList.add('variant-light');
+      else if (variant === 'dark') display.classList.add('variant-dark');
+
+      card.style.display = '';
+      img.style.display = 'none';
+      unavailable.style.display = 'none';
+      spinner.style.display = 'block';
+      meta.textContent = '';
+
+      const imgEl = new Image();
+      imgEl.crossOrigin = 'anonymous';
+      imgEl.onload = () => {
+        if (currentDashboardIconsSlug !== slug || currentDashboardIconsVariant !== variant) return;
+        img.src = imgEl.src;
+        img.style.display = 'block';
+        spinner.style.display = 'none';
+        display.dataset.proxyUrl = `${location.origin}${proxyUrl}`;
+
+        const escapedUrl = escapeHtml(sourceUrl);
+        meta.innerHTML =
+          `<span class="dimensions">${imgEl.naturalWidth}x${imgEl.naturalHeight}</span>` +
+          `<a class="src-url" href="${escapedUrl}" target="_blank" rel="noopener" title="${escapedUrl}">${escapedUrl}</a>` +
+          `<button class="copy-btn" type="button" title="Copy source URL" aria-label="Copy source URL">${COPY_ICON_SVG}</button>`;
+        const copyBtn = meta.querySelector('.copy-btn');
+        copyBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          copySource(copyBtn, sourceUrl);
+        });
+      };
+      imgEl.onerror = () => {
+        if (currentDashboardIconsSlug !== slug || currentDashboardIconsVariant !== variant) return;
+        spinner.style.display = 'none';
+        if (hideOnError) {
+          card.style.display = 'none';
+        } else {
+          unavailable.textContent = variant === 'color' ? 'icon not available' : 'variant not available';
+          unavailable.style.display = 'block';
+          delete display.dataset.proxyUrl;
+        }
+      };
+      imgEl.src = proxyUrl;
+    }
+
+    function switchDashboardIconsVariant(variant) {
+      if (!currentDashboardIconsSlug) return;
+      currentDashboardIconsVariant = variant;
+      setActiveVariant('dashboardicons-variants', variant);
+      loadDashboardIcons(currentDashboardIconsSlug, variant, { hideOnError: false });
+    }
+
+    function resetDashboardIconsVariantButtons() {
+      document.querySelectorAll('#dashboardicons-variants .size-btn').forEach((btn) => {
+        btn.style.display = btn.dataset.variant === 'color' ? '' : 'none';
+      });
+    }
+
+    function probeDashboardIconsVariant(slug, variant) {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve(true);
+        img.onerror = () => resolve(false);
+        img.src = dashboardIconsProxyPath(slug, variant);
+      });
+    }
+
+    async function probeAndShowDashboardIconsVariants(slug) {
+      const variants = ['light', 'dark'];
+      await Promise.all(
+        variants.map(async (variant) => {
+          const ok = await probeDashboardIconsVariant(slug, variant);
+          if (currentDashboardIconsSlug !== slug) return;
+          const btn = document.querySelector(`#dashboardicons-variants .size-btn[data-variant="${variant}"]`);
           if (btn) btn.style.display = ok ? '' : 'none';
         })
       );

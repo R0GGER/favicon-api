@@ -318,6 +318,10 @@ const PROVIDERS = {
     const suffix = variant === 'light' ? '-light' : variant === 'dark' ? '-dark' : '';
     return `https://cdn.jsdelivr.net/gh/selfhst/icons/png/${encodeURIComponent(service)}${suffix}.png`;
   },
+  dashboardIcons: (service, variant = 'color') => {
+    const suffix = variant === 'light' ? '-light' : variant === 'dark' ? '-dark' : '';
+    return `https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/${encodeURIComponent(service)}${suffix}.png`;
+  },
 };
 
 async function fetchFavicon(url, requestHeaders) {
@@ -405,6 +409,12 @@ async function fetchSelfhst(service, variant = 'color') {
   const url = PROVIDERS.selfhst(service, variant);
   const result = await fetchFavicon(url);
   return result ? { ...result, provider: 'selfhst' } : null;
+}
+
+async function fetchDashboardIcons(service, variant = 'color') {
+  const url = PROVIDERS.dashboardIcons(service, variant);
+  const result = await fetchFavicon(url);
+  return result ? { ...result, provider: 'dashboardicons' } : null;
 }
 
 // Parse "16x16" / "32x32 64x64" sizes attribute, return largest square dimension or 0.
@@ -820,6 +830,7 @@ module.exports = {
   fetchFaviconkit,
   fetchLogoDev,
   fetchSelfhst,
+  fetchDashboardIcons,
   fetchScraper,
   fetchScraperAsset,
   fetchBesticonAllIcons,

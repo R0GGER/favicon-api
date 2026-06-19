@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **homarr-labs/dashboard-icons lookup** (`/di/{service}`)
+  - New service-name lookup against the [homarr-labs/dashboard-icons](https://github.com/homarr-labs/dashboard-icons) catalog via `cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/...`.
+  - Supports `?variant=color|light|dark` with the same `-light` / `-dark` suffix convention used for `/sh/`. Color variant uses the bare slug (`/di/jellyfin` → `png/jellyfin.png`); light/dark map to `png/{slug}-light.png` and `png/{slug}-dark.png`.
+  - Service slug validation reused from `/sh/`: lowercase alphanumerics with `.`, `_`, `-`.
+  - Returns HTTP 404 when the upstream icon does not exist (caches the negative result through the existing on-disk cache layer).
+  - New `dashboardicons` cache provider key + `fetchDashboardIcons(service, variant)` exported from `src/providers.js`; `PROVIDERS.dashboardIcons(service, variant)` builds the upstream URL.
+  - `/{domain}/json` now exposes the new source alongside `selfhst` under `endpoints.dashboardicons` (same shape: `service`, `proxy`, `source`, `variants.{color,light,dark}.{proxy,source}`). `null`-valued fields when the domain has no usable slug (i.e. no first label).
+  - **Best-pick cascade** (`/{domain}`): `dashboardicons` is added to the candidate set when a domain has a derivable service slug, and is a valid value for `DEFAULT_PROVIDER`. `.env.example`, `README.md` and the Environment Variables table updated to list the new value.
+  - **Web UI**: new "Dashboard Icons (homarr)" card rendered side-by-side with the selfh.st card under the same `data-card-type="service"` group and the same color/light/dark variant probe pipeline (variant buttons auto-hide when the upstream variant does not exist). The existing search-options checkbox now controls both service-icon lookups (relabelled to "Also include service icon lookups (selfh.st & Dashboard Icons)") and the meta description / Open Graph / Twitter Card / JSON-LD description / keywords in `<head>` mention both catalogs for SEO.
 - **SEO: `/robots.txt`, `/sitemap.xml` and a templated homepage**
   - New `GET /robots.txt` route serves an allow-list: only the homepage and the three static assets (`/favicon.png`, `/logo.png`, `/sitemap.xml`) are indexable; everything else (the `/g/...`, `/g2/...`, `/d/...`, `/y/...`, `/f/...`, `/v/...`, `/p/...`, `/k/...`, `/l/...`, `/s/...`, `/sh/...`, `/s-asset`, `/providers`, `/{domain}` and `/{domain}/json` endpoints) is disallowed so search engines don't enumerate the unbounded favicon URL space. The `Sitemap:` directive is auto-built from `${req.protocol}://${req.get('host')}`.
   - New `GET /sitemap.xml` route returns a single-URL sitemap pointing at the homepage, with `<loc>` derived from the request host (so it picks up the public origin behind any reverse proxy via the existing `trust proxy` setting; no env var required).

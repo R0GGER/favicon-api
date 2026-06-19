@@ -1,6 +1,6 @@
 # MAFL+ Favicon API
 
-A lightweight favicon proxy that fetches favicons from multiple providers (HTML scraper, Google, Google v2, DuckDuckGo, Yandex, Favicon.so, Vemetric, Favicon-3j1, Faviconkit, logo.dev) plus a service-name lookup against the [selfhst icons](https://github.com/selfhst/icons) catalog. Includes a web UI and a simple API to grab any website's favicon.
+A lightweight favicon proxy that fetches favicons from multiple providers (HTML scraper, Google, Google v2, DuckDuckGo, Yandex, Favicon.so, Vemetric, Favicon-3j1, Faviconkit, logo.dev) plus service-name lookups against the [selfhst icons](https://github.com/selfhst/icons) and [homarr-labs/dashboard-icons](https://github.com/homarr-labs/dashboard-icons) catalogs. Includes a web UI and a simple API to grab any website's favicon.
 
 ## API
 
@@ -19,7 +19,8 @@ A lightweight favicon proxy that fetches favicons from multiple providers (HTML 
 | `/p/{domain}` | Favicon-3j1 favicon |
 | `/k/{size}/{domain}` | Faviconkit favicon (sizes 16, 32, 64, 128, 256) |
 | `/l/{domain}` | logo.dev logo (requires `LOGODEV_TOKEN`, otherwise returns 503) |
-| `/sh/{service}` | [selfhst icons](https://github.com/selfhst/icons) lookup by service name (e.g. `/sh/jellyfin`) |
+| `/sh/{service}` | [selfhst icons](https://github.com/selfhst/icons) lookup by service name (e.g. `/sh/jellyfin`). Supports `?variant=color\|light\|dark`. |
+| `/di/{service}` | [homarr-labs/dashboard-icons](https://github.com/homarr-labs/dashboard-icons) lookup by service name (e.g. `/di/jellyfin`). Supports `?variant=color\|light\|dark`. |
 | `/s-asset?url=...` | Server-side asset proxy used by the web UI to render every icon discovered by the scraper/besticon. Cached on disk + LRU keyed by SHA-1 of the URL; SSRF-guarded against localhost / private IPv4 ranges and link-local / ULA IPv6; only `http(s)` and a max URL length of 2048. Useful for upstream icons whose CDN blocks direct browser `<img>` loads via Referer/UA filtering. |
 | `/providers` | JSON config indicating which optional providers are enabled |
 | `/{domain}/json` | JSON list of every endpoint URL for the domain |
@@ -40,7 +41,9 @@ When `BESTICON_URL` is set, the JSON output also exposes every icon besticon fou
 
 **selfhst example:** `https://your-host/sh/jellyfin`
 
-The web UI accepts both a domain (e.g. `example.com`) and a bare service name without a TLD (e.g. `radarr`, `sonarr`); when no dot is present the input is treated as a selfhst service name and only the selfhst icon card is shown.
+**Dashboard Icons example:** `https://your-host/di/jellyfin`
+
+The web UI accepts both a domain (e.g. `example.com`) and a bare service name without a TLD (e.g. `radarr`, `sonarr`); when no dot is present the input is treated as a service-icon name and the selfh.st and Dashboard Icons (homarr) cards are shown side-by-side. The "Also include service icon lookups" toggle controls whether they are also probed for domain searches (derived slug = first label of the domain).
 
 ## SEO
 
@@ -159,5 +162,5 @@ Then use the host path in your `docker-compose.yml`:
 | `PICK_HEAD_START_MS` | `150` | Head-start (ms) given to the preferred provider in `/{domain}` requests. The first provider in priority order (typically `DEFAULT_PROVIDER`) starts immediately; the remaining providers start after this delay (or sooner if the preferred provider already failed). Lower = more parallel/faster fallback but more wasted upstream calls; higher = stronger preference for the favored provider. |
 | `SCRAPER_PROBE_BATCH_SIZE` | `4` | Number of HTML scraper icon candidates probed in parallel per batch (in `/s/{domain}` and as part of `/{domain}`). Higher values speed up scraping of sites with many `<link rel="icon">` entries but increase concurrent upstream load. |
 | `LOGODEV_TOKEN` | _(unset)_ | Optional [logo.dev](https://www.logo.dev/) publishable key. When unset, `/l/{domain}` returns 503 and the logo.dev card is hidden in the UI. |
-| `DEFAULT_PROVIDER` | _(unset)_ | Optional preferred provider for `/{domain}` requests. Since providers are now raced in parallel, this provider gets a `PICK_HEAD_START_MS` ms head-start over the others — so it usually wins when reachable, but a slow/failing favorite no longer blocks the response. Valid values: `scraper`, `google`, `googlev2`, `duckduckgo`, `yandex`, `faviconso`, `vemetric`, `favicondev`, `faviconkit`, `logodev`, `selfhst`. Note: `logodev` requires `LOGODEV_TOKEN`. |
+| `DEFAULT_PROVIDER` | _(unset)_ | Optional preferred provider for `/{domain}` requests. Since providers are now raced in parallel, this provider gets a `PICK_HEAD_START_MS` ms head-start over the others — so it usually wins when reachable, but a slow/failing favorite no longer blocks the response. Valid values: `scraper`, `google`, `googlev2`, `duckduckgo`, `yandex`, `faviconso`, `vemetric`, `favicondev`, `faviconkit`, `logodev`, `selfhst`, `dashboardicons`. Note: `logodev` requires `LOGODEV_TOKEN`. |
 | `BESTICON_URL` | _(unset)_ | Optional base URL of a sidecar [besticon](https://github.com/mat/besticon) instance (e.g. `http://besticon:8080`). When set, `/s/{domain}` first asks besticon's `/allicons.json?url={domain}` for the icon list, then probes/picks the best one locally. Falls back to the built-in HTML scraper when besticon is unreachable or returns no candidates. The bundled `docker-compose.yml` runs besticon as an internal-only service (no exposed port; its frontend at `/` is not publicly reachable). |

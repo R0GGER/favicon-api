@@ -18,6 +18,7 @@ const {
   fetchFaviconkit,
   fetchLogoDev,
   fetchSelfhst,
+  fetchDashboardIcons,
   fetchScraper,
   fetchScraperAsset,
   fetchScraperAllIcons,
@@ -116,6 +117,7 @@ const VALID_GOOGLEV2_SIZES = new Set([16, 32, 64, 128, 256]);
 const VALID_FAVICONKIT_SIZES = new Set([16, 32, 64, 128, 256]);
 const VALID_VEMETRIC_FORMATS = new Set(['png', 'jpg', 'webp']);
 const VALID_SELFHST_VARIANTS = new Set(['color', 'light', 'dark']);
+const VALID_DASHBOARDICONS_VARIANTS = new Set(['color', 'light', 'dark']);
 const SERVICE_SLUG_RE = /^[a-z0-9][a-z0-9._-]*$/;
 const CACHE_CONTROL = 'public, max-age=86400';
 
@@ -134,10 +136,20 @@ function extractDomain(raw) {
   return domain;
 }
 
+function normalizeServiceSlug(raw) {
+  if (!raw || typeof raw !== 'string') return '';
+  return raw
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9._-]/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 function extractService(raw) {
-  if (!raw || typeof raw !== 'string') return null;
-  const slug = raw.trim().toLowerCase();
-  if (!SERVICE_SLUG_RE.test(slug)) return null;
+  const slug = normalizeServiceSlug(raw);
+  if (!slug || !SERVICE_SLUG_RE.test(slug)) return null;
   return slug;
 }
 
@@ -387,6 +399,32 @@ app.get('/sh/:service', async (req, res) => {
   }
 });
 
+// homarr-labs/dashboard-icons (service-name based): /di/:service[?variant=color|light|dark]
+app.get('/di/:service', async (req, res) => {
+  const service = extractService(req.params.service);
+  if (!service) return res.status(400).json({ error: 'Invalid service name.' });
+
+  const variant = (req.query.variant || 'color').toString().toLowerCase();
+  if (!VALID_DASHBOARDICONS_VARIANTS.has(variant)) {
+    return res.status(400).json({ error: 'Invalid variant. Use color, light, or dark.' });
+  }
+
+  try {
+    const cacheKey = variant === 'color' ? null : variant;
+    const entry = await fetchWithCache(
+      'dashboardicons',
+      service,
+      cacheKey,
+      () => fetchDashboardIcons(service, variant)
+    );
+    if (!entry) return res.status(404).json({ error: 'Service icon not found.' });
+    sendFavicon(res, entry);
+  } catch (err) {
+    console.error('Dashboard Icons proxy error:', err.message);
+    res.status(500).json({ error: 'Internal error.' });
+  }
+});
+
 // Provider availability/config: /providers
 app.get('/providers', (req, res) => {
   res.set('Cache-Control', 'no-store');
@@ -459,24 +497,46 @@ app.get('/:domain/json', async (req, res) => {
     return SERVICE_SLUG_RE.test(slug) ? slug : null;
   })();
 
-  const selfhstSlugEncoded = serviceSlug ? encodeURIComponent(serviceSlug) : null;
+  const serviceSlugEncoded = serviceSlug ? encodeURIComponent(serviceSlug) : null;
   const selfhst = serviceSlug
     ? {
         service: serviceSlug,
-        proxy: `${host}/sh/${selfhstSlugEncoded}`,
+        proxy: `${host}/sh/${serviceSlugEncoded}`,
         source: PROVIDERS.selfhst(serviceSlug),
         variants: {
           color: {
-            proxy: `${host}/sh/${selfhstSlugEncoded}`,
+            proxy: `${host}/sh/${serviceSlugEncoded}`,
             source: PROVIDERS.selfhst(serviceSlug, 'color'),
           },
           light: {
-            proxy: `${host}/sh/${selfhstSlugEncoded}?variant=light`,
+            proxy: `${host}/sh/${serviceSlugEncoded}?variant=light`,
             source: PROVIDERS.selfhst(serviceSlug, 'light'),
           },
           dark: {
-            proxy: `${host}/sh/${selfhstSlugEncoded}?variant=dark`,
+            proxy: `${host}/sh/${serviceSlugEncoded}?variant=dark`,
             source: PROVIDERS.selfhst(serviceSlug, 'dark'),
+          },
+        },
+      }
+    : { service: null, proxy: null, source: null, variants: null };
+
+  const dashboardicons = serviceSlug
+    ? {
+        service: serviceSlug,
+        proxy: `${host}/di/${serviceSlugEncoded}`,
+        source: PROVIDERS.dashboardIcons(serviceSlug),
+        variants: {
+          color: {
+            proxy: `${host}/di/${serviceSlugEncoded}`,
+            source: PROVIDERS.dashboardIcons(serviceSlug, 'color'),
+          },
+          light: {
+            proxy: `${host}/di/${serviceSlugEncoded}?variant=light`,
+            source: PROVIDERS.dashboardIcons(serviceSlug, 'light'),
+          },
+          dark: {
+            proxy: `${host}/di/${serviceSlugEncoded}?variant=dark`,
+            source: PROVIDERS.dashboardIcons(serviceSlug, 'dark'),
           },
         },
       }
@@ -529,6 +589,7 @@ app.get('/:domain/json', async (req, res) => {
         icons: scraperAllIcons,
       },
       selfhst,
+      dashboardicons,
     },
   });
 });
