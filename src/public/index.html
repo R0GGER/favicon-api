@@ -202,31 +202,36 @@
     .search-options {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
       margin-top: 0.6rem;
-      font-size: 0.88rem;
+      font-size: 0.78rem;
       color: #4a4642;
       user-select: none;
     }
 
     .search-options input[type="checkbox"] {
       accent-color: #5b2e7e;
-      width: 16px;
-      height: 16px;
+      width: 14px;
+      height: 14px;
       cursor: pointer;
     }
 
     .search-options label {
       display: inline-flex;
-      align-items: center;
-      gap: 0.45rem;
+      align-items: baseline;
+      gap: 0.4rem;
       cursor: pointer;
       font-weight: 500;
+      line-height: 1.4;
+    }
+
+    .search-options label input[type="checkbox"] {
+      align-self: center;
     }
 
     .search-options .hint {
       color: #8a8480;
-      font-size: 0.8rem;
+      font-weight: 400;
+      white-space: nowrap;
     }
 
     .quick-links {
@@ -583,9 +588,8 @@
       <div class="search-options">
         <label for="selfhst-toggle">
           <input type="checkbox" id="selfhst-toggle" checked onchange="toggleSelfhst()">
-          Also include selfhst icon lookup when searching a domain
+          <span>Also include selfhst icon lookup<span class="hint" id="selfhst-hint"></span></span>
         </label>
-        <span class="hint" id="selfhst-hint"></span>
       </div>
       <div class="quick-links">
         <span>Try:</span>
@@ -612,6 +616,7 @@
           <img id="scraper-img" style="display:none" alt="Scraped favicon">
           <span class="copied-toast">URL copied!</span>
         </div>
+        <div class="size-buttons" id="scraper-sizes" style="display:none"></div>
         <div class="meta" id="scraper-meta"></div>
       </div>
 
@@ -845,7 +850,7 @@
         card.style.display = '';
         if (currentMode === 'domain' && currentDomain) {
           const slug = deriveServiceSlug(currentDomain);
-          hint.textContent = slug ? `lookup as "${slug}"` : '';
+          hint.textContent = slug ? `\u00a0\u2014 as "${slug}"` : '';
           if (slug) {
             currentSelfhstSlug = slug;
             currentSelfhstVariant = 'color';
@@ -912,7 +917,7 @@
       if (selfhstToggle.checked) {
         selfhstCard.style.display = '';
         const slug = deriveServiceSlug(domain);
-        selfhstHint.textContent = slug ? `lookup as "${slug}"` : '';
+        selfhstHint.textContent = slug ? `\u00a0\u2192 service name: "${slug}"` : '';
         if (slug) {
           currentSelfhstSlug = slug;
           currentSelfhstVariant = 'color';
@@ -943,7 +948,7 @@
 
       const selfhstCard = document.getElementById('selfhst-card');
       selfhstCard.style.display = '';
-      document.getElementById('selfhst-hint').textContent = `service-only lookup`;
+      document.getElementById('selfhst-hint').textContent = `\u00a0\u2192 service-only lookup`;
 
       currentSelfhstSlug = slug;
       currentSelfhstVariant = 'color';
@@ -1095,9 +1100,19 @@
       });
     }
 
+    let scraperIcons = [];
+    let currentScraperIdx = 0;
+
     function loadScraperFavicon(domain, refresh) {
+      scraperIcons = [];
+      currentScraperIdx = 0;
+      const sizesEl = document.getElementById('scraper-sizes');
+      sizesEl.style.display = 'none';
+      sizesEl.innerHTML = '';
+
       const proxyUrl = refresh ? `/s/${domain}?refresh=1` : `/s/${domain}`;
       loadFavicon('scraper', proxyUrl, `${location.origin}/s/${domain}`);
+      loadScraperSizes(domain, refresh);
     }
 
     function refreshScraper() {
@@ -1106,6 +1121,143 @@
       btn.classList.add('spinning');
       loadScraperFavicon(currentDomain, true);
       setTimeout(() => btn.classList.remove('spinning'), 1200);
+    }
+
+    function formatBytes(n) {
+      if (!Number.isFinite(n) || n <= 0) return '';
+      if (n < 1024) return `${n} B`;
+      if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+      return `${(n / (1024 * 1024)).toFixed(2)} MB`;
+    }
+
+    async function loadScraperSizes(domain, refresh) {
+      const requestedFor = domain;
+      const sizesEl = document.getElementById('scraper-sizes');
+      let icons = [];
+      try {
+        const url = `/${encodeURIComponent(domain)}/json${refresh ? '?_=' + Date.now() : ''}`;
+        const res = await fetch(url, { headers: { Accept: 'application/json' } });
+        if (!res.ok) return;
+        const body = await res.json();
+        icons = body?.endpoints?.scraper?.icons || [];
+      } catch {
+        return;
+      }
+
+      if (currentDomain !== requestedFor) return;
+      if (!Array.isArray(icons) || icons.length === 0) return;
+
+      const sorted = icons
+        .filter((i) => i && typeof i.url === 'string' && (i.width || 0) > 0)
+        .slice()
+        .sort((a, b) => {
+          const areaA = (a.width || 0) * (a.height || a.width || 0);
+          const areaB = (b.width || 0) * (b.height || b.width || 0);
+          if (areaB !== areaA) return areaB - areaA;
+          return (b.width || 0) - (a.width || 0);
+        });
+
+      if (sorted.length === 0) return;
+
+      scraperIcons = sorted;
+      currentScraperIdx = 0;
+      renderScraperSizes();
+      sizesEl.style.display = '';
+    }
+
+    function renderScraperSizes() {
+      const sizesEl = document.getElementById('scraper-sizes');
+      sizesEl.innerHTML = '';
+      const frag = document.createDocumentFragment();
+      scraperIcons.forEach((icon, idx) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'size-btn' + (idx === currentScraperIdx ? ' active' : '');
+        const w = icon.width || 0;
+        const h = icon.height || w;
+        btn.textContent = w === h ? String(w) : `${w}\u00d7${h}`;
+        const titleParts = [
+          icon.url,
+          w && h ? `${w}\u00d7${h}` : null,
+          icon.format ? icon.format.toUpperCase() : null,
+          formatBytes(icon.bytes) || null,
+        ].filter(Boolean);
+        btn.title = titleParts.join('  \u2022  ');
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          switchScraperSize(idx);
+        });
+        frag.appendChild(btn);
+      });
+      sizesEl.appendChild(frag);
+    }
+
+    function switchScraperSize(idx) {
+      if (!currentDomain) return;
+      if (idx < 0 || idx >= scraperIcons.length) return;
+      currentScraperIdx = idx;
+      document.querySelectorAll('#scraper-sizes .size-btn').forEach((b, i) => {
+        b.classList.toggle('active', i === idx);
+      });
+      loadScraperVariant(idx);
+    }
+
+    function loadScraperVariant(idx) {
+      const icon = scraperIcons[idx];
+      if (!icon) return;
+
+      // Idx 0 (largest) keeps the canonical /s/{domain} proxy URL so clicking
+      // the image still copies the embeddable scraper URL. Other sizes go
+      // through /s-asset so CDN Referer/hotlink filtering on the upstream
+      // host (Reddit etc.) can't break direct <img> loads.
+      const isPrimary = idx === 0;
+      const proxyUrl = isPrimary
+        ? `/s/${currentDomain}`
+        : `/s-asset?url=${encodeURIComponent(icon.url)}`;
+
+      const img = document.getElementById('scraper-img');
+      const spinner = document.getElementById('scraper-spinner');
+      const meta = document.getElementById('scraper-meta');
+      const display = img.closest('.favicon-display');
+
+      img.style.display = 'none';
+      spinner.style.display = 'block';
+      meta.textContent = '';
+
+      const writeMeta = (w, h) => {
+        const escapedUrl = escapeHtml(icon.url);
+        meta.innerHTML =
+          `<span class="dimensions">${w}x${h}</span>` +
+          `<a class="src-url" href="${escapedUrl}" target="_blank" rel="noopener" title="${escapedUrl}">${escapedUrl}</a>` +
+          `<button class="copy-btn" type="button" title="Copy source URL" aria-label="Copy source URL">${COPY_ICON_SVG}</button>`;
+        const copyBtn = meta.querySelector('.copy-btn');
+        copyBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          copySource(copyBtn, icon.url);
+        });
+      };
+
+      const imgEl = new Image();
+      imgEl.crossOrigin = 'anonymous';
+      imgEl.onload = () => {
+        if (currentScraperIdx !== idx) return;
+        img.src = imgEl.src;
+        img.style.display = 'block';
+        spinner.style.display = 'none';
+        display.dataset.proxyUrl = `${location.origin}${proxyUrl}`;
+        writeMeta(
+          icon.width || imgEl.naturalWidth || 0,
+          icon.height || imgEl.naturalHeight || 0
+        );
+      };
+      imgEl.onerror = () => {
+        if (currentScraperIdx !== idx) return;
+        spinner.style.display = 'none';
+        writeMeta(icon.width || 0, icon.height || 0);
+      };
+      imgEl.src = `${proxyUrl}${proxyUrl.includes('?') ? '&' : '?'}_=${Date.now()}`;
     }
 
     function loadFavicon(id, proxyUrl, sourceUrl) {

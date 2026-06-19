@@ -3,6 +3,7 @@ const dns = require('dns');
 // hang against CDNs (e.g. redditstatic.com) while IPv4 works fine.
 dns.setDefaultResultOrder('ipv4first');
 
+const crypto = require('crypto');
 const express = require('express');
 const path = require('path');
 const {
@@ -17,6 +18,8 @@ const {
   fetchLogoDev,
   fetchSelfhst,
   fetchScraper,
+  fetchScraperAsset,
+  fetchBesticonAllIcons,
   PROVIDERS,
 } = require('./providers');
 const { pickBest, fetchWithCache } = require('./bestPick');
@@ -229,6 +232,51 @@ app.get('/l/:domain', async (req, res) => {
   }
 });
 
+// Generic asset proxy used by the HTML Scraper card to render every icon
+// besticon discovered for a domain. Some upstream CDNs (Reddit, Twitter, ...)
+// block direct browser <img> loads via Referer/UA filtering; fetching them
+// server-side with the scraper's existing header strategy bypasses that and
+// gives us a clean same-origin URL. Cached on disk + LRU keyed by URL hash.
+const PRIVATE_HOST_RE = /^(localhost|127\.|10\.|192\.168\.|169\.254\.|::1$|fe80:|fc00:|fd00:)/i;
+
+app.get('/s-asset', async (req, res) => {
+  const raw = req.query.url;
+  if (typeof raw !== 'string' || raw.length === 0 || raw.length > 2048) {
+    return res.status(400).json({ error: 'Invalid url query.' });
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    return res.status(400).json({ error: 'Invalid url.' });
+  }
+
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+    return res.status(400).json({ error: 'Only http(s) urls are allowed.' });
+  }
+  if (PRIVATE_HOST_RE.test(parsed.hostname)) {
+    return res.status(400).json({ error: 'Disallowed host.' });
+  }
+
+  const target = parsed.toString();
+  const hash = crypto.createHash('sha1').update(target).digest('hex');
+  const referer = `${parsed.protocol}//${parsed.hostname}/`;
+
+  try {
+    const entry = await fetchWithCache('asset', hash, null, async () => {
+      const result = await fetchScraperAsset(target, referer);
+      if (!result) return null;
+      return { ...result, provider: 'asset' };
+    });
+    if (!entry) return res.status(502).json({ error: 'Could not fetch asset.' });
+    sendFavicon(res, entry);
+  } catch (err) {
+    console.error('Asset proxy error:', err.message);
+    res.status(500).json({ error: 'Internal error.' });
+  }
+});
+
 // HTML scraper proxy: /s/:domain[?refresh=1]
 app.get('/s/:domain', async (req, res) => {
   const domain = extractDomain(req.params.domain);
@@ -286,7 +334,10 @@ app.get('/:domain/json', async (req, res) => {
 
   const host = `${req.protocol}://${req.get('host')}`;
   const encoded = encodeURIComponent(domain);
-  const scraperCached = await cache.get('scraper', domain, null);
+  const [scraperCached, scraperAllIcons] = await Promise.all([
+    cache.get('scraper', domain, null),
+    fetchBesticonAllIcons(domain),
+  ]);
 
   const googleSizes = [16, 32, 64, 128];
   const googleV2Sizes = [16, 32, 64, 128, 256];
@@ -404,6 +455,7 @@ app.get('/:domain/json', async (req, res) => {
       scraper: {
         proxy: `${host}/s/${encoded}`,
         source: scraperCached?.url || null,
+        icons: scraperAllIcons,
       },
       selfhst,
     },

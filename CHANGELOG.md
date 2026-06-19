@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **besticon integration for the HTML scraper**
+  - New `BESTICON_URL` environment variable points at a sidecar [besticon](https://github.com/mat/besticon) instance (e.g. `http://besticon:8080`).
+  - When set, `/s/{domain}` first asks besticon's `/allicons.json?url={domain}` for the icon list, then runs the candidates through the existing `sharp`-validated probe pipeline (`fetchBesticonCandidates` → `rankCandidates` → `probeScraperCandidates`). Falls back to the built-in HTML scraper (`fetchScraperPage` + `buildScraperCandidates`) when besticon is unreachable or returns no usable candidates.
+  - The resulting entry keeps `provider: 'scraper'` so the `X-Favicon-Source` header, the scraper cache key (`?refresh=1` flow) and the `/{domain}/json` listing all stay backward-compatible.
+  - **`/{domain}/json` now exposes the full discovered icon list** under `endpoints.scraper.icons` (each entry has `url`, `width`, `height`, `format`, `bytes`); empty array when `BESTICON_URL` is unset or besticon errors out.
+  - **New asset proxy `/s-asset?url=...`** that fetches arbitrary upstream icon URLs server-side using the scraper's existing header retry strategy (bare → minimal → Sec-Fetch chrome headers). Cached on disk + LRU keyed by SHA-1 of the URL; SSRF-guarded against localhost / `127.`, `10.`, `192.168.`, `169.254.`, `::1`, link-local and ULA IPv6 ranges; max URL length 2048; only `http(s)`. Used by the UI so CDN Referer/hotlink protection on hosts like `redditstatic.com` or `redgifs` cannot break direct browser `<img>` loads.
+  - **HTML Scraper card in the web UI** now renders a row of size-selector buttons (same `.size-btn` styling as Google/Faviconkit), populated from `endpoints.scraper.icons` and sorted descending by `width × height`. Clicking a size:
+    - Idx 0 (largest) keeps loading via the canonical `/s/{domain}` proxy so click-to-copy on the image still yields the embeddable scraper URL.
+    - Idx > 0 loads via `/s-asset?url=...`, with the meta row showing `{w}×{h}` and the upstream source URL plus a copy button (consistent with Google's behaviour).
+    - Race-protected via a `currentScraperIdx` guard so a slow variant load cannot overwrite a newer selection.
+  - **Bundled `docker-compose.yml` ships besticon as an internal-only service**: no `ports:` mapping (the besticon frontend at `/` is not publicly reachable), health-checked on `/up`, joined to a shared `besticon` bridge network so `maflplus-favicon-api` can resolve it on hostname `besticon`. `maflplus-favicon-api` declares `depends_on: besticon: { condition: service_healthy }` and is configured with `BESTICON_URL=http://besticon:8080` by default.
+  - Documented in `README.md` and `.env.example`:
+    - API table row for `/s-asset?url=...` covering the SSRF guard (localhost / private IPv4 ranges, link-local / ULA IPv6, `http(s)` only, max URL length 2048) and that the route is used by the UI for upstream icons whose CDN blocks direct browser `<img>` loads.
+    - `/s/{domain}` row updated to mention besticon delegation via `/allicons.json?url=...` and the built-in scraper fallback.
+    - `/{domain}/json` example documenting the new `endpoints.scraper.icons` array.
+    - Docker section rewritten to show the actual two-service compose file (incl. the besticon sidecar with healthcheck, the shared `besticon` bridge network and `depends_on: { condition: service_healthy }`) plus a note on swapping `image:` for `build: .` and how to run the stack without besticon (built-in scraper fallback).
+    - Environment Variables table entry for `BESTICON_URL`.
 - **HTML scraper provider** (`/s/{domain}`)
   - Parses the target site's HTML for `<link rel="icon">`, `shortcut icon`, `apple-touch-icon`, `apple-touch-icon-precomposed`, and `fluid-icon`.
   - Reads the web app manifest (`<link rel="manifest">`) and merges its declared icons into the candidate list.
@@ -101,6 +118,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Internal
 
+- `fetchScraperAsset` and a new `fetchBesticonAllIcons` helper are exported from `src/providers.js`; the asset fetcher is reused by the `/s-asset` route, the besticon helper is reused by `/{domain}/json` to enrich the scraper section.
+- New `besticonIconsToCandidates` helper bridges besticon's raw `/allicons.json` response to the existing `{ href, sizes, type }` candidate format consumed by `rankCandidates` / `probeScraperCandidates`.
+- `BESTICON_URL` is read once at module load (`process.env.BESTICON_URL`) and trailing slashes are stripped so both `http://besticon:8080` and `http://besticon:8080/` work.
 - `services.txt` added to `.gitignore` (local notes file).
 - `cache.del()` added for per-entry cache invalidation (used by `/s/{domain}?refresh=1`).
 - HTML scraper upstream requests routed through `src/upstreamFetch.js` instead of global `fetch`.

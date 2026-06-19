@@ -7,7 +7,7 @@ A lightweight favicon proxy that fetches favicons from multiple providers (HTML 
 | Endpoint | Description |
 |---|---|
 | `/{domain}` | Best favicon (cascading fallback through all domain-based providers) |
-| `/s/{domain}` | HTML scraper: parses the site's `<link rel="icon">`, web manifest and standard fallbacks. Append `?refresh=1` to bypass the cache and re-scrape (see below). |
+| `/s/{domain}` | HTML scraper: parses the site's `<link rel="icon">`, web manifest and standard fallbacks. When `BESTICON_URL` is set, candidate discovery is delegated to a sidecar [besticon](https://github.com/mat/besticon) instance via `/allicons.json?url=...` and falls back to the built-in scraper if besticon yields nothing. Append `?refresh=1` to bypass the cache and re-scrape (see below). |
 | `/g/{size}/{domain}` | Google favicon (sizes 16, 32, 64, 128) |
 | `/g2/{size}/{domain}` | Google v2 (`faviconV2`) favicon (sizes 16, 32, 64, 128, 256) |
 | `/d/{domain}` | DuckDuckGo favicon |
@@ -20,6 +20,7 @@ A lightweight favicon proxy that fetches favicons from multiple providers (HTML 
 | `/k/{size}/{domain}` | Faviconkit favicon (sizes 16, 32, 64, 128, 256) |
 | `/l/{domain}` | logo.dev logo (requires `LOGODEV_TOKEN`, otherwise returns 503) |
 | `/sh/{service}` | [selfhst icons](https://github.com/selfhst/icons) lookup by service name (e.g. `/sh/jellyfin`) |
+| `/s-asset?url=...` | Server-side asset proxy used by the web UI to render every icon discovered by the scraper/besticon. Cached on disk + LRU keyed by SHA-1 of the URL; SSRF-guarded against localhost / private IPv4 ranges and link-local / ULA IPv6; only `http(s)` and a max URL length of 2048. Useful for upstream icons whose CDN blocks direct browser `<img>` loads via Referer/UA filtering. |
 | `/providers` | JSON config indicating which optional providers are enabled |
 | `/{domain}/json` | JSON list of every endpoint URL for the domain |
 
@@ -33,11 +34,15 @@ Forces a fresh scrape for that domain by clearing the cached scraper entry (memo
 
 **JSON example:** `https://your-host/github.com/json`
 
+When `BESTICON_URL` is set, the JSON output also exposes every icon besticon found for the domain under `endpoints.scraper.icons` (each entry has `url`, `width`, `height`, `format`, `bytes`).
+
 **selfhst example:** `https://your-host/sh/jellyfin`
 
 The web UI accepts both a domain (e.g. `example.com`) and a bare service name without a TLD (e.g. `radarr`, `sonarr`); when no dot is present the input is treated as a selfhst service name and only the selfhst icon card is shown.
 
 ## Docker
+
+The bundled `docker-compose.yml` runs two services: `maflplus-favicon-api` and a sidecar [besticon](https://github.com/mat/besticon) instance used by the HTML scraper. Besticon is joined to an internal `besticon` bridge network and has no `ports:` mapping, so its frontend at `/` is **not** publicly reachable — only `maflplus-favicon-api` can talk to it on hostname `besticon`.
 
 ```yaml
 services:
@@ -57,15 +62,59 @@ services:
       - DISK_CACHE_TTL=86400
       - UPSTREAM_TIMEOUT=5000
       - UV_THREADPOOL_SIZE=16
-      #- WORKERS=2
-      #- PICK_HEAD_START_MS=150
-      #- SCRAPER_PROBE_BATCH_SIZE=4
+      - WORKERS=8
+      - SCRAPER_PROBE_BATCH_SIZE=8
+      - PICK_HEAD_START_MS=150
+      - DEFAULT_PROVIDER=scraper
       - LOGODEV_TOKEN=
-      #- DEFAULT_PROVIDER=scraper
+      - BESTICON_URL=http://besticon:8080
+    depends_on:
+      besticon:
+        condition: service_healthy
+    networks:
+      - besticon
+
+  besticon:
+    image: matthiasluedtke/iconserver:latest
+    container_name: besticon
+    restart: unless-stopped
+    # No ports: besticon is only reachable from other containers on the
+    # `besticon` network. The frontend at "/" is therefore not exposed.
+    environment:
+      TZ: Europe/Amsterdam
+      ADDRESS: ""
+      CACHE_SIZE_MB: 1024
+      HOST_ONLY_DOMAINS: "*"
+      HTTP_CLIENT_TIMEOUT: 5s
+      HTTP_MAX_AGE_DURATION: 720h
+      HTTP_USER_AGENT: ""
+      PORT: 8080
+      SERVER_MODE: redirect
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - --quiet
+        - --tries=1
+        - --spider
+        - http://localhost:8080/up
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - besticon
+
+networks:
+  besticon:
+    name: besticon
+    driver: bridge
 
 volumes:
   favicon-cache:
 ```
+
+To build the image locally instead of pulling the published one, swap `image:` for `build: .` on `maflplus-favicon-api`. To run without besticon, drop the `besticon` service, the `BESTICON_URL` environment variable, the `depends_on` block and the `networks` section — the HTML scraper will then transparently fall back to its built-in implementation.
 
 ### Using a host path for the cache volume
 
@@ -99,3 +148,4 @@ Then use the host path in your `docker-compose.yml`:
 | `SCRAPER_PROBE_BATCH_SIZE` | `4` | Number of HTML scraper icon candidates probed in parallel per batch (in `/s/{domain}` and as part of `/{domain}`). Higher values speed up scraping of sites with many `<link rel="icon">` entries but increase concurrent upstream load. |
 | `LOGODEV_TOKEN` | _(unset)_ | Optional [logo.dev](https://www.logo.dev/) publishable key. When unset, `/l/{domain}` returns 503 and the logo.dev card is hidden in the UI. |
 | `DEFAULT_PROVIDER` | _(unset)_ | Optional preferred provider for `/{domain}` requests. Since providers are now raced in parallel, this provider gets a `PICK_HEAD_START_MS` ms head-start over the others — so it usually wins when reachable, but a slow/failing favorite no longer blocks the response. Valid values: `scraper`, `google`, `googlev2`, `duckduckgo`, `yandex`, `faviconso`, `vemetric`, `favicondev`, `faviconkit`, `logodev`, `selfhst`. Note: `logodev` requires `LOGODEV_TOKEN`. |
+| `BESTICON_URL` | _(unset)_ | Optional base URL of a sidecar [besticon](https://github.com/mat/besticon) instance (e.g. `http://besticon:8080`). When set, `/s/{domain}` first asks besticon's `/allicons.json?url={domain}` for the icon list, then probes/picks the best one locally. Falls back to the built-in HTML scraper when besticon is unreachable or returns no candidates. The bundled `docker-compose.yml` runs besticon as an internal-only service (no exposed port; its frontend at `/` is not publicly reachable). |

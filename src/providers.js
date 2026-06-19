@@ -4,6 +4,8 @@ const { upstreamFetch, ipv4Dispatcher, ipv4Http1Dispatcher } = require('./upstre
 
 const UPSTREAM_TIMEOUT = parseInt(process.env.UPSTREAM_TIMEOUT || '5000', 10);
 
+const BESTICON_URL = (process.env.BESTICON_URL || '').replace(/\/+$/, '');
+
 const SCRAPER_USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 
@@ -622,7 +624,71 @@ async function buildScraperCandidates(domain, html, finalBaseUrl) {
   };
 }
 
+// Query a sidecar besticon (https://github.com/mat/besticon) instance for the
+// list of icons it discovered for `domain`. Besticon already runs the HTML
+// scrape + manifest parse + size probing server-side and returns a JSON array
+// sorted by area (largest first). Errored entries are filtered out, all
+// successful icons are kept (including very small ones) so callers can decide
+// what to do with them.
+async function fetchBesticonAllIcons(domain) {
+  if (!BESTICON_URL) return [];
+
+  const url = `${BESTICON_URL}/allicons.json?url=${encodeURIComponent(domain)}`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT);
+
+  try {
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: { Accept: 'application/json' },
+    });
+    if (!res.ok) return [];
+
+    const body = await res.json();
+    const list = Array.isArray(body) ? body : Array.isArray(body?.icons) ? body.icons : [];
+
+    return list
+      .filter((i) => i && !i.error && typeof i.url === 'string')
+      .map((i) => ({
+        url: i.url,
+        width: Number.isFinite(i.width) ? i.width : 0,
+        height: Number.isFinite(i.height) ? i.height : 0,
+        format: i.format ? String(i.format).toLowerCase() : null,
+        bytes: Number.isFinite(i.bytes) ? i.bytes : 0,
+      }));
+  } catch {
+    return [];
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Convert raw besticon icons into the `{ href, sizes, type }` candidate shape
+// used by rankCandidates / probeScraperCandidates.
+function besticonIconsToCandidates(icons) {
+  return icons
+    .filter((i) => (i.width || 0) > 0)
+    .map((i) => ({
+      href: i.url,
+      sizes: i.width ? `${i.width}x${i.height || i.width}` : '',
+      type: i.format ? `image/${i.format}` : '',
+    }));
+}
+
+async function fetchBesticonCandidates(domain) {
+  return besticonIconsToCandidates(await fetchBesticonAllIcons(domain));
+}
+
 async function fetchScraper(domain) {
+  if (BESTICON_URL) {
+    const besticonCandidates = await fetchBesticonCandidates(domain);
+    if (besticonCandidates.length > 0) {
+      const referer = `https://${domain}/`;
+      const best = await probeScraperCandidates(rankCandidates(besticonCandidates), referer);
+      if (best) return best;
+    }
+  }
+
   const { html, finalBaseUrl } = await fetchScraperPage(domain);
   const { rankedPrimary, rankedFallback } = await buildScraperCandidates(domain, html, finalBaseUrl);
 
@@ -644,5 +710,7 @@ module.exports = {
   fetchLogoDev,
   fetchSelfhst,
   fetchScraper,
+  fetchScraperAsset,
+  fetchBesticonAllIcons,
   PROVIDERS,
 };

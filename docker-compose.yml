@@ -16,11 +16,51 @@ services:
       - DISK_CACHE_TTL=86400 # default is 86400
       - UPSTREAM_TIMEOUT=5000 # default is 5000
       - UV_THREADPOOL_SIZE=16 # default is 16
-      - WORKERS=8 # default is 2
+      - WORKERS=8 # default is 8
       - SCRAPER_PROBE_BATCH_SIZE=8 # default is 4
       - PICK_HEAD_START_MS=150 # default is 150
+      - DEFAULT_PROVIDER=scraper # default is scraper
       - LOGODEV_TOKEN=
-      - DEFAULT_PROVIDER=googlev2 # default is scraper
+      - BESTICON_URL=http://besticon:8080
+    depends_on:
+      besticon:
+        condition: service_healthy
+    networks:
+      - besticon
+
+  besticon:
+    image: matthiasluedtke/iconserver:latest
+    container_name: besticon
+    restart: unless-stopped
+    environment:
+      TZ: Europe/Amsterdam
+      ADDRESS: ""
+      CACHE_SIZE_MB: 1024
+      HOST_ONLY_DOMAINS: "*"
+      HTTP_CLIENT_TIMEOUT: 5s
+      HTTP_MAX_AGE_DURATION: 720h
+      HTTP_USER_AGENT: ""
+      PORT: 8080
+      SERVER_MODE: redirect
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - --quiet
+        - --tries=1
+        - --spider
+        - http://localhost:8080/up
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - besticon
+
+networks:
+  besticon:
+    name: besticon
+    driver: bridge
 
 volumes:
   favicon-cache:
