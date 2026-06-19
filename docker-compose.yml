@@ -14,6 +14,7 @@ services:
       - MEMORY_CACHE_MAX=2000 # default is 500
       - MEMORY_CACHE_TTL=3600 # default is 3600
       - DISK_CACHE_TTL=86400 # default is 86400
+      - CACHE_SIZE_MB=512 # max total disk cache size in MB; 0 = unlimited
       - UPSTREAM_TIMEOUT=5000 # default is 5000
       - UV_THREADPOOL_SIZE=16 # default is 16
       - WORKERS=8 # default is 8

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`CACHE_SIZE_MB` environment variable** caps the total size of the disk cache (`CACHE_DIR`) in megabytes. When the directory exceeds the configured limit, the oldest entries (by `mtime`) are evicted — both the data file and its `.meta` sibling — until the cache is back under the cap. Each cluster worker keeps a lightweight in-memory index of disk files and rescans the shared cache directory every 60 seconds (and on every set that pushes its local view over the limit) so writes from sibling workers converge into a single accurate view before eviction runs. Set to `0` (default in code) to disable the size cap and fall back to the original TTL-only behaviour. Bundled `docker-compose.yml` and `.env.example` ship `CACHE_SIZE_MB=512` as a sensible upper bound for a typical deployment. Documented in `README.md`.
 - **besticon integration for the HTML scraper**
   - New `BESTICON_URL` environment variable points at a sidecar [besticon](https://github.com/mat/besticon) instance (e.g. `http://besticon:8080`).
   - When set, `/s/{domain}` first asks besticon's `/allicons.json?url={domain}` for the icon list, then runs the candidates through the existing `sharp`-validated probe pipeline (`fetchBesticonCandidates` → `rankCandidates` → `probeScraperCandidates`). Falls back to the built-in HTML scraper (`fetchScraperPage` + `buildScraperCandidates`) when besticon is unreachable or returns no usable candidates.

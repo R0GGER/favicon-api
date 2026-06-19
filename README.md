@@ -60,6 +60,7 @@ services:
       - MEMORY_CACHE_MAX=2000
       - MEMORY_CACHE_TTL=3600
       - DISK_CACHE_TTL=86400
+      - CACHE_SIZE_MB=512
       - UPSTREAM_TIMEOUT=5000
       - UV_THREADPOOL_SIZE=16
       - WORKERS=8
@@ -141,6 +142,7 @@ Then use the host path in your `docker-compose.yml`:
 | `MEMORY_CACHE_MAX` | `2000` | Max entries in the per-worker LRU memory cache. Each cached favicon is typically 1-10 KB, so the default uses ~10-20 MB per worker. Increase if you serve many unique domains and want a higher hit ratio; decrease to reduce memory usage. |
 | `MEMORY_CACHE_TTL` | `3600` | Memory cache TTL (seconds) |
 | `DISK_CACHE_TTL` | `86400` | Disk cache TTL (seconds) |
+| `CACHE_SIZE_MB` | `0` | Maximum total size of the disk cache (in MB), shared across all cluster workers via the `CACHE_DIR` volume. When the directory exceeds this limit, the oldest entries (by mtime) are evicted until the cache is back under the cap. Set to `0` to disable the size cap (TTL-based eviction only). |
 | `UPSTREAM_TIMEOUT` | `5000` | Upstream request timeout (ms) |
 | `UV_THREADPOOL_SIZE` | `16` | Size of the libuv thread pool used by Node.js for disk I/O (cache reads/writes), DNS lookups and other blocking work. Node's built-in default is `4`; `16` gives more headroom under concurrent load. Max is `1024`. |
 | `WORKERS` | _(CPU cores)_ | Number of cluster workers to spawn. When unset, defaults to `os.cpus().length`. Note: in Docker, Node reports the host's CPU count, not the container's CPU limit — set this explicitly (e.g. `WORKERS=2`) when you constrain CPU via `--cpus` or `deploy.resources.limits`. Use `WORKERS=1` to disable clustering and run everything in a single process. |
