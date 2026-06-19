@@ -13,7 +13,13 @@ const STANDARD_FALLBACKS = [
   '/android-chrome-512x512.png',
 ];
 
-const STATIC_CDN_HINTS = {};
+// CDN entry points for domains whose homepage HTML may not expose any
+// recognisable icon link (e.g. Reddit's JS-challenge interstitial served to
+// datacenter IPs). The variant-expansion below grows these into 128–512 sizes.
+const STATIC_CDN_HINTS = {
+  'reddit.com': 'https://www.redditstatic.com/shreddit/assets/favicon/64x64.png',
+  'www.reddit.com': 'https://www.redditstatic.com/shreddit/assets/favicon/64x64.png',
+};
 
 const HTML_MIN_BYTES = 256;
 
@@ -156,6 +162,29 @@ function faviconVariantGroupKey(href) {
   const m = href.match(/^(.*\/)(\d+)x\2(\.(?:png|webp|jpe?g))(\?.*)?$/i);
   if (!m) return null;
   return `${m[1]}${m[3]}${m[4] || ''}`;
+}
+
+// Probe well-known larger size variants for URLs that follow an NxN pattern,
+// e.g. .../favicon/64x64.png -> .../favicon/{128x128,192x192,256x256,512x512}.png
+// Many SPAs (Reddit, etc.) only expose a single small icon in SSR/interstitial
+// HTML while larger variants exist on the same CDN path.
+const SIZE_VARIANTS = [128, 152, 180, 192, 256, 384, 512];
+
+function expandSizedVariants(href) {
+  const out = [];
+  const m = href.match(/^(.*\/)(\d+)x\2(\.(?:png|webp|jpe?g))(\?.*)?$/i);
+  if (!m) return out;
+  const [, prefix, currentSize, ext, qs = ''] = m;
+  const current = parseInt(currentSize, 10);
+  for (const size of SIZE_VARIANTS) {
+    if (size === current) continue;
+    out.push({
+      href: `${prefix}${size}x${size}${ext}${qs}`,
+      sizes: `${size}x${size}`,
+      type: '',
+    });
+  }
+  return out;
 }
 
 function candidateDeclaredSize(candidate) {
@@ -510,7 +539,13 @@ function parseIconCandidatesFromHtml(html, finalBaseUrl) {
 
     const relTokens = rel.split(/\s+/);
     const isIcon = relTokens.some((r) =>
-      ['apple-touch-icon', 'apple-touch-icon-precomposed'].includes(r)
+      [
+        'icon',
+        'shortcut',
+        'apple-touch-icon',
+        'apple-touch-icon-precomposed',
+        'fluid-icon',
+      ].includes(r)
     );
     if (!isIcon) return;
 
@@ -562,6 +597,12 @@ async function buildScraperCandidates(domain, html, finalBaseUrl) {
   if (primaryCandidates.length === 0) {
     primaryCandidates.push(...staticHintCandidates(domain));
   }
+
+  const variantCandidates = [];
+  for (const c of primaryCandidates) {
+    variantCandidates.push(...expandSizedVariants(c.href));
+  }
+  primaryCandidates.push(...variantCandidates);
 
   for (const fallback of STANDARD_FALLBACKS) {
     try {

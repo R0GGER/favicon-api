@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Parses the target site's HTML for `<link rel="icon">`, `shortcut icon`, `apple-touch-icon`, `apple-touch-icon-precomposed`, and `fluid-icon`.
   - Reads the web app manifest (`<link rel="manifest">`) and merges its declared icons into the candidate list.
   - Honours `<base href>` and follows redirects to resolve relative URLs against the final document URL.
-  - Adds standard fallbacks: `/favicon.ico`, `/apple-touch-icon.png`, `/apple-touch-icon-precomposed.png`.
+  - Adds standard fallbacks: `/apple-touch-icon.png`, `/apple-touch-icon-precomposed.png`, `/android-chrome-512x512.png`.
   - Probes well-known larger size variants on CDN paths that follow an `NxN` naming pattern (e.g. `64x64.png` → `128x128.png`, `256x256.png`, `512x512.png`) to recover hi-res icons that SPAs only inject client-side.
   - Score-ranks candidates by declared `sizes` attribute and format (SVG > PNG > WebP > ICO), then verifies real image dimensions via `sharp` and picks the largest valid result.
   - Skips non-display icon types when ranking: Safari `mask-icon` / pinned-tab SVGs, and web-app-manifest icons with `purpose: monochrome` (or matching URL patterns).
@@ -87,15 +87,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **HTML scraper Reddit regression** — `<link rel="icon">`, `rel="shortcut"` (incl. combined `rel="icon shortcut"`) and `rel="fluid-icon"` are recognised again, alongside `apple-touch-icon` / `-precomposed`. `NxN` CDN paths are once again expanded to larger size variants (e.g. `64x64.png` → 128/152/180/192/256/384/512). Reddit's datacenter-IP interstitial only declares a single `rel="icon shortcut" sizes="64x64"`, so the previous tightening caused `/s/reddit.com` to fall back to the old low-res `apple-touch-icon.png` instead of the modern 192×192 chat-bubble logo. The `MAX_FAVICON_SIZE_JUMP = 2.5` guard still prevents Reddit's 512×512 marketing PNG from winning over the real 192×192 favicon. `STATIC_CDN_HINTS` for `reddit.com` / `www.reddit.com` is restored as a defensive fallback when the interstitial drops the icon link entirely.
 - **HTML scraper on VPS/datacenter hosts** — upstream fetches now use a dedicated IPv4-only undici dispatcher (`src/upstreamFetch.js`), fixing broken IPv6 egress that caused CDN assets (e.g. `redditstatic.com`) to fail while same-origin fallbacks still worked.
 - **HTML scraper icon probing** — CDN/cross-origin icon URLs are fetched with a bare `upstreamFetch` (no extra headers) before retrying with browser-like headers; extra headers were rejected by some CDNs from datacenter IPs.
 - **HTML scraper homepage fetch** — retries across `https://{domain}/` and `https://www.{domain}/` with bare, HTTP/1.1, curl and Chrome user-agents when the initial HTML request fails or returns an empty body.
 - **HTML scraper fallback ordering** — standard `/apple-touch-icon-precomposed.png` fallbacks are only used when all HTML/CDN candidates fail, preventing a wrong 128×128 icon from winning over a reachable CDN hi-res variant.
-- **HTML scraper embedded icon discovery** — scans raw HTML for favicon URLs in inline scripts/JSON when `<link rel="icon">` tags are absent.
 - **HTML scraper static CDN hints** — when homepage HTML is blocked entirely (e.g. `reddit.com` from datacenter IPs), known CDN entry points are probed and expanded to larger `NxN` variants (`STATIC_CDN_HINTS` in `providers.js`).
 - **HTML scraper variant probing** — when probing `NxN` CDN paths, stops before a sharp size jump (e.g. Reddit serves a full-body marketing PNG at 512×512 while 64–192 are the actual logo favicons).
-- **HTML scraper mask-icon exclusion** — ignores Safari `rel="mask-icon"` / `safari-pinned-tab.svg` assets; these are monochrome pinned-tab silhouettes, not display favicons (e.g. `proton.me` showed a solid black “P” instead of the purple gradient logo).
+- **HTML scraper mask-icon exclusion** — ignores Safari `rel="mask-icon"` / `safari-pinned-tab.svg` assets; these are monochrome pinned-tab silhouettes, not display favicons (e.g. `proton.me` showed a solid black "P" instead of the purple gradient logo).
 - **HTML scraper manifest monochrome icons** — skips web-app-manifest icons with `purpose: monochrome` (and known monochrome URL patterns); sites like YouTube expose a white logo at 512×512 alongside the red favicon set.
+- **HTML scraper manifest size threshold** — only manifest icons with a declared size of `512×512` or larger are considered, avoiding low-res manifest entries winning over a higher-quality `apple-touch-icon`.
 - **Web UI HTML Scraper URL** — card no longer showed `https://{domain}/` under the icon; it now always displays and copies the proxy URL (`{origin}/s/{domain}`), matching how other providers expose usable API URLs.
 
 ### Internal
