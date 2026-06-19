@@ -1,10 +1,25 @@
 const cheerio = require('cheerio');
 const sharp = require('sharp');
+const { LRUCache } = require('lru-cache');
 const { upstreamFetch, ipv4Dispatcher, ipv4Http1Dispatcher } = require('./upstreamFetch');
 
 const UPSTREAM_TIMEOUT = parseInt(process.env.UPSTREAM_TIMEOUT || '5000', 10);
 
 const BESTICON_URL = (process.env.BESTICON_URL || '').replace(/\/+$/, '');
+
+// In-memory cache for the enriched scraper icons list. Probing 8+ candidate
+// URLs (besticon + static hints + sized variants) on every /:domain/json
+// request would add seconds of latency for the UI's size-button strip, so we
+// reuse the probe result for a configurable TTL (default: 1 hour).
+const SCRAPER_ICONS_CACHE_TTL_MS =
+  parseInt(process.env.SCRAPER_ICONS_CACHE_TTL || '3600', 10) * 1000;
+const SCRAPER_ICONS_CACHE_MAX =
+  parseInt(process.env.SCRAPER_ICONS_CACHE_MAX || '500', 10);
+
+const scraperIconsCache = new LRUCache({
+  max: SCRAPER_ICONS_CACHE_MAX,
+  ttl: SCRAPER_ICONS_CACHE_TTL_MS,
+});
 
 const SCRAPER_USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
@@ -465,6 +480,94 @@ function staticHintCandidates(domain) {
   return [{ href, sizes: '64x64', type: 'image/png' }];
 }
 
+// Build extra candidate URLs for a domain by combining:
+//   - static CDN hints (e.g. redditstatic.com/.../64x64.png for reddit.com)
+//   - sized variants of each hint (128, 152, 180, 192, ...)
+//   - sized variants of any URLs we already know about (`knownUrls`)
+// URLs already present in `knownUrls` are skipped so the caller can keep its
+// pre-existing metadata (besticon already returns widths for those).
+function deriveHintCandidates(domain, knownUrls = []) {
+  const seen = new Set(knownUrls);
+  const out = [];
+
+  function pushUnique(candidate) {
+    if (!candidate || !candidate.href) return;
+    if (seen.has(candidate.href)) return;
+    seen.add(candidate.href);
+    out.push(candidate);
+  }
+
+  for (const hint of staticHintCandidates(domain)) {
+    pushUnique(hint);
+    for (const v of expandSizedVariants(hint.href)) pushUnique(v);
+  }
+
+  for (const url of knownUrls) {
+    for (const v of expandSizedVariants(url)) pushUnique(v);
+  }
+
+  return out;
+}
+
+async function probeIconMetadata(href, referer) {
+  const result = await fetchScraperAsset(href, referer);
+  if (!result) return null;
+  try {
+    const meta = await sharp(result.buffer).metadata();
+    const width = meta.width || 0;
+    const height = meta.height || 0;
+    if (width <= 0 || height <= 0) return null;
+    return {
+      url: href,
+      width,
+      height,
+      format: meta.format ? String(meta.format).toLowerCase() : null,
+      bytes: result.buffer.length,
+    };
+  } catch {
+    return null;
+  }
+}
+
+// Returns the merged + sorted list of every icon we can find for `domain`:
+// besticon's discoveries plus anything we can reach ourselves via the static
+// CDN hints and sized-variant expansion. This is the source of truth for the
+// /:domain/json icons array shown as the size-button strip on the UI.
+async function fetchScraperAllIcons(domain) {
+  const cached = scraperIconsCache.get(domain);
+  if (cached) return cached;
+
+  const referer = `https://${domain}/`;
+  const besticonIcons = BESTICON_URL ? await fetchBesticonAllIcons(domain) : [];
+
+  const byUrl = new Map();
+  for (const icon of besticonIcons) {
+    if (!icon || !icon.url || byUrl.has(icon.url)) continue;
+    byUrl.set(icon.url, { ...icon });
+  }
+
+  const extras = deriveHintCandidates(domain, [...byUrl.keys()]);
+
+  if (extras.length > 0) {
+    const probed = await runInBatches(extras, SCRAPER_PROBE_BATCH_SIZE, (c) =>
+      probeIconMetadata(c.href, referer)
+    );
+    for (const p of probed) {
+      if (p && p.url && !byUrl.has(p.url)) byUrl.set(p.url, p);
+    }
+  }
+
+  const sorted = [...byUrl.values()].sort((a, b) => {
+    const areaA = (a.width || 0) * (a.height || a.width || 0);
+    const areaB = (b.width || 0) * (b.height || b.width || 0);
+    if (areaB !== areaA) return areaB - areaA;
+    return (b.width || 0) - (a.width || 0);
+  });
+
+  scraperIconsCache.set(domain, sorted);
+  return sorted;
+}
+
 async function fetchScraperPage(domain) {
   const baseUrl = `https://${domain}/`;
   const attempts = [
@@ -684,7 +787,15 @@ async function fetchScraper(domain) {
     const besticonCandidates = await fetchBesticonCandidates(domain);
     if (besticonCandidates.length > 0) {
       const referer = `https://${domain}/`;
-      const best = await probeScraperCandidates(rankCandidates(besticonCandidates), referer);
+      // Augment besticon's discoveries with static CDN hints + sized variants
+      // so domains whose origin blocks besticon's datacenter IP (Reddit, etc.)
+      // still get the full size ladder probed and the largest icon picked.
+      const hintCandidates = deriveHintCandidates(
+        domain,
+        besticonCandidates.map((c) => c.href)
+      );
+      const combined = rankCandidates([...besticonCandidates, ...hintCandidates]);
+      const best = await probeScraperCandidates(combined, referer, 32);
       if (best) return best;
     }
   }
@@ -712,5 +823,6 @@ module.exports = {
   fetchScraper,
   fetchScraperAsset,
   fetchBesticonAllIcons,
+  fetchScraperAllIcons,
   PROVIDERS,
 };

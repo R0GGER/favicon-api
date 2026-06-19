@@ -19,7 +19,7 @@ const {
   fetchSelfhst,
   fetchScraper,
   fetchScraperAsset,
-  fetchBesticonAllIcons,
+  fetchScraperAllIcons,
   PROVIDERS,
 } = require('./providers');
 const { pickBest, fetchWithCache } = require('./bestPick');
@@ -336,7 +336,7 @@ app.get('/:domain/json', async (req, res) => {
   const encoded = encodeURIComponent(domain);
   const [scraperCached, scraperAllIcons] = await Promise.all([
     cache.get('scraper', domain, null),
-    fetchBesticonAllIcons(domain),
+    fetchScraperAllIcons(domain),
   ]);
 
   const googleSizes = [16, 32, 64, 128];
