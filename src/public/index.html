@@ -502,6 +502,30 @@
         justify-content: center;
         margin-bottom: 1rem;
       }
+
+      /* Hide Tip and Bookmarklet boxes on mobile (both use .tip) */
+      .tip { display: none !important; }
+
+      /* Make the API Endpoint button responsive: allow URL to wrap */
+      .json-button-wrap { text-align: left; }
+      .json-button {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        width: 100%;
+        max-width: 100%;
+        padding: 0.7rem 0.9rem;
+        gap: 0.4rem 0.55rem;
+      }
+      .json-button .label { flex: 0 0 auto; }
+      .json-button .url {
+        flex: 1 1 100%;
+        min-width: 0;
+        white-space: normal;
+        word-break: break-all;
+        overflow-wrap: anywhere;
+        font-size: 0.8rem;
+      }
     }
 
     .global-toast {
