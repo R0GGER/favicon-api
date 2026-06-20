@@ -1284,7 +1284,7 @@ docker compose exec maflplus-favicon-api npm run keys:revoke -- --prefix fa_abcd
         </tbody>
       </table>
 
-      <p style="margin-top:0.8rem">A request counts toward the monthly quota only when the API returns <span class="pill s200">200</span> - matching the behaviour of <a href="https://www.faviconapis.com/docs" target="_blank" rel="noopener">faviconapis.com</a>.</p>
+      <p id="quota-count-note" style="margin-top:0.8rem">A request counts toward the monthly quota only when the API returns <span class="pill s200">200</span>.</p>
     </section>
 
     <!-- Plans -->
@@ -1596,9 +1596,11 @@ print(data["url"])`;
       const keyRow = document.getElementById('pg-key-row');
       const authSection = document.getElementById('authentication');
       const plansSection = document.getElementById('plans');
+      const quotaCountNote = document.getElementById('quota-count-note');
       if (keyRow) keyRow.style.display = api.requireKey ? '' : 'none';
       if (authSection) authSection.style.display = api.requireKey ? '' : 'none';
       if (plansSection) plansSection.style.display = api.requireKey ? '' : 'none';
+      if (quotaCountNote) quotaCountNote.style.display = api.requireKey ? '' : 'none';
 
       // Re-render code samples so the Quick start tabs drop the
       // `Authorization: Bearer fa_your_key_here` header when keys are not
