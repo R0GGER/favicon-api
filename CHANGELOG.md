@@ -9,6 +9,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **FaviconAPIs-compatible JSON API** (`/api/v1/favicon` + `/cdn/favicons/{domain}.png`)
+  - New `GET /api/v1/favicon?url={website}` endpoint returns a JSON object — `{ url, domain, width, height, format, sourceType, cached, cachedAt }` — instead of the image bytes, modelled on [faviconapis.com/docs](https://www.faviconapis.com/docs). The PNG itself is fetched separately from the returned CDN URL.
+  - **Source priority** for icon discovery is `svg` > `manifest` > `apple-touch-icon` > `png` > `ico`. The first source that yields a decodable image wins, and the tag is reported in the `sourceType` response field. Implemented in new `src/apiScraper.js`, reusing existing scraper helpers (`fetchScraperPage`, `parseIconCandidatesFromHtml`, `fetchManifestIcons`, `fetchScraperAsset`) rather than duplicating HTML/manifest fetch logic.
+  - **All output is normalized to a 256×256 PNG** via new `src/imageNormalize.js`. SVGs are rasterized at `density=384` (4×96 dpi) for a crisp 256-pixel render; multi-frame ICO files are decoded via the new `decode-ico` dependency with the largest frame selected; everything else goes through `sharp` with `fit: contain` and a transparent background.
+  - **7-day CDN cache.** The generated PNG is written to `API_CACHE_DIR` (default `/cache/api`) with a sibling `.meta.json` (`{ sourceType, cachedAt }`), and re-served via the new public `GET /cdn/favicons/{domain}.png` route with `Content-Type: image/png` and `Cache-Control: public, max-age=604800, immutable`. Subsequent calls within the TTL window return `cached: true` and the original `cachedAt` timestamp; `cdn/favicons/...` returns `404` until `/api/v1/favicon` has been called at least once for that domain (safe to expose publicly).
+  - **Error responses match the FaviconAPIs spec** and are always JSON with `error` and `code` fields: `400 missing_url` / `400 invalid_url`, `401 missing_api_key` / `401 invalid_api_key`, `422 favicon_not_found` / `422 favicon_not_processable` (with `sourceType` + `sourceUrl` for diagnostics), `429 quota_exceeded` (with `plan` / `limit` / `used` / `period`), `500 internal_error`.
+  - New environment variables: `API_KEYS_DB` (default `/cache/api-keys.sqlite`), `API_CACHE_DIR` (default `/cache/api`), `API_CACHE_TTL` (default `604800` = 7 days, used both for cache freshness and the CDN `Cache-Control: max-age`).
+  - Mounted in `src/index.js` (`app.use(apiRoutes)`) directly after the static-assets handler and before the catch-all `/:domain` provider route so `/api/...` and `/cdn/...` paths take precedence. Existing routes (`/g/...`, `/g2/...`, `/d/...`, `/y/...`, `/f/...`, `/v/...`, `/p/...`, `/k/...`, `/l/...`, `/s/...`, `/sh/...`, `/di/...`, `/{domain}`, `/{domain}/json`) are unaffected.
+
+- **API key authentication with per-key monthly quotas** (SQLite-backed)
+  - New `src/apiStore.js` persists API keys and per-key monthly usage in a SQLite file at `API_KEYS_DB` (default `/cache/api-keys.sqlite`, inside the existing cache volume so it survives container restarts and is shared between cluster workers via WAL mode + `synchronous=NORMAL` + `foreign_keys=ON`). Only the SHA-256 hash of each raw key is stored server-side; the raw key is shown exactly once at creation time.
+  - Keys are passed either as `Authorization: Bearer <key>` or `?key=<key>`. Keys use the prefix `fa_` followed by 24 base32-style characters drawn from an `abcdefghijkmnopqrstuvwxyz23456789` alphabet (no `0/O/1/I` confusion), giving roughly 120 bits of entropy per key.
+  - Three plans configurable via env vars, defaults mirror FaviconAPIs: `PLAN_FREE_LIMIT=25`, `PLAN_PRO_LIMIT=2500`, `PLAN_ENTERPRISE_LIMIT=0` (where `0 = unlimited`). The plan assigned at key creation determines the monthly cap; that cap is snapshotted into `api_keys.monthly_limit` so changing the env var afterwards does not retroactively change existing keys.
+  - Quotas reset per calendar month UTC (`period = YYYY-MM`). A request only counts toward the quota when the API returns `200`, matching FaviconAPIs' "successful HTTP response" rule — `4xx`/`5xx` calls do not consume quota. `cached: true` responses do count (the API still authenticated you and returned a valid result).
+  - When the cap is reached, subsequent calls return `429 quota_exceeded` with `{ plan, limit, used, period }` in the response body.
+  - Two tables: `api_keys` (`id`, `key_prefix`, `key_hash`, `label`, `plan`, `monthly_limit`, `status`, `created_at`) and `usage_monthly` (`api_key_id`, `period`, `count`, PK = `(api_key_id, period)`, with `ON DELETE CASCADE` so deleting a key wipes its history). Increment uses `INSERT ... ON CONFLICT DO UPDATE SET count = count + 1`.
+
+- **`API_REQUIRE_KEY` environment variable** to disable auth and quotas entirely
+  - Default `true` (current behaviour: key required, quota enforced).
+  - Set to `false` to make `/api/v1/favicon` a fully public endpoint — no `Authorization` header or `?key=` required, and per-key plans/quotas are not enforced. A provided key is silently ignored in this mode (not validated, not tracked). Useful for self-hosted deployments behind their own auth layer or for fully open instances.
+  - Accepts `false` / `0` / `no` / `off` (case-insensitive) as off-values; an empty or unset value falls back to the default `true`.
+  - Plan-related env vars (`PLAN_FREE_LIMIT`, `PLAN_PRO_LIMIT`, `PLAN_ENTERPRISE_LIMIT`) are only applied when `API_REQUIRE_KEY=true`.
+  - Documented in `README.md`, `.env.example` and `docker-compose.yml`.
+
+- **CLI for API key management** (`scripts/manage-keys.js`, wired as npm scripts)
+  - `npm run keys:create -- --label "customer A" --plan free|pro|enterprise` — prints the raw `fa_<24 chars>` key exactly once (only its SHA-256 hash is persisted) along with the plan and monthly limit. The displayed prefix in `keys:list` is the first 11 characters (`fa_` + 8 random) — long enough to revoke unambiguously without leaking the secret.
+  - `npm run keys:list` shows active keys with this month's usage counter; `npm run keys:list -- --all` also includes revoked keys (kept for audit history).
+  - `npm run keys:revoke -- --prefix fa_abcd1234` flips `status` to `revoked` so the key stops validating immediately, but keeps the row in the DB and excludes it from the default `keys:list` output.
+  - `npm run keys:delete -- --prefix fa_abcd1234` permanently removes the key row and (via `ON DELETE CASCADE`) its usage counters.
+  - Inside Docker, invoke via `docker compose exec maflplus-favicon-api npm run keys:create -- --label "..." --plan pro` so the script writes to the same SQLite file the running server reads from.
+
+- **`api.html` - interactive API documentation and playground** for the new v1 API, served at `/api` and `/api.html`.
+  - New user-facing page (`src/public/api.html`) styled to match the homepage (same `#faf6f1` background, `#5b2e7e` purple accents, Georgia serif headings) and registered via `app.get(['/api', '/api.html'], renderTemplate(API_HTML_TEMPLATE))` in `src/index.js`.
+  - Templated rendering shared with the homepage: `src/index.js` factored the per-request `__BASE_URL__` substitution into a `renderTemplate(template)` helper now mounted on both `['/', '/index.html']` and `['/api', '/api.html']`. Canonical link, Open Graph, Twitter Card and JSON-LD (`@type: TechArticle`, `isPartOf: WebApplication`) tags are populated with the request's absolute origin without baking the hostname into the image. `express.static` still runs with `{ index: false }` so `/api.html` always goes through the templated route.
+  - **Quick start** with a copy-able `GET` example and tabbed code samples for `curl`, `JavaScript` (browser `fetch`), `Node.js` (undici `request`), `Python` (`requests`), `PHP` and `PowerShell` (`Invoke-RestMethod`). Each sample is regenerated client-side from `location.origin` so it shows the exact URL the visitor is on (no `your-host` placeholders).
+  - **Interactive playground** ("Try it") that sends a real request from the browser:
+    - Free-text URL input plus optional API key field with an `Authorization: Bearer` / `?key=` toggle for how the key is sent.
+    - Live response panel showing a status pill (`200`, `400`, `401`, `422`, `429`, `500`) in mode-appropriate colors, the request URL, elapsed time in ms, and the formatted JSON body.
+    - Side preview frame that renders the resulting `/cdn/favicons/{domain}.png` plus dimensions and `cached` / `sourceType` notes when the call succeeds; "Request did not return an image" placeholder on error.
+    - Quick-domain chips, `Copy JSON` button, `Clear` button, and `localStorage` persistence of the entered key across page loads.
+  - **Endpoint reference** with query-parameter and response-field tables; **Errors table** with colored status pills per code (400, 401, 422, 429, 500); **Authentication** section (Bearer header + `?key=` examples + bundled `scripts/manage-keys.js` CLI usage); **Plans & quotas table** populated at runtime from `/providers`; **CDN route** documentation.
+  - **Adaptive UI based on the server's `API_REQUIRE_KEY` setting** - the page fetches `/providers` on load and:
+    - Toggles a green "Public / anonymous" vs. orange "API keys required" badge in the header.
+    - Hides the playground key input, the **Authentication** section and the **Plans & quotas** section when this instance does not require a key.
+    - Re-renders the Quick start code samples so the `Authorization: Bearer fa_your_key_here` header (or `?key=...`) is dropped when not relevant - the samples become valid copy-paste calls for the actual running instance.
+  - All env-var names (`API_REQUIRE_KEY`, `API_CACHE_TTL`, `PLAN_*_LIMIT`) are kept out of the user-facing copy; runtime/config documentation lives in `README.md` and `.env.example`.
+  - **`/providers` extended with `api.{ requireKey, cacheTtl, plans }`** so the docs page can adapt without a separate endpoint. `requireKey` mirrors the `API_REQUIRE_KEY` parsing in `src/apiRoutes.js` (truthy unless the env var equals `false` / `0` / `no` / `off`), `cacheTtl` reflects `API_CACHE_TTL` (default 604800), `plans` exposes `apiStore.PLAN_LIMITS` (`free` / `pro` / `enterprise`).
+  - **`/robots.txt`** allow-list extended with `/api` and `/api.html`; **`/sitemap.xml`** includes a new `<url>` entry for `/api` (`<priority>0.8</priority>`, `<changefreq>monthly</changefreq>`) so search engines can index the docs page.
+  - **Homepage `top-nav`** gains an **API** link pointing at `/api`, sitting between the **Tools** offcanvas button and the **MAFL+** external link.
+
+- **Consistent top navigation across pages** — `api.html` now has the same top-nav as `index.html`: **Tools** offcanvas (bookmarklet + browser search-engine setup modal), **Home**, **API**, **MAFL+**, **Favicon API** and **Wiki** links. A **Home** menu item (`/`) has been added to both pages, with the current page highlighted via an `active` style.
+- **Page footer on `index.html`** — the homepage now displays the same footer as `api.html` (links to GitHub and Wiki, separated by a subtle top border).
 - **Browser custom search engine** (`/search?q=...` + `/opensearch.xml`)
   - New `GET /search?q={query}` route redirects to `/?q={query}` so the homepage loads favicon results for the typed domain or service name. Intended URL for browser search-engine settings: `https://your-host/search?q=%s`.
   - New `GET /opensearch.xml` OpenSearch descriptor (linked from the homepage `<head>`) for one-click "Add search engine" in Firefox, Chrome and other OpenSearch-aware browsers.
@@ -116,6 +168,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`parseIconCandidatesFromHtml` (`src/providers.js`)** now also reports the `rel` attribute per candidate (`{ href, sizes, type, rel }`), enabling the new `apiScraper.js` to classify candidates by source type (`svg` / `manifest` / `apple-touch-icon` / `png` / `ico`). Existing callers (`buildScraperCandidates` in `fetchScraper`) ignore the new field and are not affected.
+- **`src/providers.js` exports** expanded with `fetchScraperPage`, `parseIconCandidatesFromHtml`, `fetchManifestIcons` and `parseSizesAttr` so the new `apiScraper.js` can reuse the existing HTML/manifest fetch pipeline without duplication. Pre-existing exports are unchanged.
+- **`Dockerfile`** updates for the v1 API:
+  - Deps stage installs `python3 make g++` as a virtual `.build-deps` apk package and removes them again after `npm ci`, so native modules like `better-sqlite3` can compile from source on Alpine/musl when no prebuilt binary is available for the target arch; the runtime image is unaffected.
+  - Runtime stage now also copies `scripts/` so the `npm run keys:*` CLI is available inside the container (`docker compose exec maflplus-favicon-api npm run keys:create -- ...`).
 - `docker-compose.yml` supports local development via `build: .` (comment out for the published `ghcr.io/r0gger/maflplus-favicon-api:latest` image).
 - Best-pick (`/{domain}`) now scrapes the source site first, falling back to network providers only when scraping does not yield a usable icon — typically improving icon quality and resilience for self-hosted/private domains.
 - **Best-pick (`/{domain}`) races providers in parallel** instead of trying them strictly sequentially.
@@ -148,6 +205,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Internal
 
+- New dependencies: `better-sqlite3` (synchronous SQLite driver in WAL mode so the API key store is safe across cluster workers writing into the same `/cache/api-keys.sqlite` file) and `decode-ico` (multi-frame ICO decoder used by the 256×256 PNG normaliser to extract the largest frame from `/favicon.ico` responses).
+- The v1 API cache is **namespaced separately** from the existing provider-based cache (`src/cache.js`): PNGs live at `${API_CACHE_DIR}/{domain}.png` with a sibling `.meta.json` (`{ sourceType, cachedAt }`) so the two schemes can coexist in `/cache` without key collisions. The existing `CACHE_SIZE_MB` LRU rescan picks up `${API_CACHE_DIR}/...` files alongside the rest of the cache directory, so the global disk-size cap also covers the v1 API output.
 - New `fetchScraperAllIcons(domain)` exported from `src/providers.js` is the single source of truth for the merged scraper icon list (besticon + static CDN hints + sized variants, deduped + sorted by area). Backed by an in-memory `LRUCache` (`SCRAPER_ICONS_CACHE_MAX` / `SCRAPER_ICONS_CACHE_TTL`). Consumed by `/{domain}/json` (`endpoints.scraper.icons`); `fetchScraper` uses the same `deriveHintCandidates` helper to enrich its candidate pool before `probeScraperCandidates` so the chosen "best" icon matches the largest entry the UI displays. `probeScraperCandidates` is invoked with `limit=32` in the besticon path so the augmented pool is not truncated at the previous default of 16. The earlier `fetchBesticonAllIcons` export is now an internal implementation detail.
 - `fetchScraperAsset` is exported from `src/providers.js`; the asset fetcher is reused by the `/s-asset` route.
 - New `besticonIconsToCandidates` helper bridges besticon's raw `/allicons.json` response to the existing `{ href, sizes, type }` candidate format consumed by `rankCandidates` / `probeScraperCandidates`.

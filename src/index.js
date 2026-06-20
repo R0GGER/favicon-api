@@ -26,6 +26,17 @@ const {
 } = require('./providers');
 const { pickBest, fetchWithCache } = require('./bestPick');
 const cache = require('./cache');
+const apiRoutes = require('./apiRoutes');
+const apiStore = require('./apiStore');
+
+// Mirror of the parsing logic in src/apiRoutes.js (kept local so the homepage
+// /providers endpoint can advertise the current API mode to the docs page
+// without importing the router itself).
+const API_REQUIRE_KEY = (() => {
+  const raw = String(process.env.API_REQUIRE_KEY ?? '').trim().toLowerCase();
+  if (raw === '') return true;
+  return !['false', '0', 'no', 'off'].includes(raw);
+})();
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
@@ -40,19 +51,26 @@ const INDEX_HTML_TEMPLATE = fs.readFileSync(
   path.join(__dirname, 'public', 'index.html'),
   'utf8'
 );
+const API_HTML_TEMPLATE = fs.readFileSync(
+  path.join(__dirname, 'public', 'api.html'),
+  'utf8'
+);
 
 function getBaseUrl(req) {
   return `${req.protocol}://${req.get('host')}`;
 }
 
-function renderIndex(req, res) {
-  const html = INDEX_HTML_TEMPLATE.replace(/__BASE_URL__/g, getBaseUrl(req));
-  res.set('Content-Type', 'text/html; charset=utf-8');
-  res.set('Cache-Control', 'no-cache');
-  res.send(html);
+function renderTemplate(template) {
+  return (req, res) => {
+    const html = template.replace(/__BASE_URL__/g, getBaseUrl(req));
+    res.set('Content-Type', 'text/html; charset=utf-8');
+    res.set('Cache-Control', 'no-cache');
+    res.send(html);
+  };
 }
 
-app.get(['/', '/index.html'], renderIndex);
+app.get(['/', '/index.html'], renderTemplate(INDEX_HTML_TEMPLATE));
+app.get(['/api', '/api.html'], renderTemplate(API_HTML_TEMPLATE));
 
 // Browser custom search engine: /search?q=example.com → homepage with results.
 app.get('/search', (req, res) => {
@@ -92,6 +110,8 @@ app.get('/robots.txt', (req, res) => {
     '\n' +
     'User-agent: *\n' +
     'Allow: /$\n' +
+    'Allow: /api\n' +
+    'Allow: /api.html\n' +
     'Allow: /favicon.png\n' +
     'Allow: /logo.png\n' +
     'Allow: /sitemap.xml\n' +
@@ -116,6 +136,11 @@ app.get('/sitemap.xml', (req, res) => {
     '    <changefreq>monthly</changefreq>\n' +
     '    <priority>1.0</priority>\n' +
     '  </url>\n' +
+    '  <url>\n' +
+    `    <loc>${baseUrl}/api</loc>\n` +
+    '    <changefreq>monthly</changefreq>\n' +
+    '    <priority>0.8</priority>\n' +
+    '  </url>\n' +
     '</urlset>\n';
   res.set('Content-Type', 'application/xml; charset=utf-8');
   res.set('Cache-Control', 'public, max-age=3600');
@@ -136,6 +161,11 @@ app.use(
     },
   })
 );
+
+// FaviconAPIs-style JSON API (/api/v1/favicon) + public CDN route
+// (/cdn/favicons/:domain.png). Mounted before the catch-all `/:domain`
+// route below so its paths take precedence.
+app.use(apiRoutes);
 
 const VALID_GOOGLE_SIZES = new Set([16, 32, 64, 128]);
 const VALID_GOOGLEV2_SIZES = new Set([16, 32, 64, 128, 256]);
@@ -458,6 +488,11 @@ app.get('/providers', (req, res) => {
     logoDevToken: process.env.LOGODEV_TOKEN || null,
     defaultProvider: (process.env.DEFAULT_PROVIDER || '').trim().toLowerCase() || null,
     upstreamIpv4: true,
+    api: {
+      requireKey: API_REQUIRE_KEY,
+      cacheTtl: parseInt(process.env.API_CACHE_TTL || '604800', 10),
+      plans: { ...apiStore.PLAN_LIMITS },
+    },
   });
 });
 

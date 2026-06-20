@@ -26,6 +26,8 @@ A lightweight favicon proxy that fetches favicons from multiple providers (HTML 
 | `/opensearch.xml` | OpenSearch descriptor for one-click "Add search engine" in supported browsers. Linked from the homepage `<head>`. |
 | `/providers` | JSON config indicating which optional providers are enabled |
 | `/{domain}/json` | JSON list of every endpoint URL for the domain |
+| `/api/v1/favicon?url=...` | **FaviconAPIs-compatible JSON endpoint.** Returns a JSON response (not the image bytes) with a CDN URL to a normalized 256x256 PNG, the detected `sourceType` (`svg` > `manifest` > `apple-touch-icon` > `png` > `ico`), and cache metadata. Requires an API key (Bearer or `?key=`). See [API v1](#api-v1-faviconapis-style) below. |
+| `/cdn/favicons/{domain}.png` | Public CDN route that serves the 256x256 PNG cached by `/api/v1/favicon`. Sends `Cache-Control: public, max-age=604800, immutable`. |
 | `/robots.txt` | Search-engine crawl directives. Allows indexing of the homepage and static assets (`/favicon.png`, `/logo.png`, `/sitemap.xml`) only; disallows every favicon endpoint so crawlers don't waste budget on the unbounded `/{domain}` URL space. The `Sitemap:` line is auto-built from the request host. |
 | `/sitemap.xml` | Single-URL sitemap pointing at the homepage. The `<loc>` is auto-built from `req.protocol`/`req.get('host')`, so the correct public origin is used behind any reverse proxy (relies on Express `trust proxy`). |
 
@@ -46,6 +48,105 @@ When `BESTICON_URL` is set, the JSON output also exposes every icon besticon fou
 **Dashboard Icons example:** `https://your-host/di/jellyfin`
 
 The web UI accepts both a domain (e.g. `example.com`) and a bare service name without a TLD (e.g. `radarr`, `sonarr`); when no dot is present the input is treated as a service-icon name and the selfh.st and Dashboard Icons (homarr) cards are shown side-by-side. The "Also include service icon lookups" toggle controls whether they are also probed for domain searches (derived slug = first label of the domain).
+
+## API v1 (FaviconAPIs-style)
+
+`GET /api/v1/favicon?url=<website>` is a JSON-returning endpoint modeled on [faviconapis.com](https://www.faviconapis.com/docs). It runs the HTML scraper, picks the best source in priority order (`svg` > `manifest` > `apple-touch-icon` > `png` > root `/favicon.ico`), normalizes the result to a 256x256 PNG, caches that PNG on disk for 7 days and returns a CDN URL plus metadata. The image is **not** sent in the response body; clients fetch it from the returned `url` via `/cdn/favicons/{domain}.png`.
+
+### Authentication
+
+By default API keys are required. For self-hosted setups that want a fully public, anonymous endpoint, set `API_REQUIRE_KEY=false` in the environment (see [docker-compose.yml](docker-compose.yml)). In that mode the route accepts any request without an `Authorization` header or `?key=`, and per-key plans/quotas are not enforced. A provided key is silently ignored — it is not validated and its usage counter is not incremented.
+
+When `API_REQUIRE_KEY=true` (default), pass the key in one of two ways:
+
+```bash
+curl "https://your-host/api/v1/favicon?url=https://github.com" \
+  -H "Authorization: Bearer fa_your_key_here"
+```
+
+```bash
+curl "https://your-host/api/v1/favicon?url=https://github.com&key=fa_your_key_here"
+```
+
+On Windows PowerShell, `curl` is an alias for `Invoke-WebRequest` and will not accept `-H "Authorization: ..."` as a string. Use `curl.exe` (the real curl binary that ships with Windows 10+), or use native PowerShell:
+
+```powershell
+Invoke-RestMethod "https://your-host/api/v1/favicon?url=https://github.com" `
+  -Headers @{ Authorization = "Bearer fa_your_key_here" }
+```
+
+Only the SHA-256 hash of each key is stored. The raw key is shown exactly once at creation time.
+
+### Successful response
+
+```json
+{
+  "url":        "https://your-host/cdn/favicons/github.com.png",
+  "domain":     "github.com",
+  "width":      256,
+  "height":     256,
+  "format":     "png",
+  "sourceType": "svg",
+  "cached":     true,
+  "cachedAt":   "2026-06-20T08:00:00.000Z"
+}
+```
+
+`sourceType` is one of `svg`, `manifest`, `apple-touch-icon`, `png`, `ico`. `cached` is `true` when the PNG was served from the 7-day disk cache, `false` when it was just generated.
+
+### Errors
+
+All error responses are JSON with `error`, `code` and (where useful) extra context.
+
+| Status | Code | Meaning |
+|---|---|---|
+| 400 | `missing_url` / `invalid_url` | Missing or unparseable `url` query parameter. |
+| 401 | `missing_api_key` / `invalid_api_key` | No key, or key not recognised / revoked. |
+| 422 | `favicon_not_found` / `favicon_not_processable` | No usable icon was found, or it could not be decoded. |
+| 429 | `quota_exceeded` | Monthly call quota for this key reached. The response body includes `plan`, `limit`, `used`, `period`. |
+| 500 | `internal_error` | Internal error. |
+
+A request counts toward the monthly quota only when the API returns `200`, matching FaviconAPIs' behaviour. Quotas reset each calendar month (UTC, `YYYY-MM`).
+
+### Plans and quotas
+
+Quotas per plan are configured via env vars (defaults shown):
+
+| Plan | Env var | Default |
+|---|---|---|
+| `free` | `PLAN_FREE_LIMIT` | `25` |
+| `pro` | `PLAN_PRO_LIMIT` | `2500` |
+| `enterprise` | `PLAN_ENTERPRISE_LIMIT` | `0` (unlimited) |
+
+`0` means no limit. The plan you assign at key creation time is what determines the monthly cap. To disable plans entirely (and run as a public API), set `API_REQUIRE_KEY=false` — see [Authentication](#authentication) above.
+
+### CLI: managing API keys
+
+The bundled `scripts/manage-keys.js` reads/writes the SQLite file at `API_KEYS_DB` (default `/cache/api-keys.sqlite`, shared with the cache volume).
+
+```bash
+# Create a key for a customer on the pro plan.
+# The raw key is printed once and only its SHA-256 hash is stored.
+npm run keys:create -- --label "customer A" --plan pro
+
+# List active keys with this month's usage counter.
+# Pass --all to also see revoked keys (kept for audit history).
+npm run keys:list
+npm run keys:list -- --all
+
+# Revoke a key by its visible prefix. The key stops validating immediately
+# but the row is kept in the DB (and is excluded from `keys:list` by default).
+npm run keys:revoke -- --prefix fa_abcdefgh
+
+# Permanently remove a key and its usage history from the database.
+npm run keys:delete -- --prefix fa_abcdefgh
+```
+
+Inside Docker, run these via `docker compose exec maflplus-favicon-api npm run keys:create -- --label "..." --plan pro` so the script writes to the same SQLite file the running server reads from.
+
+### Cached images and the CDN route
+
+`GET /cdn/favicons/{domain}.png` is the public read-only mirror of `API_CACHE_DIR` (default `/cache/api/`). It sends `Content-Type: image/png` and `Cache-Control: public, max-age=604800, immutable` so HTTP intermediaries (or a CDN in front of this service) can hold on to the PNG for the full 7 days. The route returns `404` when no PNG has been generated for the given domain yet, so it is safe to expose publicly — callers must hit `/api/v1/favicon` (with a valid key) to populate it.
 
 ## SEO
 

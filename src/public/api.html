@@ -1,0 +1,1834 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>API &ndash; MAFL+ Favicon API</title>
+  <meta name="description" content="JSON API reference and interactive playground for the MAFL+ Favicon API. Fetch a 256x256 PNG favicon for any domain through GET /api/v1/favicon, with optional API-key authentication, monthly quotas and a 7-day CDN cache.">
+  <meta name="keywords" content="favicon api, favicon json api, favicon api documentation, favicon playground, faviconapis alternative, self-hosted favicon api">
+  <meta name="author" content="R0GGER">
+  <meta name="robots" content="index, follow">
+  <meta name="theme-color" content="#5b2e7e">
+  <meta name="color-scheme" content="light">
+  <meta name="application-name" content="MAFL+ Favicon API">
+
+  <link rel="canonical" href="__BASE_URL__/api">
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="apple-touch-icon" href="/logo.png">
+
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="MAFL+ Favicon API">
+  <meta property="og:title" content="API &ndash; MAFL+ Favicon API">
+  <meta property="og:description" content="JSON API reference and interactive playground for the MAFL+ Favicon API. Fetch a 256x256 PNG favicon for any domain through GET /api/v1/favicon.">
+  <meta property="og:url" content="__BASE_URL__/api">
+  <meta property="og:image" content="__BASE_URL__/logo.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="150">
+  <meta property="og:image:height" content="150">
+  <meta property="og:image:alt" content="MAFL+ Favicon API logo">
+  <meta property="og:locale" content="en_US">
+
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="API &ndash; MAFL+ Favicon API">
+  <meta name="twitter:description" content="JSON API reference and interactive playground for the MAFL+ Favicon API.">
+  <meta name="twitter:image" content="__BASE_URL__/logo.png">
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "TechArticle",
+    "headline": "MAFL+ Favicon API \u2013 JSON API reference",
+    "description": "JSON API reference and interactive playground for the MAFL+ Favicon API. GET /api/v1/favicon returns a CDN URL to a normalized 256x256 PNG favicon for any domain.",
+    "url": "__BASE_URL__/api",
+    "image": "__BASE_URL__/logo.png",
+    "author": {
+      "@type": "Person",
+      "name": "R0GGER",
+      "url": "https://github.com/R0GGER"
+    },
+    "isPartOf": {
+      "@type": "WebApplication",
+      "name": "MAFL+ Favicon API",
+      "url": "__BASE_URL__/"
+    }
+  }
+  </script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #faf6f1;
+      color: #2d2a26;
+      min-height: 100vh;
+      padding: 2rem 1rem;
+    }
+
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+    }
+
+    .site-logo {
+      display: block;
+      margin: 0 auto 0.8rem;
+      width: 64px;
+      height: 64px;
+    }
+
+    h1 {
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: 2.4rem;
+      font-weight: 700;
+      text-align: center;
+      color: #2d2a26;
+      margin-bottom: 0.25rem;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: #6b6560;
+      font-size: 0.95rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .top-nav {
+      position: absolute;
+      top: 1rem;
+      right: 1.5rem;
+      display: flex;
+      gap: 1.2rem;
+      align-items: center;
+    }
+
+    .top-nav a {
+      color: #5b2e7e;
+      text-decoration: none;
+      font-size: 0.85rem;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      transition: color 0.15s;
+    }
+
+    .top-nav a:hover { color: #7b3fa8; text-decoration: underline; }
+    .top-nav a.active { color: #2d2a26; font-weight: 700; }
+
+    .top-nav svg {
+      width: 16px;
+      height: 16px;
+      fill: currentColor;
+    }
+
+    .top-nav-btn {
+      color: #5b2e7e;
+      background: transparent;
+      border: 1px solid #d9c2e6;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.35rem 0.65rem;
+      cursor: pointer;
+      font-family: inherit;
+      transition: color 0.15s, background 0.15s, border-color 0.15s;
+    }
+
+    .top-nav-btn:hover {
+      color: #7b3fa8;
+      background: #f3eaf7;
+      border-color: #c4a8d8;
+    }
+
+    .top-nav-btn svg {
+      width: 16px;
+      height: 16px;
+      fill: currentColor;
+    }
+
+    .offcanvas-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 1100;
+      display: none;
+      justify-content: flex-end;
+      background: rgba(45, 42, 38, 0.45);
+    }
+
+    .offcanvas-overlay.open { display: flex; }
+
+    .offcanvas-panel {
+      width: min(400px, 100%);
+      height: 100%;
+      background: #faf6f1;
+      border-left: 1px solid #e0dbd5;
+      box-shadow: -10px 0 40px rgba(0, 0, 0, 0.12);
+      display: flex;
+      flex-direction: column;
+      transform: translateX(100%);
+      transition: transform 0.25s ease;
+    }
+
+    .offcanvas-overlay.open .offcanvas-panel {
+      transform: translateX(0);
+    }
+
+    .offcanvas-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 1.1rem 1.25rem;
+      border-bottom: 1px solid #ece6de;
+      background: #fff;
+    }
+
+    .offcanvas-header h2 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #2d2a26;
+    }
+
+    .offcanvas-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1.1rem 1.25rem 1.5rem;
+    }
+
+    .offcanvas-intro {
+      font-size: 0.88rem;
+      color: #6b6560;
+      line-height: 1.5;
+      margin-bottom: 1rem;
+    }
+
+    .tool-card {
+      background: #f3eaf7;
+      border: 1px solid #d9c2e6;
+      border-radius: 10px;
+      padding: 1rem 1.1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+    }
+
+    .tool-card + .tool-card { margin-top: 0.85rem; }
+
+    .tool-card strong {
+      display: block;
+      font-size: 0.95rem;
+      margin-bottom: 0.15rem;
+    }
+
+    .tool-card p {
+      font-size: 0.88rem;
+      line-height: 1.5;
+      color: #4a4540;
+    }
+
+    .tool-card .tool-action { align-self: flex-start; }
+
+    .bookmarklet-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.55rem 1rem;
+      background: #5b2e7e;
+      color: #fff;
+      border-radius: 6px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.15s, transform 0.1s;
+      white-space: nowrap;
+      border: none;
+      font-family: inherit;
+    }
+
+    .bookmarklet-btn[draggable="true"] { cursor: grab; }
+    .bookmarklet-btn[draggable="true"]:active { cursor: grabbing; transform: scale(0.97); }
+
+    .bookmarklet-btn:hover { background: #7b3fa8; }
+    .bookmarklet-btn:active { transform: scale(0.97); }
+
+    .bookmarklet-btn svg {
+      width: 14px;
+      height: 14px;
+      fill: currentColor;
+    }
+
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 1200;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      background: rgba(45, 42, 38, 0.55);
+    }
+
+    .modal-overlay.open { display: flex; }
+
+    .modal {
+      width: min(560px, 100%);
+      max-height: min(85vh, 720px);
+      overflow: auto;
+      background: #fff;
+      border-radius: 12px;
+      border: 1px solid #e0dbd5;
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.18);
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 1.25rem 1.35rem 0.75rem;
+      border-bottom: 1px solid #ece6de;
+    }
+
+    .modal-header h2 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #2d2a26;
+    }
+
+    .modal-close {
+      flex: 0 0 auto;
+      border: none;
+      background: transparent;
+      color: #8a8480;
+      font-size: 1.5rem;
+      line-height: 1;
+      cursor: pointer;
+      padding: 0.1rem 0.25rem;
+      border-radius: 4px;
+    }
+
+    .modal-close:hover {
+      color: #2d2a26;
+      background: #f5f0ea;
+    }
+
+    .modal-body {
+      padding: 1rem 1.35rem 1.35rem;
+      font-size: 0.9rem;
+      line-height: 1.55;
+    }
+
+    .modal-intro {
+      color: #6b6560;
+      margin-bottom: 1rem;
+    }
+
+    .search-url-box {
+      display: flex;
+      align-items: stretch;
+      gap: 0.5rem;
+      margin-bottom: 1.25rem;
+      padding: 0.75rem;
+      background: #f5f0ea;
+      border: 1px solid #e0dbd5;
+      border-radius: 8px;
+    }
+
+    .search-url-box code {
+      flex: 1;
+      min-width: 0;
+      font-size: 0.82rem;
+      word-break: break-all;
+      color: #5b2e7e;
+      background: transparent;
+      padding: 0;
+      cursor: default;
+    }
+
+    .search-url-box code:hover { background: transparent; }
+
+    .modal-copy-btn {
+      flex: 0 0 auto;
+      border: none;
+      background: #5b2e7e;
+      color: #fff;
+      border-radius: 6px;
+      padding: 0.45rem 0.75rem;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .modal-copy-btn:hover { background: #7b3fa8; }
+
+    .browser-guide {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .browser-guide section {
+      border: 1px solid #ece6de;
+      border-radius: 8px;
+      padding: 0.85rem 1rem;
+      background: #faf8f5;
+    }
+
+    .browser-guide h3 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      margin-bottom: 0.45rem;
+      color: #2d2a26;
+    }
+
+    .browser-guide ol {
+      margin: 0;
+      padding-left: 1.2rem;
+    }
+
+    .browser-guide li + li { margin-top: 0.25rem; }
+
+    .browser-guide a {
+      color: #5b2e7e;
+      word-break: break-all;
+    }
+
+    .browser-guide a:hover { text-decoration: underline; }
+
+    .browser-guide .note {
+      margin-top: 0.45rem;
+      font-size: 0.82rem;
+      color: #8a8480;
+      font-style: italic;
+    }
+
+    .api-mode {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+      font-size: 0.88rem;
+      color: #4a4540;
+    }
+
+    .api-mode .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.25rem 0.65rem;
+      border-radius: 999px;
+      background: #f3eaf7;
+      color: #5b2e7e;
+      border: 1px solid #d9c2e6;
+      font-weight: 600;
+      font-size: 0.8rem;
+    }
+
+    .api-mode .badge.public {
+      background: #e8f5e9;
+      color: #2e7d32;
+      border-color: #c8e6c9;
+    }
+
+    .api-mode .badge.guarded {
+      background: #fff3e0;
+      color: #b25c00;
+      border-color: #f5d6a5;
+    }
+
+    .api-mode .badge .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    section.block {
+      background: #fff;
+      border: 1px solid #e0dbd5;
+      border-radius: 12px;
+      padding: 1.25rem 1.4rem;
+      margin-bottom: 1.4rem;
+    }
+
+    section.block > h2 {
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: 1.35rem;
+      color: #2d2a26;
+      margin-bottom: 0.4rem;
+    }
+
+    section.block > h2 .anchor {
+      color: #c4a8d8;
+      text-decoration: none;
+      margin-left: 0.35rem;
+      font-size: 0.9rem;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+
+    section.block > h2:hover .anchor { opacity: 1; }
+
+    section.block .lead {
+      color: #6b6560;
+      font-size: 0.93rem;
+      line-height: 1.55;
+      margin-bottom: 1rem;
+    }
+
+    section.block h3 {
+      font-size: 1rem;
+      color: #2d2a26;
+      margin-top: 1.1rem;
+      margin-bottom: 0.5rem;
+    }
+
+    section.block p {
+      font-size: 0.9rem;
+      color: #4a4540;
+      line-height: 1.55;
+      margin-bottom: 0.6rem;
+    }
+
+    section.block ul {
+      padding-left: 1.2rem;
+      font-size: 0.9rem;
+      color: #4a4540;
+      line-height: 1.6;
+    }
+
+    section.block ul li + li { margin-top: 0.15rem; }
+
+    code, pre {
+      font-family: 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
+      font-size: 0.85rem;
+    }
+
+    p code, li code, td code {
+      background: rgba(91, 46, 126, 0.08);
+      color: #5b2e7e;
+      padding: 0.1rem 0.4rem;
+      border-radius: 4px;
+      font-size: 0.82rem;
+    }
+
+    .code-block {
+      position: relative;
+      background: #2d2a26;
+      color: #f5f0ea;
+      border-radius: 8px;
+      padding: 0.85rem 1rem;
+      overflow-x: auto;
+      font-size: 0.82rem;
+      line-height: 1.5;
+    }
+
+    .code-block pre { white-space: pre; }
+
+    .code-block .copy-btn {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.5rem;
+      background: rgba(255,255,255,0.08);
+      color: #f5f0ea;
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 6px;
+      padding: 0.25rem 0.5rem;
+      font-size: 0.72rem;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.15s;
+    }
+
+    .code-block .copy-btn:hover { background: rgba(255,255,255,0.18); }
+    .code-block .copy-btn.copied { background: #2e7d32; border-color: #2e7d32; }
+
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      margin-bottom: 0.55rem;
+      border-bottom: 1px solid #ece6de;
+      padding-bottom: 0.35rem;
+    }
+
+    .tab-btn {
+      border: 1px solid transparent;
+      background: transparent;
+      color: #6b6560;
+      padding: 0.3rem 0.75rem;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      cursor: pointer;
+      font-family: inherit;
+      font-weight: 500;
+      transition: all 0.15s;
+    }
+
+    .tab-btn:hover { color: #5b2e7e; background: #f3eaf7; }
+    .tab-btn.active {
+      color: #fff;
+      background: #5b2e7e;
+      border-color: #5b2e7e;
+    }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+      margin: 0.5rem 0 0.25rem;
+    }
+
+    table th, table td {
+      text-align: left;
+      padding: 0.55rem 0.75rem;
+      border-bottom: 1px solid #ece6de;
+      vertical-align: top;
+    }
+
+    table th {
+      background: #faf6f1;
+      color: #2d2a26;
+      font-weight: 700;
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+
+    table tr:last-child td { border-bottom: none; }
+
+    .pill {
+      display: inline-block;
+      padding: 0.1rem 0.5rem;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    .pill.method { background: #5b2e7e; color: #fff; }
+    .pill.s200 { background: #e8f5e9; color: #2e7d32; }
+    .pill.s400 { background: #fff3e0; color: #b25c00; }
+    .pill.s401 { background: #ffe7e1; color: #c0392b; }
+    .pill.s422 { background: #fff3e0; color: #b25c00; }
+    .pill.s429 { background: #ffe7e1; color: #c0392b; }
+    .pill.s500 { background: #fde2e2; color: #c0392b; }
+
+    .endpoint-line {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.6rem;
+      background: #faf6f1;
+      border: 1px solid #ece6de;
+      border-radius: 8px;
+      padding: 0.65rem 0.85rem;
+      margin-bottom: 0.85rem;
+      font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+      font-size: 0.9rem;
+      color: #2d2a26;
+      word-break: break-all;
+    }
+
+    /* Interactive playground */
+    .playground-form {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+
+    .form-row {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+    }
+
+    .form-row label {
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      color: #6b6560;
+    }
+
+    .form-row label .hint {
+      font-weight: 400;
+      text-transform: none;
+      letter-spacing: 0;
+      color: #8a8480;
+      margin-left: 0.4rem;
+    }
+
+    .form-row input[type="text"] {
+      padding: 0.7rem 0.85rem;
+      border: 2px solid #d4cfc9;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      background: #fff;
+      color: #2d2a26;
+      transition: border-color 0.15s;
+    }
+
+    .form-row input[type="text"]:focus {
+      border-color: #5b2e7e;
+      outline: none;
+    }
+
+    .form-row .key-row {
+      display: flex;
+      gap: 0.5rem;
+      align-items: stretch;
+    }
+
+    .form-row .key-row input { flex: 1; min-width: 0; }
+
+    .form-row .key-row select {
+      flex: 0 0 auto;
+      padding: 0 0.85rem;
+      border: 2px solid #d4cfc9;
+      border-radius: 8px;
+      background: #fff;
+      font-family: inherit;
+      font-size: 0.85rem;
+      color: #2d2a26;
+      cursor: pointer;
+    }
+
+    .form-row .key-row select:focus {
+      border-color: #5b2e7e;
+      outline: none;
+    }
+
+    .playground-actions {
+      display: flex;
+      gap: 0.6rem;
+      align-items: center;
+    }
+
+    .btn-primary {
+      background: #5b2e7e;
+      color: #fff;
+      border: none;
+      padding: 0.7rem 1.4rem;
+      border-radius: 8px;
+      font-size: 0.92rem;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.15s;
+    }
+
+    .btn-primary:hover { background: #7b3fa8; }
+    .btn-primary:disabled { background: #a08aaf; cursor: wait; }
+
+    .btn-secondary {
+      background: transparent;
+      color: #5b2e7e;
+      border: 1px solid #d9c2e6;
+      padding: 0.7rem 1.1rem;
+      border-radius: 8px;
+      font-size: 0.88rem;
+      font-weight: 500;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s;
+    }
+
+    .btn-secondary:hover {
+      background: #f3eaf7;
+      color: #7b3fa8;
+    }
+
+    .playground-result {
+      display: none;
+      grid-template-columns: 220px 1fr;
+      gap: 1rem;
+      margin-top: 1rem;
+      padding: 1rem;
+      background: #faf6f1;
+      border: 1px solid #ece6de;
+      border-radius: 10px;
+    }
+
+    .playground-result.visible { display: grid; }
+
+    .result-preview {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .preview-frame {
+      background: #fff;
+      border: 1px solid #e0dbd5;
+      border-radius: 10px;
+      width: 180px;
+      height: 180px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      padding: 0.5rem;
+    }
+
+    .preview-frame img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+
+    .preview-meta {
+      font-size: 0.78rem;
+      color: #8a8480;
+      text-align: center;
+    }
+
+    .result-json {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      min-width: 0;
+    }
+
+    .result-status {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+      font-size: 0.85rem;
+      color: #4a4540;
+    }
+
+    .result-status .url {
+      flex: 1 1 auto;
+      min-width: 0;
+      font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+      font-size: 0.78rem;
+      color: #6b6560;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .result-json pre {
+      background: #2d2a26;
+      color: #f5f0ea;
+      padding: 0.85rem 1rem;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-size: 0.82rem;
+      line-height: 1.5;
+      max-height: 320px;
+    }
+
+    .quick-domains {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      margin-top: 0.4rem;
+      font-size: 0.82rem;
+      color: #8a8480;
+      align-items: center;
+    }
+
+    .quick-domains a {
+      color: #5b2e7e;
+      cursor: pointer;
+      text-decoration: none;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      background: #f3eaf7;
+      border: 1px solid transparent;
+      transition: border-color 0.15s;
+    }
+
+    .quick-domains a:hover { border-color: #c4a8d8; }
+
+    @media (max-width: 700px) {
+      h1 { font-size: 1.8rem; }
+      .top-nav {
+        position: static;
+        justify-content: center;
+        margin-bottom: 1rem;
+        flex-wrap: wrap;
+      }
+      .top-nav-btn {
+        padding: 0.45rem 0.75rem;
+      }
+      section.block { padding: 1.1rem; }
+      .playground-result { grid-template-columns: 1fr; }
+      .preview-frame { width: 100%; max-width: 240px; height: 200px; margin: 0 auto; }
+      .form-row .key-row { flex-direction: column; }
+      .form-row .key-row select { padding: 0.6rem 0.85rem; }
+      table { font-size: 0.82rem; }
+      table th, table td { padding: 0.45rem 0.55rem; }
+    }
+
+    .global-toast {
+      position: fixed;
+      right: 1.25rem;
+      bottom: 1.25rem;
+      background: #2d2a26;
+      color: #fff;
+      padding: 0.7rem 1rem 0.7rem 0.85rem;
+      border-radius: 8px;
+      font-size: 0.88rem;
+      font-weight: 500;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      max-width: min(420px, calc(100vw - 2.5rem));
+      transform: translateY(20px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      z-index: 9999;
+    }
+
+    .global-toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .global-toast .check {
+      color: #6ee7a8;
+      font-weight: 700;
+      flex: 0 0 auto;
+    }
+
+    footer.page-footer {
+      text-align: center;
+      font-size: 0.8rem;
+      color: #8a8480;
+      margin-top: 2rem;
+      padding-top: 1rem;
+      border-top: 1px solid #ece6de;
+    }
+
+    footer.page-footer a {
+      color: #5b2e7e;
+      text-decoration: none;
+    }
+    footer.page-footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <nav class="top-nav">
+    <button type="button" class="top-nav-btn" id="tools-offcanvas-btn" onclick="openToolsOffcanvas()" aria-expanded="false" aria-controls="tools-offcanvas">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 2.5A1.5 1.5 0 012.5 1h3A1.5 1.5 0 017 2.5v3A1.5 1.5 0 015.5 7h-3A1.5 1.5 0 011 5.5v-3zM2.5 2a.5.5 0 00-.5.5v3a.5.5 0 00.5.5h3a.5.5 0 00.5-.5v-3a.5.5 0 00-.5-.5h-3zm6.5.5A1.5 1.5 0 0110.5 1h3A1.5 1.5 0 0115 2.5v3A1.5 1.5 0 0113.5 7h-3A1.5 1.5 0 019 5.5v-3zm1.5-.5a.5.5 0 00-.5.5v3a.5.5 0 00.5.5h3a.5.5 0 00.5-.5v-3a.5.5 0 00-.5-.5h-3zM1 10.5A1.5 1.5 0 012.5 9h3A1.5 1.5 0 017 10.5v3A1.5 1.5 0 015.5 15h-3A1.5 1.5 0 011 13.5v-3zm1.5-.5a.5.5 0 00-.5.5v3a.5.5 0 00.5.5h3a.5.5 0 00.5-.5v-3a.5.5 0 00-.5-.5h-3zm6.5.5A1.5 1.5 0 0110.5 9h3a1.5 1.5 0 011.5 1.5v3a1.5 1.5 0 01-1.5 1.5h-3A1.5 1.5 0 019 13.5v-3zm1.5-.5a.5.5 0 00-.5.5v3a.5.5 0 00.5.5h3a.5.5 0 00.5-.5v-3a.5.5 0 00-.5-.5h-3z"/></svg>
+      Tools
+    </button>
+    <a href="/">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.5 14.5v-3.505c0-.245.25-.495.5-.495h2c.25 0 .5.25.5.5v3.5a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.146-.354L13 5.793V2.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.293L8.354 1.146a.5.5 0 0 0-.708 0l-6 6A.5.5 0 0 0 1.5 7.5v7a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5z"/></svg>
+      Home
+    </a>
+    <a href="/api" class="active">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.854 4.854a.5.5 0 1 0-.708-.708l-3.5 3.5a.5.5 0 0 0 0 .708l3.5 3.5a.5.5 0 0 0 .708-.708L2.707 8l3.147-3.146zm4.292 0a.5.5 0 0 1 .708-.708l3.5 3.5a.5.5 0 0 1 0 .708l-3.5 3.5a.5.5 0 0 1-.708-.708L13.293 8l-3.147-3.146z"/></svg>
+      API
+    </a>
+    <a href="https://github.com/R0GGER/maflplus" target="_blank" rel="noopener">
+      <svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      MAFL+
+    </a>
+    <a href="https://github.com/R0GGER/maflplus-favicon-api" target="_blank" rel="noopener">
+      <svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      Favicon API
+    </a>
+    <a href="https://wiki.maflplus.eu/mafl/icons#favicon-api" target="_blank" rel="noopener">
+      <svg viewBox="0 0 16 16"><path d="M0 1.75A.75.75 0 01.75 1h4.253c1.227 0 2.317.59 3 1.501A3.744 3.744 0 0111.006 1h4.245a.75.75 0 01.75.75v10.5a.75.75 0 01-.75.75h-4.507a2.25 2.25 0 00-1.591.659l-.622.621a.75.75 0 01-1.06 0l-.622-.621A2.25 2.25 0 005.258 13H.75a.75.75 0 01-.75-.75V1.75zm7.251 10.324V2.922a2.25 2.25 0 00-2.248-2.172H1.5v10h3.757a3.75 3.75 0 012 .578zM8.75 12.074V2.922a2.25 2.25 0 012.248-2.172h3.502v10h-3.757a3.75 3.75 0 00-1.993.574z"/></svg>
+      Wiki
+    </a>
+  </nav>
+
+  <div class="offcanvas-overlay" id="tools-offcanvas" hidden aria-hidden="true" onclick="onToolsOffcanvasBackdropClick(event)">
+    <aside class="offcanvas-panel" role="dialog" aria-modal="true" aria-labelledby="tools-offcanvas-title" onclick="event.stopPropagation()">
+      <div class="offcanvas-header">
+        <h2 id="tools-offcanvas-title">Browser tools</h2>
+        <button type="button" class="modal-close" onclick="closeToolsOffcanvas()" aria-label="Close">&times;</button>
+      </div>
+      <div class="offcanvas-body">
+        <p class="offcanvas-intro">Shortcuts to use MAFL+ from your browser address bar or bookmarks bar.</p>
+
+        <div class="tool-card">
+          <div>
+            <strong><span class="icon">&#128269;</span> Browser search</strong>
+            <p>Add MAFL+ as a custom search engine and look up favicons straight from your address bar.</p>
+          </div>
+          <button type="button" class="bookmarklet-btn tool-action" id="search-browser-btn" onclick="openSearchModal()">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/></svg>
+            Search from browser
+          </button>
+        </div>
+
+        <div class="tool-card">
+          <div>
+            <strong><span class="icon">&#9733;</span> Bookmarklet</strong>
+            <p><span style="color:#5b2e7e;font-weight:700">Drag</span> the button to your bookmarks bar (don't click &amp; copy &mdash; the name will only auto-fill when dragging). Click the saved bookmark on any page to copy that site's favicon URL.</p>
+          </div>
+          <a class="bookmarklet-btn tool-action" id="bookmarklet-link" href="#" draggable="true" title="Drag me to your bookmarks bar" onclick="bookmarkletClicked(event)">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v13.5a.5.5 0 0 1-.777.416L8 13.101l-5.223 2.815A.5.5 0 0 1 2 15.5V2z"/></svg>
+            Mafl+ Favicon Copy
+          </a>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <div class="modal-overlay" id="search-modal" hidden aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="search-modal-title">
+      <div class="modal-header">
+        <h2 id="search-modal-title">Search from browser</h2>
+        <button type="button" class="modal-close" onclick="closeSearchModal()" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-intro">Add MAFL+ as a custom search engine. Use <code>%s</code> as the query placeholder &mdash; your browser replaces it with whatever you type in the address bar.</p>
+        <div class="search-url-box">
+          <code id="search-engine-url">http://localhost:3100/search?q=%s</code>
+          <button type="button" class="modal-copy-btn" onclick="copySearchEngineUrl()">Copy URL</button>
+        </div>
+        <div class="browser-guide">
+          <section>
+            <h3>Google Chrome</h3>
+            <ol>
+              <li>Open <strong>Settings</strong> &rarr; <strong>Search engine</strong> &rarr; <strong>Manage search engines and site search</strong>.</li>
+              <li>Click <strong>Add</strong> under Site search.</li>
+              <li>Name: <strong>MAFL+ Favicon</strong></li>
+              <li>Shortcut: <strong>fav</strong> (optional)</li>
+              <li>URL: <a id="search-engine-url-chrome" href="#" target="_blank" rel="noopener"></a></li>
+            </ol>
+          </section>
+          <section>
+            <h3>Microsoft Edge</h3>
+            <ol>
+              <li>Open <strong>Settings</strong> &rarr; <strong>Privacy, search, and services</strong> &rarr; <strong>Address bar and search</strong> &rarr; <strong>Manage search engines</strong>.</li>
+              <li>Click <strong>Add</strong>.</li>
+              <li>Name: <strong>MAFL+ Favicon</strong></li>
+              <li>Keyword: <strong>fav</strong> (optional)</li>
+              <li>URL: <a id="search-engine-url-edge" href="#" target="_blank" rel="noopener"></a></li>
+            </ol>
+          </section>
+          <section>
+            <h3>Mozilla Firefox</h3>
+            <ol>
+              <li>Firefox may offer <strong>Add search engine</strong> automatically on this page (OpenSearch).</li>
+              <li>Or open <strong>Settings</strong> &rarr; <strong>Search</strong> &rarr; scroll to <strong>Search Shortcuts</strong> &rarr; <strong>Add</strong>.</li>
+              <li>Name: <strong>MAFL+ Favicon</strong></li>
+              <li>Keyword: <strong>fav</strong> (optional)</li>
+              <li>URL: <a id="search-engine-url-firefox" href="#" target="_blank" rel="noopener"></a></li>
+            </ol>
+          </section>
+          <section>
+            <h3>Apple Safari</h3>
+            <ol>
+              <li>Desktop Safari does not support custom search-engine URLs.</li>
+              <li>On iPhone/iPad: <strong>Settings</strong> &rarr; <strong>Safari</strong> &rarr; <strong>Search Engine</strong> (only built-in engines are available).</li>
+            </ol>
+            <p class="note">Use Chrome, Edge or Firefox for this feature, or use the bookmarklet in Tools.</p>
+          </section>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="container">
+    <img src="/logo.png" alt="MAFL+ Favicon API" class="site-logo">
+    <h1>API Reference</h1>
+    <p class="subtitle">A simple JSON API to fetch a normalized 256&times;256 PNG favicon for any domain.</p>
+
+    <div class="api-mode" id="api-mode-banner">
+      <span class="badge" id="api-mode-badge">
+        <span class="dot"></span>
+        <span id="api-mode-label">Checking API mode&hellip;</span>
+      </span>
+      <span id="api-mode-text"></span>
+    </div>
+
+    <!-- Quick start -->
+    <section class="block" id="quick-start">
+      <h2>Quick start <a class="anchor" href="#quick-start" aria-label="Anchor link">#</a></h2>
+      <p class="lead">One <code>GET</code> request returns a JSON object containing a CDN URL to a normalized 256&times;256 PNG favicon plus cache metadata. The PNG itself is served separately by <code>/cdn/favicons/{domain}.png</code> and is cached on disk for 7 days.</p>
+
+      <div class="endpoint-line">
+        <span class="pill method">GET</span>
+        <span><span id="qs-base-url">https://&lt;this-host&gt;</span>/api/v1/favicon?url=<em>https://github.com</em></span>
+      </div>
+
+      <div class="tabs" role="tablist" aria-label="Quick start code samples">
+        <button class="tab-btn active" data-tab="curl" type="button" role="tab">curl</button>
+        <button class="tab-btn" data-tab="js" type="button" role="tab">JavaScript</button>
+        <button class="tab-btn" data-tab="node" type="button" role="tab">Node.js</button>
+        <button class="tab-btn" data-tab="python" type="button" role="tab">Python</button>
+        <button class="tab-btn" data-tab="powershell" type="button" role="tab">PowerShell</button>
+      </div>
+
+      <div class="tab-panel active" data-panel="curl">
+        <div class="code-block">
+          <button type="button" class="copy-btn" data-copy-target="sample-curl">Copy</button>
+<pre id="sample-curl"></pre>
+        </div>
+      </div>
+
+      <div class="tab-panel" data-panel="js">
+        <div class="code-block">
+          <button type="button" class="copy-btn" data-copy-target="sample-js">Copy</button>
+<pre id="sample-js"></pre>
+        </div>
+      </div>
+
+      <div class="tab-panel" data-panel="node">
+        <div class="code-block">
+          <button type="button" class="copy-btn" data-copy-target="sample-node">Copy</button>
+<pre id="sample-node"></pre>
+        </div>
+      </div>
+
+      <div class="tab-panel" data-panel="python">
+        <div class="code-block">
+          <button type="button" class="copy-btn" data-copy-target="sample-python">Copy</button>
+<pre id="sample-python"></pre>
+        </div>
+      </div>
+
+      <div class="tab-panel" data-panel="powershell">
+        <div class="code-block">
+          <button type="button" class="copy-btn" data-copy-target="sample-powershell">Copy</button>
+<pre id="sample-powershell"></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- Interactive playground -->
+    <section class="block" id="playground">
+      <h2>Try it <a class="anchor" href="#playground" aria-label="Anchor link">#</a></h2>
+      <p class="lead">Send a real request to your own instance from the browser. The response JSON and the resulting CDN-cached PNG are shown below.</p>
+
+      <div class="playground-form">
+        <div class="form-row">
+          <label for="pg-url">Website URL or domain</label>
+          <input type="text" id="pg-url" placeholder="https://github.com" autocomplete="off" spellcheck="false">
+          <div class="quick-domains">
+            <span>Try:</span>
+            <a data-quick="https://github.com">github.com</a>
+            <a data-quick="https://reddit.com">reddit.com</a>
+            <a data-quick="https://proton.me">proton.me</a>
+            <a data-quick="https://news.ycombinator.com">news.ycombinator.com</a>
+            <a data-quick="https://wikipedia.org">wikipedia.org</a>
+          </div>
+        </div>
+
+        <div class="form-row" id="pg-key-row">
+          <label for="pg-key">
+            API key
+            <span class="hint" id="pg-key-hint">optional - ignored when keys are not required</span>
+          </label>
+          <div class="key-row">
+            <input type="text" id="pg-key" placeholder="fa_xxxxxxxxxxxxxxxxxxxxxxxx" autocomplete="off" spellcheck="false">
+            <select id="pg-key-method" aria-label="How to send the API key">
+              <option value="header">Authorization header</option>
+              <option value="query">?key= query param</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="playground-actions">
+          <button type="button" class="btn-primary" id="pg-send">Send request</button>
+          <button type="button" class="btn-secondary" id="pg-clear">Clear</button>
+        </div>
+      </div>
+
+      <div class="playground-result" id="pg-result">
+        <div class="result-preview">
+          <div class="preview-frame" id="pg-preview-frame">
+            <img id="pg-preview-img" alt="Favicon preview" style="display:none">
+            <span id="pg-preview-placeholder" style="color:#8a8480;font-size:0.85rem">No image</span>
+          </div>
+          <div class="preview-meta" id="pg-preview-meta"></div>
+        </div>
+        <div class="result-json">
+          <div class="result-status">
+            <span class="pill" id="pg-status-pill">&nbsp;</span>
+            <span id="pg-status-text"></span>
+            <span class="url" id="pg-request-url" title=""></span>
+            <button type="button" class="btn-secondary" id="pg-copy-json" style="padding:0.3rem 0.7rem; font-size:0.78rem">Copy JSON</button>
+          </div>
+          <pre id="pg-response-body">(no response yet)</pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- Authentication -->
+    <section class="block" id="authentication">
+      <h2>Authentication <a class="anchor" href="#authentication" aria-label="Anchor link">#</a></h2>
+      <p>Every call to <code>/api/v1/favicon</code> needs an API key. Only the SHA-256 hash of each key is stored server-side - the raw key is shown exactly once at creation time.</p>
+
+      <h3>Sending the key</h3>
+      <p>Pass the key in one of two ways:</p>
+      <div class="code-block">
+        <button type="button" class="copy-btn" data-copy-target="auth-header">Copy</button>
+<pre id="auth-header"></pre>
+      </div>
+      <div class="code-block" style="margin-top:0.5rem">
+        <button type="button" class="copy-btn" data-copy-target="auth-query">Copy</button>
+<pre id="auth-query"></pre>
+      </div>
+
+      <h3>Creating keys</h3>
+      <p>Keys are generated and managed through the bundled <code>scripts/manage-keys.js</code> CLI:</p>
+      <div class="code-block">
+        <button type="button" class="copy-btn" data-copy-target="cli-create">Copy</button>
+<pre id="cli-create"># Create a key for "customer A" on the pro plan
+docker compose exec maflplus-favicon-api npm run keys:create -- --label "customer A" --plan pro
+
+# List active keys with this month's usage counter
+docker compose exec maflplus-favicon-api npm run keys:list
+
+# Revoke a key by its visible prefix (kept in DB for audit history)
+docker compose exec maflplus-favicon-api npm run keys:revoke -- --prefix fa_abcdefgh</pre>
+      </div>
+    </section>
+
+    <!-- Endpoint reference -->
+    <section class="block" id="endpoint">
+      <h2>Endpoint reference <a class="anchor" href="#endpoint" aria-label="Anchor link">#</a></h2>
+
+      <div class="endpoint-line">
+        <span class="pill method">GET</span>
+        <span>/api/v1/favicon?url=<em>{website}</em></span>
+      </div>
+
+      <h3>Query parameters</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Required</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>url</code></td>
+            <td>Yes</td>
+            <td>Absolute URL (or bare domain) of the website to look up. The host is extracted, lowercased and validated.</td>
+          </tr>
+          <tr>
+            <td><code>key</code></td>
+            <td>If keys are required</td>
+            <td>Optional alternative to the <code>Authorization: Bearer</code> header. Ignored when this instance does not require a key.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Successful response (HTTP 200)</h3>
+      <p>The image bytes are <strong>not</strong> in the response body. Fetch the PNG from the <code>url</code> field instead - it points to <code>/cdn/favicons/{domain}.png</code> with a long <code>Cache-Control</code>.</p>
+      <div class="code-block">
+        <button type="button" class="copy-btn" data-copy-target="sample-response">Copy</button>
+<pre id="sample-response"></pre>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Field</th>
+            <th>Type</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><code>url</code></td><td>string</td><td>Public CDN URL of the cached PNG (<code>/cdn/favicons/{domain}.png</code>).</td></tr>
+          <tr><td><code>domain</code></td><td>string</td><td>Normalized hostname extracted from the input.</td></tr>
+          <tr><td><code>width</code> / <code>height</code></td><td>number</td><td>Always 256 &times; 256.</td></tr>
+          <tr><td><code>format</code></td><td>string</td><td>Always <code>"png"</code>.</td></tr>
+          <tr><td><code>sourceType</code></td><td>string</td><td>Where the icon came from, in priority order: <code>svg</code> &gt; <code>manifest</code> &gt; <code>apple-touch-icon</code> &gt; <code>png</code> &gt; <code>ico</code>.</td></tr>
+          <tr><td><code>cached</code></td><td>boolean</td><td><code>true</code> if served from the 7-day disk cache, <code>false</code> if just generated.</td></tr>
+          <tr><td><code>cachedAt</code></td><td>string (ISO-8601)</td><td>Timestamp of when the PNG was stored.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Errors -->
+    <section class="block" id="errors">
+      <h2>Errors <a class="anchor" href="#errors" aria-label="Anchor link">#</a></h2>
+      <p>All error responses are JSON with the shape <code>{ "error": ..., "code": ... }</code>, plus extra context fields where useful (such as <code>plan</code>, <code>limit</code>, <code>used</code>, <code>period</code> on quota errors).</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Status</th>
+            <th>Code</th>
+            <th>Meaning</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><span class="pill s400">400</span></td><td><code>missing_url</code><br><code>invalid_url</code></td><td>The <code>url</code> query parameter is missing or could not be parsed.</td></tr>
+          <tr><td><span class="pill s401">401</span></td><td><code>missing_api_key</code><br><code>invalid_api_key</code></td><td>No key was sent, or the provided key is not recognized / has been revoked.</td></tr>
+          <tr><td><span class="pill s422">422</span></td><td><code>favicon_not_found</code><br><code>favicon_not_processable</code></td><td>No usable icon could be discovered for the domain, or the bytes could not be decoded.</td></tr>
+          <tr><td><span class="pill s429">429</span></td><td><code>quota_exceeded</code></td><td>The monthly call quota for this key has been reached. Resets on the 1st of next month (UTC).</td></tr>
+          <tr><td><span class="pill s500">500</span></td><td><code>internal_error</code></td><td>Unexpected server error.</td></tr>
+        </tbody>
+      </table>
+
+      <p style="margin-top:0.8rem">A request counts toward the monthly quota only when the API returns <span class="pill s200">200</span> - matching the behaviour of <a href="https://www.faviconapis.com/docs" target="_blank" rel="noopener">faviconapis.com</a>.</p>
+    </section>
+
+    <!-- Plans -->
+    <section class="block" id="plans">
+      <h2>Plans &amp; quotas <a class="anchor" href="#plans" aria-label="Anchor link">#</a></h2>
+      <p>Each API key is assigned a plan at creation time. A monthly limit of <code>0</code> means unlimited. Quotas reset on the 1st of every month (UTC).</p>
+
+      <table id="plans-table">
+        <thead>
+          <tr>
+            <th>Plan</th>
+            <th>Monthly calls</th>
+          </tr>
+        </thead>
+        <tbody id="plans-body">
+          <tr><td><code>free</code></td><td>&hellip;</td></tr>
+          <tr><td><code>pro</code></td><td>&hellip;</td></tr>
+          <tr><td><code>enterprise</code></td><td>&hellip;</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- CDN route -->
+    <section class="block" id="cdn-route">
+      <h2>CDN route <a class="anchor" href="#cdn-route" aria-label="Anchor link">#</a></h2>
+      <p>The <code>url</code> field in every successful response points here. It is publicly readable, requires no API key, and returns <code>404</code> until <code>/api/v1/favicon</code> has been called at least once for that domain.</p>
+
+      <div class="endpoint-line">
+        <span class="pill method">GET</span>
+        <span><span class="cdn-base">https://&lt;this-host&gt;</span>/cdn/favicons/<em>{domain}</em>.png</span>
+      </div>
+
+      <ul>
+        <li><strong>Content-Type:</strong> <code>image/png</code></li>
+        <li><strong>Cache-Control:</strong> <code>public, max-age=604800, immutable</code> (7 days by default)</li>
+        <li>Safe to put behind a CDN - the response is immutable for the lifetime of the cache entry.</li>
+      </ul>
+    </section>
+
+    <footer class="page-footer">
+      MAFL+ Favicon API &middot; <a href="https://github.com/R0GGER/maflplus-favicon-api" target="_blank" rel="noopener">GitHub</a> &middot; <a href="https://wiki.maflplus.eu/mafl/icons#favicon-api" target="_blank" rel="noopener">Wiki</a>
+    </footer>
+  </div>
+
+  <div class="global-toast" id="global-toast" role="status" aria-live="polite">
+    <span class="check">&#10003;</span>
+    <span class="toast-text" id="global-toast-text">Copied</span>
+  </div>
+
+  <script>
+    const ORIGIN = location.origin;
+    const STORAGE_KEY = 'maflplus-favicon-api-key';
+
+    let providersCfg = {
+      api: { requireKey: true, cacheTtl: 604800, plans: { free: 25, pro: 2500, enterprise: 0 } },
+    };
+
+    const PLAYGROUND_DEFAULT_URL = 'https://github.com';
+
+    document.querySelectorAll('#qs-base-url, .cdn-base').forEach((el) => {
+      el.textContent = ORIGIN;
+    });
+
+    function placeholderKeyHint(requireKey) {
+      return requireKey
+        ? 'required by this instance'
+        : 'optional - ignored by this instance';
+    }
+
+    function escapeHtml(s) {
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function showToast(text) {
+      const toast = document.getElementById('global-toast');
+      document.getElementById('global-toast-text').textContent = text || 'Copied';
+      toast.classList.add('show');
+      clearTimeout(showToast._t);
+      showToast._t = setTimeout(() => toast.classList.remove('show'), 1800);
+    }
+
+    /* ---------------------- Tools offcanvas + Search modal ---------------------- */
+
+    const searchEngineUrl = `${ORIGIN}/search?q=%s`;
+
+    (function setupSearchEngineModal() {
+      const urlEl = document.getElementById('search-engine-url');
+      if (!urlEl) return;
+      urlEl.textContent = searchEngineUrl;
+      ['chrome', 'edge', 'firefox'].forEach((browser) => {
+        const link = document.getElementById(`search-engine-url-${browser}`);
+        if (!link) return;
+        link.href = searchEngineUrl;
+        link.textContent = searchEngineUrl;
+      });
+    })();
+
+    function openSearchModal() {
+      closeToolsOffcanvas();
+      const modal = document.getElementById('search-modal');
+      if (!modal) return;
+      modal.hidden = false;
+      modal.classList.add('open');
+      modal.setAttribute('aria-hidden', 'false');
+      document.body.style.overflow = 'hidden';
+      modal.addEventListener('click', onSearchModalBackdropClick);
+      document.addEventListener('keydown', onSearchModalKeydown);
+    }
+
+    function closeSearchModal() {
+      const modal = document.getElementById('search-modal');
+      if (!modal) return;
+      modal.hidden = true;
+      modal.classList.remove('open');
+      modal.setAttribute('aria-hidden', 'true');
+      const toolsOpen = document.getElementById('tools-offcanvas')?.classList.contains('open');
+      if (!toolsOpen) document.body.style.overflow = '';
+      modal.removeEventListener('click', onSearchModalBackdropClick);
+      document.removeEventListener('keydown', onSearchModalKeydown);
+    }
+
+    function openToolsOffcanvas() {
+      const panel = document.getElementById('tools-offcanvas');
+      const btn = document.getElementById('tools-offcanvas-btn');
+      if (!panel) return;
+      panel.hidden = false;
+      panel.classList.add('open');
+      panel.setAttribute('aria-hidden', 'false');
+      if (btn) btn.setAttribute('aria-expanded', 'true');
+      document.body.style.overflow = 'hidden';
+      document.addEventListener('keydown', onToolsOffcanvasKeydown);
+    }
+
+    function closeToolsOffcanvas() {
+      const panel = document.getElementById('tools-offcanvas');
+      const btn = document.getElementById('tools-offcanvas-btn');
+      if (!panel) return;
+      panel.hidden = true;
+      panel.classList.remove('open');
+      panel.setAttribute('aria-hidden', 'true');
+      if (btn) btn.setAttribute('aria-expanded', 'false');
+      const searchModal = document.getElementById('search-modal');
+      if (!searchModal || !searchModal.classList.contains('open')) {
+        document.body.style.overflow = '';
+      }
+      document.removeEventListener('keydown', onToolsOffcanvasKeydown);
+    }
+
+    function onToolsOffcanvasBackdropClick(e) {
+      if (e.target.id === 'tools-offcanvas') closeToolsOffcanvas();
+    }
+
+    function onToolsOffcanvasKeydown(e) {
+      if (e.key === 'Escape') closeToolsOffcanvas();
+    }
+
+    function onSearchModalBackdropClick(e) {
+      if (e.target.id === 'search-modal') closeSearchModal();
+    }
+
+    function onSearchModalKeydown(e) {
+      if (e.key === 'Escape') closeSearchModal();
+    }
+
+    async function copySearchEngineUrl() {
+      try {
+        await navigator.clipboard.writeText(searchEngineUrl);
+        showToast('Copied: ' + searchEngineUrl);
+      } catch { /* clipboard API not available */ }
+    }
+
+    (function setupBookmarklet() {
+      const link = document.getElementById('bookmarklet-link');
+      if (!link) return;
+      const code = `javascript:(function(){var H='${location.origin}';var d=location.hostname;if(!d){alert('No domain on this page.');return;}var u=H+'/'+d;navigator.clipboard.writeText(u).then(function(){var t=document.createElement('div');t.style.cssText='position:fixed;top:20px;right:20px;z-index:2147483647;background:#5b2e7e;color:#fff;padding:12px 14px;border-radius:8px;font:14px system-ui,-apple-system,sans-serif;box-shadow:0 4px 12px rgba(0,0,0,.3);max-width:min(420px,90vw);display:flex;align-items:center;gap:12px';var i=document.createElement('img');i.src=u;i.alt='';i.style.cssText='width:40px;height:40px;flex:0 0 auto;border-radius:6px;background:rgba(255,255,255,.15);padding:4px;object-fit:contain';i.onerror=function(){i.style.display='none';};var b=document.createElement('div');b.style.cssText='display:flex;flex-direction:column;gap:4px;min-width:0';var ti=document.createElement('div');ti.textContent='\\u2713 Favicon URL copied';ti.style.cssText='font-weight:600';var a=document.createElement('a');a.href=u;a.target='_blank';a.rel='noopener noreferrer';a.textContent=u;a.style.cssText='color:#fff;text-decoration:underline;word-break:break-all;font-size:12px';b.appendChild(ti);b.appendChild(a);t.appendChild(i);t.appendChild(b);document.body.appendChild(t);setTimeout(function(){t.remove();},5000);},function(e){alert('Copy failed: '+e);});})();`;
+      link.setAttribute('href', code);
+    })();
+
+    function bookmarkletClicked(e) {
+      e.preventDefault();
+      alert('Drag this button to your bookmarks bar (the name will auto-fill as "Mafl+ Favicon Copy"). Then click the saved bookmark on any website to copy that site\u2019s favicon URL.\n\nTip: if you copy-paste the URL into a manual "Add bookmark" dialog instead, browsers can\u2019t pre-fill the name for security reasons \u2014 you\u2019ll have to type it yourself.');
+    }
+
+    function renderSamples(requireKey) {
+      const ex = 'https://github.com';
+      const keyExample = 'fa_your_key_here';
+      // When this instance does not require a key, render plain calls so the
+      // documentation matches the actual behaviour and users don't try to
+      // paste a placeholder key into their own clients.
+      const withAuth = !!requireKey;
+
+      document.getElementById('sample-curl').textContent = withAuth
+? `curl "${ORIGIN}/api/v1/favicon?url=${ex}" \\
+  -H "Authorization: Bearer ${keyExample}"`
+        : `curl "${ORIGIN}/api/v1/favicon?url=${ex}"`;
+
+      document.getElementById('sample-js').textContent = withAuth
+? `const res = await fetch("${ORIGIN}/api/v1/favicon?url=${encodeURIComponent(ex)}", {
+  headers: { Authorization: "Bearer ${keyExample}" },
+});
+const data = await res.json();
+console.log(data.url); // -> ${ORIGIN}/cdn/favicons/github.com.png`
+        : `const res = await fetch("${ORIGIN}/api/v1/favicon?url=${encodeURIComponent(ex)}");
+const data = await res.json();
+console.log(data.url); // -> ${ORIGIN}/cdn/favicons/github.com.png`;
+
+      document.getElementById('sample-node').textContent = withAuth
+? `import { request } from "undici";
+
+const { body } = await request("${ORIGIN}/api/v1/favicon?url=${encodeURIComponent(ex)}", {
+  headers: { Authorization: "Bearer ${keyExample}" },
+});
+const data = await body.json();
+console.log(data);`
+        : `import { request } from "undici";
+
+const { body } = await request("${ORIGIN}/api/v1/favicon?url=${encodeURIComponent(ex)}");
+const data = await body.json();
+console.log(data);`;
+
+      document.getElementById('sample-python').textContent = withAuth
+? `import requests
+
+res = requests.get(
+    "${ORIGIN}/api/v1/favicon",
+    params={"url": "${ex}"},
+    headers={"Authorization": "Bearer ${keyExample}"},
+    timeout=10,
+)
+res.raise_for_status()
+data = res.json()
+print(data["url"])`
+        : `import requests
+
+res = requests.get(
+    "${ORIGIN}/api/v1/favicon",
+    params={"url": "${ex}"},
+    timeout=10,
+)
+res.raise_for_status()
+data = res.json()
+print(data["url"])`;
+
+      document.getElementById('sample-powershell').textContent = withAuth
+? `Invoke-RestMethod "${ORIGIN}/api/v1/favicon?url=${ex}" \`
+  -Headers @{ Authorization = "Bearer ${keyExample}" }`
+        : `Invoke-RestMethod "${ORIGIN}/api/v1/favicon?url=${ex}"`;
+
+      // Authentication section samples only render when keys are required.
+      // The section itself is hidden in public mode (see renderApiMode), so
+      // these targets may not even be visible, but we keep the text in sync.
+      const authHeaderEl = document.getElementById('auth-header');
+      const authQueryEl = document.getElementById('auth-query');
+      if (authHeaderEl) {
+        authHeaderEl.textContent =
+`curl "${ORIGIN}/api/v1/favicon?url=${ex}" \\
+  -H "Authorization: Bearer ${keyExample}"`;
+      }
+      if (authQueryEl) {
+        authQueryEl.textContent =
+`curl "${ORIGIN}/api/v1/favicon?url=${ex}&key=${keyExample}"`;
+      }
+
+      document.getElementById('sample-response').textContent = JSON.stringify(
+        {
+          url: `${ORIGIN}/cdn/favicons/github.com.png`,
+          domain: 'github.com',
+          width: 256,
+          height: 256,
+          format: 'png',
+          sourceType: 'svg',
+          cached: true,
+          cachedAt: '2026-06-20T08:00:00.000Z',
+        },
+        null,
+        2
+      );
+    }
+
+    function renderApiMode(api) {
+      const badge = document.getElementById('api-mode-badge');
+      const label = document.getElementById('api-mode-label');
+      const text = document.getElementById('api-mode-text');
+
+      badge.classList.remove('public', 'guarded');
+
+      if (api.requireKey) {
+        badge.classList.add('guarded');
+        label.textContent = 'API keys required';
+        text.innerHTML =
+          'This instance requires a key on every <code>/api/v1/favicon</code> request.';
+      } else {
+        badge.classList.add('public');
+        label.textContent = 'Public / anonymous';
+        text.innerHTML =
+          'This instance accepts every request without a key.';
+      }
+
+      document.getElementById('pg-key-hint').textContent = placeholderKeyHint(api.requireKey);
+
+      // When the server runs without API keys, the playground key field, the
+      // Authentication section and the Plans & quotas section are pure noise:
+      // hide them so the docs match the actual behaviour of this instance.
+      const keyRow = document.getElementById('pg-key-row');
+      const authSection = document.getElementById('authentication');
+      const plansSection = document.getElementById('plans');
+      if (keyRow) keyRow.style.display = api.requireKey ? '' : 'none';
+      if (authSection) authSection.style.display = api.requireKey ? '' : 'none';
+      if (plansSection) plansSection.style.display = api.requireKey ? '' : 'none';
+
+      // Re-render code samples so the Quick start tabs drop the
+      // `Authorization: Bearer fa_your_key_here` header when keys are not
+      // required.
+      renderSamples(api.requireKey);
+    }
+
+    function renderPlans(plans) {
+      const tbody = document.getElementById('plans-body');
+      const fmt = (n) => (Number(n) > 0 ? Number(n).toLocaleString() : 'unlimited');
+      tbody.innerHTML =
+        `<tr><td><code>free</code></td><td>${fmt(plans.free)}</td></tr>` +
+        `<tr><td><code>pro</code></td><td>${fmt(plans.pro)}</td></tr>` +
+        `<tr><td><code>enterprise</code></td><td>${fmt(plans.enterprise)}</td></tr>`;
+    }
+
+    async function loadProviders() {
+      try {
+        const res = await fetch('/providers', { headers: { Accept: 'application/json' } });
+        if (res.ok) {
+          const cfg = await res.json();
+          if (cfg && cfg.api) providersCfg = cfg;
+        }
+      } catch { /* keep defaults */ }
+      renderApiMode(providersCfg.api);
+      renderPlans(providersCfg.api.plans);
+    }
+
+    function setupTabs() {
+      document.querySelectorAll('.tabs').forEach((tabs) => {
+        const buttons = tabs.querySelectorAll('.tab-btn');
+        const container = tabs.parentElement;
+        buttons.forEach((btn) => {
+          btn.addEventListener('click', () => {
+            buttons.forEach((b) => b.classList.toggle('active', b === btn));
+            container.querySelectorAll('.tab-panel').forEach((panel) => {
+              panel.classList.toggle('active', panel.dataset.panel === btn.dataset.tab);
+            });
+          });
+        });
+      });
+    }
+
+    function setupCopyButtons() {
+      document.querySelectorAll('.copy-btn[data-copy-target]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const target = document.getElementById(btn.dataset.copyTarget);
+          if (!target) return;
+          try {
+            await navigator.clipboard.writeText(target.textContent);
+            const orig = btn.textContent;
+            btn.classList.add('copied');
+            btn.textContent = 'Copied';
+            showToast('Copied to clipboard');
+            setTimeout(() => {
+              btn.classList.remove('copied');
+              btn.textContent = orig;
+            }, 1200);
+          } catch {
+            /* clipboard API not available */
+          }
+        });
+      });
+    }
+
+    /* ---------------------- Playground ---------------------- */
+
+    const pgUrl = document.getElementById('pg-url');
+    const pgKey = document.getElementById('pg-key');
+    const pgMethod = document.getElementById('pg-key-method');
+    const pgSend = document.getElementById('pg-send');
+    const pgClear = document.getElementById('pg-clear');
+    const pgResult = document.getElementById('pg-result');
+    const pgPreviewImg = document.getElementById('pg-preview-img');
+    const pgPreviewPlaceholder = document.getElementById('pg-preview-placeholder');
+    const pgPreviewMeta = document.getElementById('pg-preview-meta');
+    const pgStatusPill = document.getElementById('pg-status-pill');
+    const pgStatusText = document.getElementById('pg-status-text');
+    const pgRequestUrl = document.getElementById('pg-request-url');
+    const pgResponseBody = document.getElementById('pg-response-body');
+    const pgCopyJson = document.getElementById('pg-copy-json');
+
+    pgUrl.value = PLAYGROUND_DEFAULT_URL;
+    try {
+      const savedKey = localStorage.getItem(STORAGE_KEY);
+      if (savedKey) pgKey.value = savedKey;
+    } catch { /* localStorage unavailable */ }
+
+    document.querySelectorAll('.quick-domains a[data-quick]').forEach((a) => {
+      a.addEventListener('click', () => {
+        pgUrl.value = a.dataset.quick;
+        runPlayground();
+      });
+    });
+
+    pgUrl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') runPlayground();
+    });
+    pgKey.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') runPlayground();
+    });
+
+    pgSend.addEventListener('click', runPlayground);
+    pgClear.addEventListener('click', () => {
+      pgResult.classList.remove('visible');
+      pgUrl.value = '';
+      pgPreviewImg.style.display = 'none';
+      pgPreviewPlaceholder.style.display = '';
+      pgPreviewMeta.textContent = '';
+      pgResponseBody.textContent = '(no response yet)';
+    });
+
+    pgCopyJson.addEventListener('click', async () => {
+      const text = pgResponseBody.textContent;
+      if (!text) return;
+      try {
+        await navigator.clipboard.writeText(text);
+        showToast('Response copied');
+      } catch { /* ignore */ }
+    });
+
+    function pillFromStatus(status) {
+      const cls = `s${Math.floor(status / 100)}xx`;
+      pgStatusPill.className = 'pill';
+      if (status >= 200 && status < 300) pgStatusPill.classList.add('s200');
+      else if (status === 400) pgStatusPill.classList.add('s400');
+      else if (status === 401) pgStatusPill.classList.add('s401');
+      else if (status === 422) pgStatusPill.classList.add('s422');
+      else if (status === 429) pgStatusPill.classList.add('s429');
+      else pgStatusPill.classList.add('s500');
+      pgStatusPill.textContent = status;
+      return cls;
+    }
+
+    async function runPlayground() {
+      const raw = pgUrl.value.trim();
+      if (!raw) {
+        pgUrl.focus();
+        return;
+      }
+
+      const params = new URLSearchParams();
+      params.set('url', raw);
+
+      const key = pgKey.value.trim();
+      const method = pgMethod.value;
+      const headers = { Accept: 'application/json' };
+      if (key) {
+        try { localStorage.setItem(STORAGE_KEY, key); } catch { /* ignore */ }
+        if (method === 'header') {
+          headers.Authorization = `Bearer ${key}`;
+        } else {
+          params.set('key', key);
+        }
+      } else {
+        try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
+      }
+
+      const requestUrl = `/api/v1/favicon?${params.toString()}`;
+      pgResult.classList.add('visible');
+      pgStatusPill.className = 'pill';
+      pgStatusPill.textContent = '...';
+      pgStatusText.textContent = 'Sending request\u2026';
+      pgRequestUrl.textContent = `${ORIGIN}${requestUrl}`;
+      pgRequestUrl.title = `${ORIGIN}${requestUrl}`;
+      pgResponseBody.textContent = '';
+      pgPreviewImg.style.display = 'none';
+      pgPreviewPlaceholder.style.display = '';
+      pgPreviewPlaceholder.textContent = 'Loading\u2026';
+      pgPreviewMeta.textContent = '';
+
+      pgSend.disabled = true;
+      const startedAt = performance.now();
+
+      let res;
+      try {
+        res = await fetch(requestUrl, { headers });
+      } catch (err) {
+        pillFromStatus(0);
+        pgStatusPill.className = 'pill s500';
+        pgStatusPill.textContent = 'ERR';
+        pgStatusText.textContent = 'Network error';
+        pgResponseBody.textContent = String(err && err.message ? err.message : err);
+        pgPreviewPlaceholder.textContent = 'Request failed';
+        pgSend.disabled = false;
+        return;
+      }
+
+      const elapsed = Math.round(performance.now() - startedAt);
+      pillFromStatus(res.status);
+
+      let body;
+      const text = await res.text();
+      try {
+        body = JSON.parse(text);
+        pgResponseBody.textContent = JSON.stringify(body, null, 2);
+      } catch {
+        body = null;
+        pgResponseBody.textContent = text || '(empty response)';
+      }
+
+      pgStatusText.textContent = `${res.statusText || ''} \u2022 ${elapsed} ms`;
+
+      if (res.ok && body && body.url) {
+        pgPreviewPlaceholder.style.display = 'none';
+        pgPreviewImg.style.display = '';
+        pgPreviewImg.src = `${body.url}?_=${Date.now()}`;
+        const cachedNote = body.cached ? 'cached' : 'freshly generated';
+        const sourceNote = body.sourceType ? ` \u2022 source: ${body.sourceType}` : '';
+        pgPreviewMeta.innerHTML =
+          `<div>${escapeHtml(body.domain || '')} &middot; ${body.width}\u00d7${body.height}</div>` +
+          `<div>${cachedNote}${sourceNote}</div>`;
+      } else {
+        pgPreviewImg.style.display = 'none';
+        pgPreviewPlaceholder.style.display = '';
+        pgPreviewPlaceholder.textContent = res.ok ? 'No image in response' : 'Request did not return an image';
+      }
+
+      pgSend.disabled = false;
+    }
+
+    /* ---------------------- Init ---------------------- */
+
+    // Render samples with the default (conservative) requireKey=true so the
+    // page has content immediately. renderApiMode() re-renders them after
+    // /providers resolves with the actual server configuration.
+    renderSamples(providersCfg.api.requireKey);
+    setupTabs();
+    setupCopyButtons();
+    loadProviders();
+  </script>
+</body>
+</html>

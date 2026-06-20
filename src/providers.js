@@ -669,6 +669,7 @@ function parseIconCandidatesFromHtml(html, finalBaseUrl) {
         href: new URL(href, resolveBase).toString(),
         sizes: $(el).attr('sizes') || '',
         type: $(el).attr('type') || '',
+        rel,
       });
     } catch {
       /* ignore invalid URLs */
@@ -833,7 +834,11 @@ module.exports = {
   fetchDashboardIcons,
   fetchScraper,
   fetchScraperAsset,
+  fetchScraperPage,
+  parseIconCandidatesFromHtml,
+  fetchManifestIcons,
   fetchBesticonAllIcons,
   fetchScraperAllIcons,
+  parseSizesAttr,
   PROVIDERS,
 };

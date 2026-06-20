@@ -23,6 +23,9 @@ services:
       - DEFAULT_PROVIDER=scraper # default is scraper
       - LOGODEV_TOKEN=
       - BESTICON_URL=http://besticon:8080
+      - API_CACHE_DIR=/cache/api
+      - API_CACHE_TTL=604800 # 7 days, in seconds
+      - API_REQUIRE_KEY=false
     depends_on:
       besticon:
         condition: service_healthy
