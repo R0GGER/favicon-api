@@ -819,12 +819,17 @@
         margin-bottom: 1rem;
       }
 
+      .top-nav-btn,
+      .top-nav a[href*="github.com"] {
+        display: none;
+      }
+
+      .quick-links a.quick-hide-mobile {
+        display: none;
+      }
+
       /* Hide Tip box on mobile */
       .tip { display: none !important; }
-
-      .top-nav-btn {
-        padding: 0.45rem 0.75rem;
-      }
 
       /* Make the API Endpoint button responsive: allow URL to wrap */
       .json-button-wrap { text-align: left; }
@@ -965,10 +970,10 @@
       <div class="quick-links">
         <span>Try:</span>
         <a onclick="quickFetch('github.com')">github.com</a>
-        <a onclick="quickFetch('reddit.com')">reddit.com</a>
+        <a class="quick-hide-mobile" onclick="quickFetch('reddit.com')">reddit.com</a>
         <a onclick="quickFetch('proton.me')">proton.me</a>
-        <a onclick="quickFetch('firefox')">firefox</a>
-        <a onclick="quickFetch('immich')">immich</a>  
+        <a class="quick-hide-mobile" onclick="quickFetch('firefox')">firefox</a>
+        <a onclick="quickFetch('immich')">immich</a>
         <a onclick="quickFetch('jellyfin')">jellyfin</a>
       </div>
     </div>

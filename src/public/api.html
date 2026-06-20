@@ -865,11 +865,21 @@
         position: static;
         justify-content: center;
         margin-bottom: 1rem;
-        flex-wrap: wrap;
       }
-      .top-nav-btn {
-        padding: 0.45rem 0.75rem;
+
+      .top-nav-btn,
+      .top-nav a[href*="github.com"] {
+        display: none;
       }
+
+      #api-mode-banner {
+        display: none;
+      }
+
+      .quick-domains a.quick-hide-mobile {
+        display: none;
+      }
+
       section.block { padding: 1.1rem; }
       .playground-result { grid-template-columns: 1fr; }
       .preview-frame { width: 100%; max-width: 240px; height: 200px; margin: 0 auto; }
@@ -1125,9 +1135,9 @@
           <div class="quick-domains">
             <span>Try:</span>
             <a data-quick="https://github.com">github.com</a>
-            <a data-quick="https://reddit.com">reddit.com</a>
+            <a class="quick-hide-mobile" data-quick="https://reddit.com">reddit.com</a>
             <a data-quick="https://proton.me">proton.me</a>
-            <a data-quick="https://netflix.com">netflix.com</a>
+            <a class="quick-hide-mobile" data-quick="https://netflix.com">netflix.com</a>
             <a data-quick="https://hosthatch.com">hosthatch.com</a>
           </div>
         </div>
