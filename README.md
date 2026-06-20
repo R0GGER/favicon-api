@@ -4,19 +4,7 @@ A lightweight favicon proxy that fetches favicons from multiple providers (HTML 
 
 ## Documentation
 
-Full documentation lives in the [`docs/`](docs/) folder:
-
-| Guide | Topics |
-|---|---|
-| [docs/README.md](docs/README.md) | Index and quick links |
-| [Getting started](docs/getting-started.md) | Docker Compose, local dev, verification |
-| [Web UI](docs/web-ui.md) | Search, tools panel, browser integration |
-| [API reference](docs/api-reference.md) | All HTTP routes |
-| [API v1](docs/api-v1.md) | JSON endpoint, auth, quotas, key management |
-| [Configuration](docs/configuration.md) | Complete environment variable reference |
-| [Architecture](docs/architecture.md) | Caching, clustering, scraper pipeline |
-| [Deployment](docs/deployment.md) | Production, reverse proxy, monitoring |
-| [SEO](docs/seo.md) | Indexing, Open Graph, sitemap |
+Soon..!
 
 Interactive API docs and a live playground are also available at `/api` on a running instance.
 
