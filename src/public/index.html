@@ -1771,6 +1771,11 @@
     let scraperIcons = [];
     let currentScraperIdx = 0;
 
+    function loadScraperFallback(domain, refresh) {
+      const proxyUrl = refresh ? `/s/${domain}?refresh=1` : `/s/${domain}`;
+      loadFavicon('scraper', proxyUrl, `${location.origin}/s/${domain}`);
+    }
+
     function loadScraperFavicon(domain, refresh) {
       scraperIcons = [];
       currentScraperIdx = 0;
@@ -1778,8 +1783,13 @@
       sizesEl.style.display = 'none';
       sizesEl.innerHTML = '';
 
-      const proxyUrl = refresh ? `/s/${domain}?refresh=1` : `/s/${domain}`;
-      loadFavicon('scraper', proxyUrl, `${location.origin}/s/${domain}`);
+      const img = document.getElementById('scraper-img');
+      const spinner = document.getElementById('scraper-spinner');
+      const meta = document.getElementById('scraper-meta');
+      img.style.display = 'none';
+      spinner.style.display = 'block';
+      meta.textContent = '';
+
       loadScraperSizes(domain, refresh);
     }
 
@@ -1805,17 +1815,17 @@
       try {
         const url = `/${encodeURIComponent(domain)}/json${refresh ? '?_=' + Date.now() : ''}`;
         const res = await fetch(url, { headers: { Accept: 'application/json' } });
-        if (!res.ok) return;
-        const body = await res.json();
-        icons = body?.endpoints?.scraper?.icons || [];
+        if (res.ok) {
+          const body = await res.json();
+          icons = body?.endpoints?.scraper?.icons || [];
+        }
       } catch {
-        return;
+        // fall through to proxy fallback
       }
 
       if (currentDomain !== requestedFor) return;
-      if (!Array.isArray(icons) || icons.length === 0) return;
 
-      const sorted = icons
+      const sorted = (Array.isArray(icons) ? icons : [])
         .filter((i) => i && typeof i.url === 'string' && (i.width || 0) > 0)
         .slice()
         .sort((a, b) => {
@@ -1825,12 +1835,16 @@
           return (b.width || 0) - (a.width || 0);
         });
 
-      if (sorted.length === 0) return;
+      if (sorted.length === 0) {
+        loadScraperFallback(domain, refresh);
+        return;
+      }
 
       scraperIcons = sorted;
       currentScraperIdx = 0;
       renderScraperSizes();
       sizesEl.style.display = '';
+      loadScraperVariant(0);
     }
 
     function renderScraperSizes() {
@@ -1894,16 +1908,20 @@
       meta.textContent = '';
 
       const writeMeta = (w, h) => {
-        const escapedUrl = escapeHtml(icon.url);
+        const displayUrl = isPrimary
+          ? `${location.origin}/s/${currentDomain}`
+          : icon.url;
+        const copyLabel = isPrimary ? 'Copy proxy URL' : 'Copy source URL';
+        const escapedUrl = escapeHtml(displayUrl);
         meta.innerHTML =
           `<span class="dimensions">${w}x${h}</span>` +
           `<a class="src-url" href="${escapedUrl}" target="_blank" rel="noopener" title="${escapedUrl}">${escapedUrl}</a>` +
-          `<button class="copy-btn" type="button" title="Copy source URL" aria-label="Copy source URL">${COPY_ICON_SVG}</button>`;
+          `<button class="copy-btn" type="button" title="${copyLabel}" aria-label="${copyLabel}">${COPY_ICON_SVG}</button>`;
         const copyBtn = meta.querySelector('.copy-btn');
         copyBtn.addEventListener('click', (e) => {
           e.preventDefault();
           e.stopPropagation();
-          copySource(copyBtn, icon.url);
+          copySource(copyBtn, displayUrl);
         });
       };
 
