@@ -52,7 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Endpoint reference** with query-parameter and response-field tables; **Errors table** with colored status pills per code (400, 401, 422, 429, 500); **Authentication** section (Bearer header + `?key=` examples + bundled `scripts/manage-keys.js` CLI usage); **Plans & quotas table** populated at runtime from `/providers`; **CDN route** documentation.
   - **Adaptive UI based on the server's `API_REQUIRE_KEY` setting** - the page fetches `/providers` on load and:
     - Toggles a green "Public / anonymous" vs. orange "API keys required" badge in the header.
-    - Hides the playground key input, the **Authentication** section and the **Plans & quotas** section when this instance does not require a key.
+    - Hides the playground key input, the **Authentication** section, the **Plans & quotas** section, and the Errors-section note that only `200` responses count toward the monthly quota when this instance does not require a key.
     - Re-renders the Quick start code samples so the `Authorization: Bearer fa_your_key_here` header (or `?key=...`) is dropped when not relevant - the samples become valid copy-paste calls for the actual running instance.
   - All env-var names (`API_REQUIRE_KEY`, `API_CACHE_TTL`, `PLAN_*_LIMIT`) are kept out of the user-facing copy; runtime/config documentation lives in `README.md` and `.env.example`.
   - **`/providers` extended with `api.{ requireKey, cacheTtl, plans }`** so the docs page can adapt without a separate endpoint. `requireKey` mirrors the `API_REQUIRE_KEY` parsing in `src/apiRoutes.js` (truthy unless the env var equals `false` / `0` / `no` / `off`), `cacheTtl` reflects `API_CACHE_TTL` (default 604800), `plans` exposes `apiStore.PLAN_LIMITS` (`free` / `pro` / `enterprise`).
@@ -172,6 +172,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Favicon responses may include `X-Favicon-Url` with the upstream asset URL when known (e.g. after HTML scraper fetch).
 
 ### Changed
+
+- **Web UI — mobile layout refinements** (`index.html`, `api.html`)
+  - Top navigation at ≤700px shows only **Home**, **API** and **Wiki**; the **Tools** offcanvas button and the **MAFL+** / **Favicon API** GitHub links are hidden so the header stays readable on narrow screens.
+  - Homepage **Try:** quick links reduced on mobile to `github.com`, `proton.me`, `immich`, `jellyfin` (`reddit.com` and `firefox` remain visible on desktop).
+  - API docs page: the public/anonymous mode banner (`#api-mode-banner`, badge + status text) is hidden on mobile.
+  - API playground **Try:** chips reduced on mobile to `github.com`, `proton.me`, `hosthatch.com` (`reddit.com` and `netflix.com` remain visible on desktop).
 
 - **`parseIconCandidatesFromHtml` (`src/providers.js`)** now also reports the `rel` attribute per candidate (`{ href, sizes, type, rel }`), enabling the new `apiScraper.js` to classify candidates by source type (`svg` / `manifest` / `apple-touch-icon` / `png` / `ico`). Existing callers (`buildScraperCandidates` in `fetchScraper`) ignore the new field and are not affected.
 - **`src/providers.js` exports** expanded with `fetchScraperPage`, `parseIconCandidatesFromHtml`, `fetchManifestIcons` and `parseSizesAttr` so the new `apiScraper.js` can reuse the existing HTML/manifest fetch pipeline without duplication. Pre-existing exports are unchanged.
