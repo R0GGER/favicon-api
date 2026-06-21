@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Domain → icon-tag table** (`src/domainIconTags.js`)
+  - Editable list of explicit `{ domain, iconTag }` rows (e.g. `drive.google.com` → `google-drive`) used when v1 API scraper fallbacks and best-pick service-icon providers need a catalog slug. Lookup runs **before** automatic rules in `serviceSlugFromDomain.js`; extend the array to override or pin mappings without code changes elsewhere.
+  - `GET /domain-icon-tags` returns `{ entries: [{ domain, iconTag }, ...] }` for programmatic inspection. Not linked from the web UI.
+
+- **Shared domain slug derivation** (`src/serviceSlugFromDomain.js`)
+  - Centralises `serviceSlugFromDomain()` consumed by `src/apiScraper.js`, `src/bestPick.js`, `/{domain}/json` and `/services/resolve/:service`.
+  - **Apex domains** (`github.com`) → first label (`github`).
+  - **Suite subdomains** (`drive.google.com`, `teams.microsoft.com`, …) → `{parent}-{subdomain}` when the parent label is in a built-in allow-list (`google`, `microsoft`, `amazon`, `apple`, `office`, `live`, `azure`).
+  - **Other subdomains** (`www.github.com`) → `null` (no service-icon lookup), avoiding ambiguous single-word slugs such as `drive` → dashboardicons `eu-drive`.
+
+- **Hidden cache purge endpoint** (`GET` / `DELETE /_internal/cache/purge`, `src/cachePurgeRoutes.js`)
+  - Purges all cached data for one or more domains: provider disk + in-memory cache (`src/cache.js` `purgeDomain`), v1 API CDN output (`${API_CACHE_DIR}/{domain}.png` + `.meta.json`) and the in-memory scraper icon list (`purgeScraperIconsCache` in `src/providers.js`).
+  - **Disabled by default** — returns `404` when `CACHE_PURGE_SECRET` is unset, so the route is invisible to scanners.
+  - Authenticated via `?secret=` query param or `X-Cache-Purge-Secret` header (timing-safe compare). Supports `?domain=example.com` or comma-separated `?domains=example.com,other.com`.
+  - New env var `CACHE_PURGE_SECRET` documented in `.env.example`; `docker-compose.yml` ships a dev placeholder.
+  - `/robots.txt` adds `Disallow: /_internal/`.
+
+- **`?refresh=1` on `/api/v1/favicon`** — skips the 7-day disk cache and regenerates the PNG (also accepts `true` / `yes`). Useful after slug-mapping or source-priority changes without calling the purge endpoint.
+
 - **Service slug alias resolution** (`src/serviceAliases.js`, `/services/resolve/:service`)
   - New `GET /services/resolve/:service` endpoint resolves a search term to canonical icon slugs per catalog. Response shape: `{ input, resolved, candidates, providers: { selfhst: { resolved, candidates[] }, dashboardicons: { resolved, candidates[] }, lobehub: { resolved, candidates[] } } }` where each candidate includes `slug`, `label` and a relevance `score`.
   - **Provider-specific catalogs** — selfh.st, dashboardicons.com and lobehub.com use different slug names for the same product (e.g. `kdrive` → selfh.st `ksuite-kdrive`, dashboardicons `infomaniak-kdrive`; `onedrive` → `microsoft-onedrive`; a vague term like `drive` may resolve to `google-drive` on selfh.st, `eu-drive` on dashboardicons and `drive` on lobehub). Resolution is no longer shared across providers.
@@ -203,6 +222,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`/services/resolve/:service`** — when the path looks like a hostname (contains `.`), runs `serviceSlugFromDomain` before catalog matching so domain searches resolve the same slug the v1 API uses (e.g. `drive.google.com` → `google-drive`).
+- **Web UI domain service-slug derivation** (`index.html`) — `deriveServiceSlug()` mirrors the server rules (`deriveServiceSlugFromDomain` + suite-parent compound slugs) instead of always taking the first domain label.
+
 - **Product renamed to FaviconAPI** (was "MAFL+ Favicon API")
   - User-facing branding updated across `index.html`, `api.html`, `src/index.js` (`/opensearch.xml` `ShortName`, `/robots.txt` comment), `README.md` and the `docs/` guides.
   - `<title>`, meta `application-name`, Open Graph / Twitter Card tags and JSON-LD `name` now use **FaviconAPI**; `alternateName` is **Favicon API**.
@@ -262,6 +284,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Wrong service icon for Google Workspace subdomains (e.g. `drive.google.com`)** — v1 API, best-pick and service-icon cards previously derived the slug from only the first domain label (`drive`), which matched dashboardicons' generic `eu-drive` folder icon instead of Google Drive. Slug derivation now maps suite subdomains to `{parent}-{service}` (with explicit rows in `domainIconTags.js`). **Note:** existing v1 API disk-cache entries are not invalidated automatically — use `?refresh=1` or `/_internal/cache/purge` after deploy.
 - **Fuzzy slug prefix false positives (dashboardicons / all catalogs)** — `fuzzyPartScore` no longer treats a query as matching a slug segment merely because the query *starts with* that segment (e.g. `baseten` → `base` in `pvy-base`). Prefix matches now require a hyphen boundary after the segment (`gitlab-ce` → `gitlab` still matches). Prevents unrelated dashboardicons hits when a search term merely shares a substring with a slug part.
 - **selfh.st wrong icon for dashboard-only slugs (e.g. `eu-drive`)** — the selfh.st "Alternative matches" panel no longer merges dashboardicons slugs into its candidate list, so entries like `eu-drive` and `synology-drive` only appear under dashboardicons.com. `/sh/eu-drive` no longer falls back to `drive-synology` when the upstream PNG is missing (404) — combined with the hyphenated-slug guard, unknown selfh.st slugs return "icon not available" instead of a substituted icon.
 - **lobehub.com tiny icons and light/dark preview** — upstream SVGs declare a 16×16 intrinsic size; `/lb/:service` now rasterizes them to PNG at `?size=64|128|256` (default 128). Light/dark variants are synthesized by recoloring non-transparent pixels to white/black after rasterization, with preview backgrounds inverted accordingly (white icon on dark / black icon on white). Cache keys bumped (`{size}_{variant}_v2`) so stale pre-fix PNGs are not reused.
@@ -282,6 +305,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Internal
 
+- `src/cache.js` exports `purgeDomain(domain)` — removes all provider cache keys whose filename ends with `_{domain}` from memory and disk.
+- `src/providers.js` exports `purgeScraperIconsCache(domain)` — evicts the merged scraper icon list for one domain from the in-memory LRU.
 - New dependencies: `better-sqlite3` (synchronous SQLite driver in WAL mode so the API key store is safe across cluster workers writing into the same `/cache/api-keys.sqlite` file) and `decode-ico` (multi-frame ICO decoder retained for legacy code paths; the v1 API no longer selects ICO sources).
 - The v1 API cache is **namespaced separately** from the existing provider-based cache (`src/cache.js`): PNGs live at `${API_CACHE_DIR}/{domain}.png` with a sibling `.meta.json` (`{ sourceType, width, height, cachedAt }`) so the two schemes can coexist in `/cache` without key collisions. The existing `CACHE_SIZE_MB` LRU rescan picks up `${API_CACHE_DIR}/...` files alongside the rest of the cache directory, so the global disk-size cap also covers the v1 API output.
 - New `fetchScraperAllIcons(domain)` exported from `src/providers.js` is the single source of truth for the merged scraper icon list (besticon + static CDN hints + sized variants, deduped + sorted by area). Backed by an in-memory `LRUCache` (`SCRAPER_ICONS_CACHE_MAX` / `SCRAPER_ICONS_CACHE_TTL`). Consumed by `/{domain}/json` (`endpoints.scraper.icons`); `fetchScraper` uses the same `deriveHintCandidates` helper to enrich its candidate pool before `probeScraperCandidates` so the chosen "best" icon matches the largest entry the UI displays. `probeScraperCandidates` is invoked with `limit=32` in the besticon path so the augmented pool is not truncated at the previous default of 16. The earlier `fetchBesticonAllIcons` export is now an internal implementation detail.

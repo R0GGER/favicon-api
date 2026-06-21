@@ -15,6 +15,7 @@ const {
   fetchScraper,
 } = require('./providers');
 const cache = require('./cache');
+const { serviceSlugFromDomain } = require('./serviceSlugFromDomain');
 
 const VALID_DEFAULT_PROVIDERS = new Set([
   'scraper', 'google', 'googlev2', 'duckduckgo', 'yandex',
@@ -79,12 +80,6 @@ function scoreCandidate(info) {
   score += Math.min(info.size / 100, 100);
 
   return score;
-}
-
-function serviceSlugFromDomain(domain) {
-  const first = domain.toLowerCase().split('.')[0];
-  const slug = first.replace(/[^a-z0-9._-]/g, '');
-  return /^[a-z0-9][a-z0-9._-]*$/.test(slug) ? slug : null;
 }
 
 function buildFallbackFetchers(domain) {

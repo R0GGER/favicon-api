@@ -8,6 +8,7 @@ const {
   PROVIDERS,
 } = require('./providers');
 const { resolveServiceSlugForProviderSync } = require('./serviceAliases');
+const { serviceSlugFromDomain } = require('./serviceSlugFromDomain');
 const cheerio = require('cheerio');
 const sharp = require('sharp');
 
@@ -27,14 +28,6 @@ const SOURCE_TYPES = [
   'lobehub',
   'external',
 ];
-
-const SERVICE_SLUG_RE = /^[a-z0-9][a-z0-9._-]*$/;
-
-function serviceSlugFromDomain(domain) {
-  const first = domain.toLowerCase().split('.')[0];
-  const slug = first.replace(/[^a-z0-9._-]/g, '');
-  return SERVICE_SLUG_RE.test(slug) ? slug : null;
-}
 
 const { MIN_SOURCE_SIZE } = require('./imageNormalize');
 

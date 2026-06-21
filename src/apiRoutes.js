@@ -190,19 +190,25 @@ router.get('/api/v1/favicon', async (req, res) => {
   }
 
   try {
-    const cached = await readCachedEntry(domain);
-    if (cached) {
-      if (keyRow) apiStore.incrementUsage(keyRow.id, period);
-      return res.json({
-        url: buildCdnUrl(req, domain),
-        domain,
-        width: TARGET_SIZE,
-        height: TARGET_SIZE,
-        format: 'png',
-        sourceType: cached.sourceType,
-        cached: true,
-        cachedAt: cached.cachedAt,
-      });
+    const forceRefresh = ['1', 'true', 'yes'].includes(
+      String(req.query.refresh ?? '').trim().toLowerCase()
+    );
+
+    if (!forceRefresh) {
+      const cached = await readCachedEntry(domain);
+      if (cached) {
+        if (keyRow) apiStore.incrementUsage(keyRow.id, period);
+        return res.json({
+          url: buildCdnUrl(req, domain),
+          domain,
+          width: TARGET_SIZE,
+          height: TARGET_SIZE,
+          format: 'png',
+          sourceType: cached.sourceType,
+          cached: true,
+          cachedAt: cached.cachedAt,
+        });
+      }
     }
 
     const hit = await fetchBySourcePriority(domain);

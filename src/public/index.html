@@ -1585,10 +1585,35 @@
       fetchFavicons();
     }
 
+    const SUITE_PARENT_LABELS = new Set([
+      'google', 'microsoft', 'amazon', 'apple', 'office', 'live', 'azure',
+    ]);
+
+    function deriveServiceSlugFromDomain(domain) {
+      const labels = domain.toLowerCase().split('.').filter(Boolean);
+      if (labels.length < 2) return '';
+
+      const first = labels[0].replace(/[^a-z0-9._-]/g, '');
+      if (!/^[a-z0-9][a-z0-9._-]*$/.test(first)) return '';
+
+      if (labels.length === 2) return first;
+
+      if (SUITE_PARENT_LABELS.has(labels[1])) {
+        const compound = `${labels[1]}-${first}`.replace(/[^a-z0-9._-]/g, '');
+        if (/^[a-z0-9][a-z0-9._-]*$/.test(compound)) return compound;
+      }
+
+      return '';
+    }
+
     function deriveServiceSlug(raw) {
       if (!raw) return '';
-      const first = raw.trim().toLowerCase().replace(/^https?:\/\//, '').split('/')[0].split('.')[0];
-      return first
+      const host = raw.trim().toLowerCase().replace(/^https?:\/\//, '').split('/')[0];
+      if (host.includes('.')) {
+        const fromDomain = deriveServiceSlugFromDomain(host);
+        if (fromDomain) return fromDomain;
+      }
+      return host
         .replace(/\s+/g, '-')
         .replace(/[^a-z0-9._-]/g, '')
         .replace(/-+/g, '-')

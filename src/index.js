@@ -30,6 +30,7 @@ const {
   resolveServiceSlugForProviderSync,
   resolveServiceMatches,
 } = require('./serviceAliases');
+const { serviceSlugFromDomain, listDomainIconTags } = require('./serviceSlugFromDomain');
 const cache = require('./cache');
 const apiRoutes = require('./apiRoutes');
 const apiStore = require('./apiStore');
@@ -441,9 +442,17 @@ app.get('/s/:domain', async (req, res) => {
   }
 });
 
+// Explicit domain → icon-tag table (see src/domainIconTags.js)
+app.get('/domain-icon-tags', (req, res) => {
+  res.json({ entries: listDomainIconTags() });
+});
+
 // Resolve a service search term to canonical icon slug(s): /services/resolve/:service
 app.get('/services/resolve/:service', async (req, res) => {
-  const service = extractService(req.params.service);
+  const raw = decodeURIComponent(req.params.service || '');
+  const host = raw.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim().toLowerCase();
+  let service = host.includes('.') ? serviceSlugFromDomain(host) : null;
+  if (!service) service = extractService(raw);
   if (!service) return res.status(400).json({ error: 'Invalid service name.' });
 
   try {
@@ -604,12 +613,7 @@ app.get('/:domain/json', async (req, res) => {
     configured: logoDevConfigured,
   };
 
-  const serviceSlug = (() => {
-    const first = domain.toLowerCase().split('.')[0];
-    const slug = first.replace(/[^a-z0-9._-]/g, '');
-    if (!SERVICE_SLUG_RE.test(slug)) return null;
-    return slug;
-  })();
+  const serviceSlug = serviceSlugFromDomain(domain);
 
   const selfhstServiceSlug = serviceSlug
     ? resolveServiceSlugForProviderSync(serviceSlug, 'selfhst')
