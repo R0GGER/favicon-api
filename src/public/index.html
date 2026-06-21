@@ -476,12 +476,6 @@
       align-self: center;
     }
 
-    .search-options .hint {
-      color: #8a8480;
-      font-weight: 400;
-      white-space: nowrap;
-    }
-
     .quick-links {
       margin-top: 0.5rem;
       font-size: 0.85rem;
@@ -1115,7 +1109,7 @@
       <div class="search-options">
         <label for="selfhst-toggle">
           <input type="checkbox" id="selfhst-toggle" checked onchange="toggleServiceCards()">
-          <span>Also include service icon lookups<span class="hint" id="selfhst-hint"></span></span>
+          <span>Also include service icon lookups</span>
         </label>
       </div>
       <div class="quick-links">
@@ -1641,21 +1635,6 @@
       }
     }
 
-    function formatServiceHint(resolveData) {
-      const input = resolveData?.input || '';
-      const sh = resolveData?.providers?.selfhst?.resolved;
-      const di = resolveData?.providers?.dashboardicons?.resolved;
-      const lb = resolveData?.providers?.lobehub?.resolved;
-      const parts = [];
-      if (sh) parts.push(`selfh.st: "${sh}"`);
-      if (di) parts.push(`dashboardicons: "${di}"`);
-      if (lb) parts.push(`lobehub: "${lb}"`);
-      if (parts.length > 1) return `\u00a0\u2192 ${parts.join(', ')}`;
-      const resolved = sh || di || lb || resolveData?.resolved || input;
-      if (!resolved || resolved === input) return `\u00a0\u2192 service name: "${input}"`;
-      return `\u00a0\u2192 "${input}" resolved as "${resolved}"`;
-    }
-
     function serviceProxyPath(provider, slug, variant) {
       if (provider === 'lobehub') {
         const params = new URLSearchParams({ size: '128' });
@@ -1841,8 +1820,6 @@
     }
 
     function toggleServiceCards() {
-      const hint = document.getElementById('selfhst-hint');
-
       if (currentMode === 'service') {
         setServiceCardsVisible(true);
         updateServiceIconsDivider();
@@ -1856,16 +1833,12 @@
           if (slug) {
             resolveServiceSlugClient(currentDomain).then((resolveData) => {
               if (currentMode !== 'domain' || slug !== deriveServiceSlug(currentDomain)) return;
-              hint.textContent = formatServiceHint(resolveData);
               startServiceIconLoads(resolveData, true);
             });
-          } else {
-            hint.textContent = '';
           }
         }
       } else {
         setServiceCardsVisible(false);
-        hint.textContent = '';
       }
       updateServiceIconsDivider();
     }
@@ -1917,22 +1890,17 @@
         loadFavicon('logodev', `/l/${domain}`, `${location.origin}/l/${domain}`);
       }
 
-      const selfhstHint = document.getElementById('selfhst-hint');
       if (selfhstToggle.checked) {
         setServiceCardsVisible(true);
         const slug = deriveServiceSlug(domain);
         if (slug) {
           resolveServiceSlugClient(domain).then((resolveData) => {
             if (currentMode !== 'domain' || currentDomain !== domain) return;
-            selfhstHint.textContent = formatServiceHint(resolveData);
             startServiceIconLoads(resolveData, true);
           });
-        } else {
-          selfhstHint.textContent = '';
         }
       } else {
         setServiceCardsVisible(false);
-        selfhstHint.textContent = '';
       }
     }
 
@@ -1955,8 +1923,6 @@
       showCardsByType('service');
 
       setServiceCardsVisible(true);
-      document.getElementById('selfhst-hint').textContent = formatServiceHint(resolveData);
-
       startServiceIconLoads(resolveData, true);
     }
 
