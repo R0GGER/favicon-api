@@ -1292,6 +1292,32 @@
           <div class="service-candidates-grid" id="dashboardicons-candidates-grid"></div>
         </div>
       </div>
+
+      <!-- LobeHub icons (service-based) -->
+      <div class="card" id="lobehub-card" data-card-type="service">
+        <h3>lobehub.com</h3>
+        <div class="favicon-display" id="lobehub-display" onclick="copyImage(this)">
+          <div class="spinner" id="lobehub-spinner" style="display:none"></div>
+          <img id="lobehub-img" style="display:none" alt="LobeHub icon">
+          <span class="unavailable" id="lobehub-unavailable" style="display:none">variant not available</span>
+          <span class="copied-toast">URL copied!</span>
+        </div>
+        <div class="size-buttons" id="lobehub-variants">
+          <button class="size-btn active" data-variant="color" onclick="switchLobehubVariant('color')">Color</button>
+          <button class="size-btn" data-variant="light" style="display:none" onclick="switchLobehubVariant('light')">Light</button>
+          <button class="size-btn" data-variant="dark" style="display:none" onclick="switchLobehubVariant('dark')">Dark</button>
+        </div>
+        <div class="size-buttons" id="lobehub-sizes">
+          <button class="size-btn" onclick="switchLobehubSize(256)">256</button>
+          <button class="size-btn active" onclick="switchLobehubSize(128)">128</button>
+          <button class="size-btn" onclick="switchLobehubSize(64)">64</button>
+        </div>
+        <div class="meta" id="lobehub-meta"></div>
+        <div class="service-candidates" id="lobehub-candidates" hidden>
+          <p class="service-candidates-title">Alternative matches</p>
+          <div class="service-candidates-grid" id="lobehub-candidates-grid"></div>
+        </div>
+      </div>
     </div>
 
     <div class="json-button-wrap" id="json-button-wrap">
@@ -1512,6 +1538,11 @@
     let currentSelfhstVariant = 'color';
     let currentDashboardIconsSlug = '';
     let currentDashboardIconsVariant = 'color';
+    let currentLobehubSlug = '';
+    let currentLobehubVariant = 'color';
+    let currentLobehubSize = 128;
+    const SERVICE_ICON_PROVIDERS = ['selfhst', 'dashboardicons', 'lobehub'];
+    const SERVICE_PROXY_PREFIX = { selfhst: '/sh', dashboardicons: '/di', lobehub: '/lb' };
     let providersConfig = { logoDev: false, logoDevToken: null };
 
     function escapeHtml(s) {
@@ -1573,6 +1604,7 @@
         providers: {
           selfhst: { resolved: slug, candidates: [{ slug, label: slug }] },
           dashboardicons: { resolved: slug, candidates: [{ slug, label: slug }] },
+          lobehub: { resolved: slug, candidates: [{ slug, label: slug }] },
         },
       };
       try {
@@ -1588,16 +1620,24 @@
       const input = resolveData?.input || '';
       const sh = resolveData?.providers?.selfhst?.resolved;
       const di = resolveData?.providers?.dashboardicons?.resolved;
-      if (sh && di && sh !== di) {
-        return `\u00a0\u2192 selfh.st: "${sh}", dashboardicons: "${di}"`;
-      }
-      const resolved = sh || di || resolveData?.resolved || input;
+      const lb = resolveData?.providers?.lobehub?.resolved;
+      const parts = [];
+      if (sh) parts.push(`selfh.st: "${sh}"`);
+      if (di) parts.push(`dashboardicons: "${di}"`);
+      if (lb) parts.push(`lobehub: "${lb}"`);
+      if (parts.length > 1) return `\u00a0\u2192 ${parts.join(', ')}`;
+      const resolved = sh || di || lb || resolveData?.resolved || input;
       if (!resolved || resolved === input) return `\u00a0\u2192 service name: "${input}"`;
       return `\u00a0\u2192 "${input}" resolved as "${resolved}"`;
     }
 
     function serviceProxyPath(provider, slug, variant) {
-      const base = provider === 'selfhst' ? `/sh/${slug}` : `/di/${slug}`;
+      if (provider === 'lobehub') {
+        const params = new URLSearchParams({ size: '128' });
+        if (variant !== 'color') params.set('variant', variant);
+        return `/lb/${slug}?${params.toString()}`;
+      }
+      const base = `${SERVICE_PROXY_PREFIX[provider]}/${slug}`;
       return variant === 'color' ? base : `${base}?variant=${variant}`;
     }
 
@@ -1680,15 +1720,24 @@
         return;
       }
 
-      currentDashboardIconsSlug = slug;
-      switchDashboardIconsVariant('color');
-      document.querySelectorAll('#dashboardicons-candidates-grid .candidate-tile').forEach((tile) => {
+      if (provider === 'dashboardicons') {
+        currentDashboardIconsSlug = slug;
+        switchDashboardIconsVariant('color');
+        document.querySelectorAll('#dashboardicons-candidates-grid .candidate-tile').forEach((tile) => {
+          tile.classList.toggle('active', tile.dataset.slug === slug);
+        });
+        return;
+      }
+
+      currentLobehubSlug = slug;
+      switchLobehubVariant('color');
+      document.querySelectorAll('#lobehub-candidates-grid .candidate-tile').forEach((tile) => {
         tile.classList.toggle('active', tile.dataset.slug === slug);
       });
     }
 
     function clearServiceCandidates() {
-      ['selfhst', 'dashboardicons'].forEach((provider) => {
+      SERVICE_ICON_PROVIDERS.forEach((provider) => {
         const panel = document.getElementById(`${provider}-candidates`);
         const grid = document.getElementById(`${provider}-candidates-grid`);
         if (panel) panel.hidden = true;
@@ -1699,22 +1748,35 @@
     function startServiceIconLoads(resolveData, hideOnError) {
       const selfhstData = resolveData.providers?.selfhst || { resolved: resolveData.resolved, candidates: [] };
       const dashboardData = resolveData.providers?.dashboardicons || { resolved: resolveData.resolved, candidates: [] };
+      const lobehubData = resolveData.providers?.lobehub || { resolved: resolveData.resolved, candidates: [] };
+      const searchQuery = resolveData.input || selfhstData.resolved;
 
-      currentSelfhstSlug = selfhstData.resolved;
+      currentSelfhstSlug = selfhstData.resolved || searchQuery;
       currentSelfhstVariant = 'color';
       resetSelfhstVariantButtons();
       setActiveVariant('selfhst-variants', 'color');
-      loadSelfhst(selfhstData.resolved, 'color', { hideOnError });
-      probeAndShowSelfhstVariants(selfhstData.resolved);
-      renderServiceCandidates('selfhst', selfhstData.candidates, selfhstData.resolved);
+      loadSelfhst(searchQuery, 'color', { hideOnError, activeSlug: currentSelfhstSlug });
+      probeAndShowSelfhstVariants(currentSelfhstSlug);
+      renderServiceCandidates('selfhst', selfhstData.candidates, currentSelfhstSlug);
 
-      currentDashboardIconsSlug = dashboardData.resolved;
+      currentDashboardIconsSlug = dashboardData.resolved || searchQuery;
       currentDashboardIconsVariant = 'color';
       resetDashboardIconsVariantButtons();
       setActiveVariant('dashboardicons-variants', 'color');
-      loadDashboardIcons(dashboardData.resolved, 'color', { hideOnError });
-      probeAndShowDashboardIconsVariants(dashboardData.resolved);
-      renderServiceCandidates('dashboardicons', dashboardData.candidates, dashboardData.resolved);
+      loadDashboardIcons(searchQuery, 'color', { hideOnError, activeSlug: currentDashboardIconsSlug });
+      probeAndShowDashboardIconsVariants(currentDashboardIconsSlug);
+      renderServiceCandidates('dashboardicons', dashboardData.candidates, currentDashboardIconsSlug);
+
+      currentLobehubSlug = lobehubData.resolved || searchQuery;
+      currentLobehubVariant = 'color';
+      currentLobehubSize = 128;
+      resetLobehubVariantButtons();
+      setActiveVariant('lobehub-variants', 'color');
+      setActiveSize('lobehub-sizes', 128);
+      loadLobehub(searchQuery, 'color', { hideOnError, activeSlug: currentLobehubSlug });
+      probeAndShowLobehubVariants(currentLobehubSlug);
+      renderServiceCandidates('lobehub', lobehubData.candidates, currentLobehubSlug);
+      updateServiceIconsDivider();
     }
 
     function showCardsByType(type) {
@@ -1725,30 +1787,45 @@
       updateServiceIconsDivider();
     }
 
+    function serviceCategoryHasResults() {
+      return SERVICE_ICON_PROVIDERS.some((provider) => {
+        const card = document.getElementById(`${provider}-card`);
+        if (!card || card.style.display === 'none') return false;
+        const img = document.getElementById(`${provider}-img`);
+        const spinner = document.getElementById(`${provider}-spinner`);
+        if (spinner?.style.display !== 'none') return false;
+        return img?.style.display !== 'none';
+      });
+    }
+
     function updateServiceIconsDivider() {
       const divider = document.getElementById('service-icons-divider');
       if (!divider) return;
-      const show = currentMode === 'domain' && selfhstToggle.checked;
+      const show = currentMode === 'domain'
+        && selfhstToggle.checked
+        && serviceCategoryHasResults();
       divider.classList.toggle('visible', show);
       divider.setAttribute('aria-hidden', show ? 'false' : 'true');
     }
 
+    function setServiceCardsVisible(visible) {
+      SERVICE_ICON_PROVIDERS.forEach((provider) => {
+        const card = document.getElementById(`${provider}-card`);
+        if (card) card.style.display = visible ? '' : 'none';
+      });
+    }
+
     function toggleServiceCards() {
-      const selfhstCard = document.getElementById('selfhst-card');
-      const dashboardIconsCard = document.getElementById('dashboardicons-card');
       const hint = document.getElementById('selfhst-hint');
 
       if (currentMode === 'service') {
-        // In service-only mode, both service cards are always shown.
-        selfhstCard.style.display = '';
-        dashboardIconsCard.style.display = '';
+        setServiceCardsVisible(true);
         updateServiceIconsDivider();
         return;
       }
 
       if (selfhstToggle.checked) {
-        selfhstCard.style.display = '';
-        dashboardIconsCard.style.display = '';
+        setServiceCardsVisible(true);
         if (currentMode === 'domain' && currentDomain) {
           const slug = deriveServiceSlug(currentDomain);
           if (slug) {
@@ -1762,8 +1839,7 @@
           }
         }
       } else {
-        selfhstCard.style.display = 'none';
-        dashboardIconsCard.style.display = 'none';
+        setServiceCardsVisible(false);
         hint.textContent = '';
       }
       updateServiceIconsDivider();
@@ -1816,12 +1892,9 @@
         loadFavicon('logodev', `/l/${domain}`, `${location.origin}/l/${domain}`);
       }
 
-      const selfhstCard = document.getElementById('selfhst-card');
-      const dashboardIconsCard = document.getElementById('dashboardicons-card');
       const selfhstHint = document.getElementById('selfhst-hint');
       if (selfhstToggle.checked) {
-        selfhstCard.style.display = '';
-        dashboardIconsCard.style.display = '';
+        setServiceCardsVisible(true);
         const slug = deriveServiceSlug(domain);
         if (slug) {
           resolveServiceSlugClient(domain).then((resolveData) => {
@@ -1833,8 +1906,7 @@
           selfhstHint.textContent = '';
         }
       } else {
-        selfhstCard.style.display = 'none';
-        dashboardIconsCard.style.display = 'none';
+        setServiceCardsVisible(false);
         selfhstHint.textContent = '';
       }
     }
@@ -1857,13 +1929,10 @@
 
       showCardsByType('service');
 
-      const selfhstCard = document.getElementById('selfhst-card');
-      const dashboardIconsCard = document.getElementById('dashboardicons-card');
-      selfhstCard.style.display = '';
-      dashboardIconsCard.style.display = '';
+      setServiceCardsVisible(true);
       document.getElementById('selfhst-hint').textContent = formatServiceHint(resolveData);
 
-      startServiceIconLoads(resolveData, false);
+      startServiceIconLoads(resolveData, true);
     }
 
     function loadGoogle(domain, size) {
@@ -1891,8 +1960,9 @@
 
     function loadSelfhst(slug, variant, opts) {
       const hideOnError = !!(opts && opts.hideOnError);
-      const proxyUrl = selfhstProxyPath(slug, variant);
-      const sourceUrl = selfhstSourceUrl(slug, variant);
+      const activeSlug = (opts && opts.activeSlug) || slug;
+      const proxyUrl = selfhstProxyPath(activeSlug, variant);
+      const sourceUrl = selfhstSourceUrl(activeSlug, variant);
 
       const img = document.getElementById('selfhst-img');
       const spinner = document.getElementById('selfhst-spinner');
@@ -1914,7 +1984,7 @@
       const imgEl = new Image();
       imgEl.crossOrigin = 'anonymous';
       imgEl.onload = () => {
-        if (currentSelfhstSlug !== slug || currentSelfhstVariant !== variant) return;
+        if (currentSelfhstSlug !== activeSlug || currentSelfhstVariant !== variant) return;
         img.src = imgEl.src;
         img.style.display = 'block';
         spinner.style.display = 'none';
@@ -1931,17 +2001,19 @@
           e.stopPropagation();
           copySource(copyBtn, sourceUrl);
         });
+        updateServiceIconsDivider();
       };
       imgEl.onerror = () => {
-        if (currentSelfhstSlug !== slug || currentSelfhstVariant !== variant) return;
+        if (currentSelfhstSlug !== activeSlug || currentSelfhstVariant !== variant) return;
         spinner.style.display = 'none';
-        if (hideOnError) {
+        if (hideOnError || variant === 'color') {
           card.style.display = 'none';
         } else {
-          unavailable.textContent = variant === 'color' ? 'icon not available' : 'variant not available';
+          unavailable.textContent = 'variant not available';
           unavailable.style.display = 'block';
           delete display.dataset.proxyUrl;
         }
+        updateServiceIconsDivider();
       };
       imgEl.src = proxyUrl;
     }
@@ -1950,7 +2022,7 @@
       if (!currentSelfhstSlug) return;
       currentSelfhstVariant = variant;
       setActiveVariant('selfhst-variants', variant);
-      loadSelfhst(currentSelfhstSlug, variant, { hideOnError: false });
+      loadSelfhst(currentSelfhstSlug, variant, { hideOnError: variant === 'color' });
     }
 
     function setActiveVariant(containerId, variant) {
@@ -1998,8 +2070,9 @@
 
     function loadDashboardIcons(slug, variant, opts) {
       const hideOnError = !!(opts && opts.hideOnError);
+      const activeSlug = (opts && opts.activeSlug) || slug;
       const proxyUrl = dashboardIconsProxyPath(slug, variant);
-      const sourceUrl = dashboardIconsSourceUrl(slug, variant);
+      const sourceUrl = dashboardIconsSourceUrl(activeSlug, variant);
 
       const img = document.getElementById('dashboardicons-img');
       const spinner = document.getElementById('dashboardicons-spinner');
@@ -2021,7 +2094,7 @@
       const imgEl = new Image();
       imgEl.crossOrigin = 'anonymous';
       imgEl.onload = () => {
-        if (currentDashboardIconsSlug !== slug || currentDashboardIconsVariant !== variant) return;
+        if (currentDashboardIconsSlug !== activeSlug || currentDashboardIconsVariant !== variant) return;
         img.src = imgEl.src;
         img.style.display = 'block';
         spinner.style.display = 'none';
@@ -2038,17 +2111,19 @@
           e.stopPropagation();
           copySource(copyBtn, sourceUrl);
         });
+        updateServiceIconsDivider();
       };
       imgEl.onerror = () => {
-        if (currentDashboardIconsSlug !== slug || currentDashboardIconsVariant !== variant) return;
+        if (currentDashboardIconsSlug !== activeSlug || currentDashboardIconsVariant !== variant) return;
         spinner.style.display = 'none';
-        if (hideOnError) {
+        if (hideOnError || variant === 'color') {
           card.style.display = 'none';
         } else {
-          unavailable.textContent = variant === 'color' ? 'icon not available' : 'variant not available';
+          unavailable.textContent = 'variant not available';
           unavailable.style.display = 'block';
           delete display.dataset.proxyUrl;
         }
+        updateServiceIconsDivider();
       };
       imgEl.src = proxyUrl;
     }
@@ -2057,7 +2132,7 @@
       if (!currentDashboardIconsSlug) return;
       currentDashboardIconsVariant = variant;
       setActiveVariant('dashboardicons-variants', variant);
-      loadDashboardIcons(currentDashboardIconsSlug, variant, { hideOnError: false });
+      loadDashboardIcons(currentDashboardIconsSlug, variant, { hideOnError: variant === 'color' });
     }
 
     function resetDashboardIconsVariantButtons() {
@@ -2082,6 +2157,119 @@
           const ok = await probeDashboardIconsVariant(slug, variant);
           if (currentDashboardIconsSlug !== slug) return;
           const btn = document.querySelector(`#dashboardicons-variants .size-btn[data-variant="${variant}"]`);
+          if (btn) btn.style.display = ok ? '' : 'none';
+        })
+      );
+    }
+
+    function lobehubProxyPath(slug, variant, size = currentLobehubSize) {
+      const params = new URLSearchParams({ size: String(size) });
+      if (variant !== 'color') params.set('variant', variant);
+      return `/lb/${slug}?${params.toString()}`;
+    }
+
+    function lobehubSourceUrl(slug, variant) {
+      const base = `https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg@latest/icons/${slug}`;
+      return `${base}.svg`;
+    }
+
+    function loadLobehub(slug, variant, opts) {
+      const hideOnError = !!(opts && opts.hideOnError);
+      const activeSlug = (opts && opts.activeSlug) || slug;
+      const size = (opts && opts.size) || currentLobehubSize;
+      const proxyUrl = lobehubProxyPath(slug, variant, size);
+      const sourceUrl = lobehubSourceUrl(activeSlug, variant);
+
+      const img = document.getElementById('lobehub-img');
+      const spinner = document.getElementById('lobehub-spinner');
+      const meta = document.getElementById('lobehub-meta');
+      const card = document.getElementById('lobehub-card');
+      const display = document.getElementById('lobehub-display');
+      const unavailable = document.getElementById('lobehub-unavailable');
+
+      display.classList.remove('variant-light', 'variant-dark');
+      if (variant === 'light') display.classList.add('variant-light');
+      else if (variant === 'dark') display.classList.add('variant-dark');
+
+      card.style.display = '';
+      img.style.display = 'none';
+      unavailable.style.display = 'none';
+      spinner.style.display = 'block';
+      meta.textContent = '';
+
+      const imgEl = new Image();
+      imgEl.crossOrigin = 'anonymous';
+      imgEl.onload = () => {
+        if (currentLobehubSlug !== activeSlug || currentLobehubVariant !== variant || currentLobehubSize !== size) return;
+        img.src = imgEl.src;
+        img.style.display = 'block';
+        spinner.style.display = 'none';
+        display.dataset.proxyUrl = `${location.origin}${proxyUrl}`;
+
+        const escapedUrl = escapeHtml(sourceUrl);
+        meta.innerHTML =
+          `<span class="dimensions">${imgEl.naturalWidth}x${imgEl.naturalHeight}</span>` +
+          `<a class="src-url" href="${escapedUrl}" target="_blank" rel="noopener" title="${escapedUrl}">${escapedUrl}</a>` +
+          `<button class="copy-btn" type="button" title="Copy source URL" aria-label="Copy source URL">${COPY_ICON_SVG}</button>`;
+        const copyBtn = meta.querySelector('.copy-btn');
+        copyBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          copySource(copyBtn, sourceUrl);
+        });
+        updateServiceIconsDivider();
+      };
+      imgEl.onerror = () => {
+        if (currentLobehubSlug !== activeSlug || currentLobehubVariant !== variant || currentLobehubSize !== size) return;
+        spinner.style.display = 'none';
+        if (hideOnError || variant === 'color') {
+          card.style.display = 'none';
+        } else {
+          unavailable.textContent = 'variant not available';
+          unavailable.style.display = 'block';
+          delete display.dataset.proxyUrl;
+        }
+        updateServiceIconsDivider();
+      };
+      imgEl.src = proxyUrl;
+    }
+
+    function switchLobehubVariant(variant) {
+      if (!currentLobehubSlug) return;
+      currentLobehubVariant = variant;
+      setActiveVariant('lobehub-variants', variant);
+      loadLobehub(currentLobehubSlug, variant, { hideOnError: variant === 'color', size: currentLobehubSize });
+    }
+
+    function switchLobehubSize(size) {
+      if (!currentLobehubSlug) return;
+      currentLobehubSize = size;
+      setActiveSize('lobehub-sizes', size);
+      loadLobehub(currentLobehubSlug, currentLobehubVariant, { hideOnError: false, size });
+    }
+
+    function resetLobehubVariantButtons() {
+      document.querySelectorAll('#lobehub-variants .size-btn').forEach((btn) => {
+        btn.style.display = btn.dataset.variant === 'color' ? '' : 'none';
+      });
+    }
+
+    function probeLobehubVariant(slug, variant) {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve(true);
+        img.onerror = () => resolve(false);
+        img.src = lobehubProxyPath(slug, variant, currentLobehubSize);
+      });
+    }
+
+    async function probeAndShowLobehubVariants(slug) {
+      const variants = ['light', 'dark'];
+      await Promise.all(
+        variants.map(async (variant) => {
+          const ok = await probeLobehubVariant(slug, variant);
+          if (currentLobehubSlug !== slug) return;
+          const btn = document.querySelector(`#lobehub-variants .size-btn[data-variant="${variant}"]`);
           if (btn) btn.style.display = ok ? '' : 'none';
         })
       );
@@ -2301,6 +2489,11 @@
       const imgEl = new Image();
       imgEl.crossOrigin = 'anonymous';
       imgEl.onload = () => {
+        if (id === 'yandex' && imgEl.naturalWidth <= 1 && imgEl.naturalHeight <= 1) {
+          spinner.style.display = 'none';
+          if (card) card.style.display = 'none';
+          return;
+        }
         img.src = imgEl.src;
         img.style.display = 'block';
         spinner.style.display = 'none';

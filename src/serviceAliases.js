@@ -4,7 +4,10 @@ const DASHBOARD_METADATA_URL =
   'https://raw.githubusercontent.com/homarr-labs/dashboard-icons/main/metadata.json';
 const SELFHST_INDEX_URL =
   'https://raw.githubusercontent.com/selfhst/icons/main/index.json';
+const LOBEHUB_TOC_URL = 'https://unpkg.com/@lobehub/icons@latest/es/toc.json';
 const METADATA_TTL_MS = 24 * 60 * 60 * 1000;
+const FUZZY_SIMILARITY_THRESHOLD = 0.8;
+const FUZZY_MIN_QUERY_LEN = 4;
 
 const STATIC_PROVIDER_ALIASES = {
   selfhst: {
@@ -19,6 +22,7 @@ const STATIC_PROVIDER_ALIASES = {
 
 let dashboardCache = { loadedAt: 0, aliasToSlug: null, slugs: null, entries: null };
 let selfhstCache = { loadedAt: 0, entries: null };
+let lobehubCache = { loadedAt: 0, aliasToSlug: null, slugs: null, entries: null };
 
 function normalizeServiceAliasKey(raw) {
   if (!raw || typeof raw !== 'string') return '';
@@ -61,7 +65,7 @@ function buildDashboardAliasIndex(metadata) {
     aliasToSlug.set(from, to);
   }
 
-  return { aliasToSlug, slugs, entries };
+  return { aliasToSlug, slugs, entries, slugKeys: [...slugs] };
 }
 
 function parseSelfhstIndex(raw) {
@@ -74,6 +78,7 @@ function parseSelfhstIndex(raw) {
       tags: value.Tags || '',
       hasLight: value.Light === 'Yes',
       hasDark: value.Dark === 'Yes',
+      hasSvg: value.SVG === 'Yes',
     });
   }
   return entries;
@@ -133,6 +138,81 @@ async function ensureSelfhstIndex() {
   return selfhstCache;
 }
 
+function buildLobehubAliasIndex(toc) {
+  const aliasToSlug = new Map();
+  const slugs = new Set();
+  const entries = new Map();
+
+  for (const item of toc || []) {
+    const slug = normalizeServiceAliasKey(item.title || item.id);
+    if (!slug) continue;
+
+    slugs.add(slug);
+    aliasToSlug.set(slug, slug);
+    entries.set(slug, {
+      slug,
+      label: item.fullTitle || item.title || item.id,
+      docsUrl: item.docsUrl || '',
+      hasColor: !!item.param?.hasColor,
+      hasBrandColor: !!item.param?.hasBrandColor,
+      hasBrand: !!item.param?.hasBrand,
+    });
+
+    const idKey = normalizeServiceAliasKey(item.id);
+    if (idKey) aliasToSlug.set(idKey, slug);
+
+    const docsKey = normalizeServiceAliasKey(item.docsUrl);
+    if (docsKey) aliasToSlug.set(docsKey, slug);
+
+    const titleKey = normalizeServiceAliasKey(item.title);
+    if (titleKey) aliasToSlug.set(titleKey, slug);
+
+    const fullTitleKey = normalizeServiceAliasKey(item.fullTitle);
+    if (fullTitleKey) aliasToSlug.set(fullTitleKey, slug);
+
+    const parts = slug.split('-');
+    if (parts.length > 1) {
+      const last = parts[parts.length - 1];
+      if (last.length >= 3 && !aliasToSlug.has(last)) {
+        aliasToSlug.set(last, slug);
+      }
+    }
+  }
+
+  return { aliasToSlug, slugs, entries, slugKeys: [...slugs] };
+}
+
+function ensureLobehubSyncIndex() {
+  if (!lobehubCache.aliasToSlug) {
+    lobehubCache = { loadedAt: 0, ...buildLobehubAliasIndex([]) };
+  }
+  return lobehubCache;
+}
+
+async function ensureLobehubIndex() {
+  const now = Date.now();
+  if (lobehubCache.aliasToSlug && now - lobehubCache.loadedAt < METADATA_TTL_MS) {
+    return lobehubCache;
+  }
+
+  try {
+    const res = await upstreamFetch(LOBEHUB_TOC_URL, {
+      headers: { 'User-Agent': 'FaviconProxy/1.0' },
+    });
+    if (res.ok) {
+      const toc = await res.json();
+      lobehubCache = { loadedAt: now, ...buildLobehubAliasIndex(toc) };
+      return lobehubCache;
+    }
+  } catch {
+    /* use stale or empty fallback */
+  }
+
+  ensureLobehubSyncIndex();
+  if (!lobehubCache.loadedAt) lobehubCache.loadedAt = now;
+  return lobehubCache;
+}
+
 function collectDashboardCandidates(key, aliasToSlug, slugs) {
   if (!key) return [];
 
@@ -149,6 +229,90 @@ function collectDashboardCandidates(key, aliasToSlug, slugs) {
   return [...new Set(candidates)];
 }
 
+function levenshtein(a, b) {
+  const m = a.length;
+  const n = b.length;
+  if (m === 0) return n;
+  if (n === 0) return m;
+
+  const dp = new Array(n + 1);
+  for (let j = 0; j <= n; j++) dp[j] = j;
+
+  for (let i = 1; i <= m; i++) {
+    let prev = dp[0];
+    dp[0] = i;
+    for (let j = 1; j <= n; j++) {
+      const tmp = dp[j];
+      dp[j] = a[i - 1] === b[j - 1] ? prev : 1 + Math.min(prev, dp[j], dp[j - 1]);
+      prev = tmp;
+    }
+  }
+  return dp[n];
+}
+
+function stringSimilarity(a, b) {
+  if (!a || !b) return 0;
+  if (a === b) return 1;
+  const dist = levenshtein(a, b);
+  return 1 - dist / Math.max(a.length, b.length);
+}
+
+function fuzzyPartScore(part, queryKey) {
+  if (!part || !queryKey || part.length < 3) return 0;
+
+  if (part === queryKey) return 75;
+
+  if (queryKey.length >= FUZZY_MIN_QUERY_LEN) {
+    const sim = stringSimilarity(part, queryKey);
+    if (sim >= FUZZY_SIMILARITY_THRESHOLD) return Math.round(sim * 80);
+  }
+
+  if (part.startsWith(queryKey) && part.length <= queryKey.length + 2) return 58;
+  if (queryKey.startsWith(`${part}-`) && part.length >= 4) return 42;
+
+  return 0;
+}
+
+function scoreDashboardSlug(slugKey, entry, queryKey) {
+  if (!slugKey || !queryKey) return 0;
+
+  let score = 0;
+  if (slugKey === queryKey) return 100;
+  if (slugKey.endsWith(`-${queryKey}`)) score = Math.max(score, 85);
+
+  const parts = slugKey.split('-');
+  for (let i = 0; i < parts.length; i++) {
+    const partScore = fuzzyPartScore(parts[i], queryKey);
+    if (partScore <= 0) continue;
+    const weighted = i === parts.length - 1 ? partScore + 8 : partScore;
+    score = Math.max(score, weighted);
+  }
+
+  for (const alias of entry?.aliases || []) {
+    const aliasKey = normalizeServiceAliasKey(alias);
+    if (!aliasKey) continue;
+    if (aliasKey === queryKey) score = Math.max(score, 90);
+    score = Math.max(score, fuzzyPartScore(aliasKey, queryKey));
+  }
+
+  return score;
+}
+
+function searchDashboardFuzzyMatches(queryKey, index, limit = 8) {
+  const { entries } = index;
+  if (!queryKey || !entries) return [];
+
+  return [...entries.values()]
+    .map((entry) => ({
+      slug: entry.slug,
+      label: entry.label || entry.slug,
+      score: scoreDashboardSlug(normalizeServiceAliasKey(entry.slug), entry, queryKey),
+    }))
+    .filter((match) => match.score > 0)
+    .sort((a, b) => b.score - a.score || a.slug.localeCompare(b.slug))
+    .slice(0, limit);
+}
+
 function scoreSelfhstEntry(entry, queryKey) {
   const refKey = normalizeServiceAliasKey(entry.slug);
   const nameKey = normalizeServiceAliasKey(entry.label);
@@ -157,11 +321,20 @@ function scoreSelfhstEntry(entry, queryKey) {
 
   if (refKey === queryKey) score += 100;
   if (refKey.endsWith(`-${queryKey}`)) score += 80;
-  if (refKey.includes(queryKey)) score += 60;
-  if (queryKey.includes(refKey) && refKey.length >= 4) score += 40;
   if (nameKey === queryKey) score += 70;
   if (nameKey.includes(queryKey)) score += 35;
   if (tagsKey.includes(queryKey)) score += 15;
+
+  const refParts = refKey.split('-');
+  for (let i = 0; i < refParts.length; i++) {
+    const partScore = fuzzyPartScore(refParts[i], queryKey);
+    if (partScore <= 0) continue;
+    score = Math.max(score, partScore + (i === refParts.length - 1 ? 8 : 0));
+  }
+
+  for (const part of nameKey.split('-')) {
+    score = Math.max(score, fuzzyPartScore(part, queryKey));
+  }
 
   const queryParts = queryKey.split('-').filter(Boolean);
   for (const part of queryParts) {
@@ -171,6 +344,28 @@ function scoreSelfhstEntry(entry, queryKey) {
   }
 
   return score;
+}
+
+function mergeSelfhstWithDashboardFallback(selfhstMatches, dashboardMatches, limit = 8) {
+  const seen = new Set();
+  const merged = [];
+
+  for (const match of selfhstMatches) {
+    if (!match?.slug || seen.has(match.slug)) continue;
+    seen.add(match.slug);
+    merged.push(match);
+  }
+
+  for (const match of dashboardMatches) {
+    if (!match?.slug || seen.has(match.slug)) continue;
+    seen.add(match.slug);
+    merged.push({
+      ...match,
+      score: Math.max(1, match.score - 12),
+    });
+  }
+
+  return sortMatchesByScore(merged).slice(0, limit);
 }
 
 function searchSelfhstMatches(slug, entries, limit = 8) {
@@ -200,7 +395,8 @@ function searchSelfhstMatches(slug, entries, limit = 8) {
     const hit = entries.find((entry) => entry.slug === staticResolved);
     addMatch(hit || { slug: staticResolved, label: staticResolved }, 1000);
   } else {
-    addMatch({ slug: queryKey, label: queryKey }, 90);
+    const exact = entries.find((entry) => entry.slug === queryKey);
+    if (exact) addMatch(exact, 100);
   }
 
   for (const entry of scored) {
@@ -208,65 +404,153 @@ function searchSelfhstMatches(slug, entries, limit = 8) {
     if (matches.length >= limit) break;
   }
 
-  return matches.slice(0, limit);
+  return sortMatchesByScore(matches).slice(0, limit);
 }
 
 function searchDashboardMatches(slug, index, limit = 8) {
   const queryKey = normalizeServiceAliasKey(slug);
   if (!queryKey) return [];
 
-  const { aliasToSlug, slugs, entries } = index;
-  const slugList = collectDashboardCandidates(queryKey, aliasToSlug, slugs);
   const staticResolved = STATIC_PROVIDER_ALIASES.dashboardicons[queryKey];
   const seen = new Set();
   const matches = [];
 
-  function addMatch(candidate, score) {
+  function addMatch(candidate, score, label) {
     if (!candidate || seen.has(candidate)) return;
     seen.add(candidate);
-    const meta = entries?.get(candidate);
+    const meta = index.entries?.get(candidate);
     matches.push({
       slug: candidate,
-      label: meta?.label || candidate,
+      label: label || meta?.label || candidate,
       score,
     });
   }
 
   if (staticResolved) addMatch(staticResolved, 1000);
 
-  for (const candidate of slugList) {
-    if (candidate === queryKey && staticResolved && candidate !== staticResolved) continue;
-    if (candidate === queryKey) addMatch(candidate, 100);
-    else if (aliasToSlug.get(queryKey) === candidate) addMatch(candidate, 900);
-    else if (candidate.endsWith(`-${queryKey}`)) addMatch(candidate, 80);
-    else addMatch(candidate, 70);
+  for (const match of searchDashboardFuzzyMatches(queryKey, index, limit)) {
+    addMatch(match.slug, match.score, match.label);
   }
 
   return matches.sort((a, b) => b.score - a.score).slice(0, limit);
 }
 
+function scoreLobehubSlug(slugKey, entry, queryKey) {
+  if (!slugKey || !queryKey) return 0;
+
+  let score = 0;
+  if (slugKey === queryKey) return 100;
+  if (slugKey.endsWith(`-${queryKey}`)) score = Math.max(score, 85);
+
+  const parts = slugKey.split('-');
+  for (let i = 0; i < parts.length; i++) {
+    const partScore = fuzzyPartScore(parts[i], queryKey);
+    if (partScore <= 0) continue;
+    score = Math.max(score, partScore + (i === parts.length - 1 ? 8 : 0));
+  }
+
+  const labelKey = normalizeServiceAliasKey(entry?.label);
+  if (labelKey === queryKey) score = Math.max(score, 90);
+  if (labelKey.includes(queryKey)) score = Math.max(score, 35);
+
+  const docsKey = normalizeServiceAliasKey(entry?.docsUrl);
+  if (docsKey === queryKey) score = Math.max(score, 88);
+  score = Math.max(score, fuzzyPartScore(docsKey, queryKey));
+
+  return score;
+}
+
+function searchLobehubFuzzyMatches(queryKey, index, limit = 8) {
+  const { entries } = index;
+  if (!queryKey || !entries) return [];
+
+  return [...entries.values()]
+    .map((entry) => ({
+      slug: entry.slug,
+      label: entry.label || entry.slug,
+      score: scoreLobehubSlug(normalizeServiceAliasKey(entry.slug), entry, queryKey),
+    }))
+    .filter((match) => match.score > 0)
+    .sort((a, b) => b.score - a.score || a.slug.localeCompare(b.slug))
+    .slice(0, limit);
+}
+
+function searchLobehubMatches(slug, index, limit = 8) {
+  const queryKey = normalizeServiceAliasKey(slug);
+  if (!queryKey) return [];
+
+  const seen = new Set();
+  const matches = [];
+
+  function addMatch(candidate, score, label) {
+    if (!candidate || seen.has(candidate)) return;
+    seen.add(candidate);
+    const meta = index.entries?.get(candidate);
+    matches.push({
+      slug: candidate,
+      label: label || meta?.label || candidate,
+      score,
+    });
+  }
+
+  const resolved = index.aliasToSlug?.get(queryKey);
+  if (resolved) addMatch(resolved, 1000);
+
+  for (const match of searchLobehubFuzzyMatches(queryKey, index, limit)) {
+    addMatch(match.slug, match.score, match.label);
+  }
+
+  return matches.sort((a, b) => b.score - a.score).slice(0, limit);
+}
+
+function sortMatchesByScore(matches) {
+  return [...matches].sort((a, b) => b.score - a.score || a.slug.localeCompare(b.slug));
+}
+
 function pickResolvedSlug(matches, fallback) {
-  return matches[0]?.slug || fallback;
+  const best = sortMatchesByScore(matches)[0];
+  return best?.slug || fallback;
 }
 
 async function getSelfhstSlugCandidates(slug) {
-  const queryKey = normalizeServiceAliasKey(slug);
   const { entries } = await ensureSelfhstIndex();
-  return searchSelfhstMatches(slug, entries).map((match) => match.slug);
+  const queryKey = normalizeServiceAliasKey(slug);
+
+  if (entries.some((entry) => entry.slug === queryKey)) {
+    return [queryKey];
+  }
+
+  // Hyphenated slug not in the selfhst catalog (e.g. dashboard-only "eu-drive"):
+  // try that slug only — never substitute a fuzzy "drive" match like drive-synology.
+  if (queryKey.includes('-')) {
+    return [queryKey];
+  }
+
+  const matches = searchSelfhstMatches(slug, entries);
+  if (matches.length > 0) {
+    return matches.map((match) => match.slug);
+  }
+
+  return queryKey ? [queryKey] : [];
 }
 
 async function getDashboardIconsSlugCandidates(slug) {
-  const queryKey = normalizeServiceAliasKey(slug);
   const index = await ensureDashboardIndex();
-  return collectDashboardCandidates(queryKey, index.aliasToSlug, index.slugs);
+  return searchDashboardMatches(slug, index).map((match) => match.slug);
+}
+
+async function getLobehubSlugCandidates(slug) {
+  const index = await ensureLobehubIndex();
+  return searchLobehubMatches(slug, index).map((match) => match.slug);
 }
 
 async function getServiceSlugCandidates(slug) {
-  const [selfhst, dashboardicons] = await Promise.all([
+  const [selfhst, dashboardicons, lobehub] = await Promise.all([
     getSelfhstSlugCandidates(slug),
     getDashboardIconsSlugCandidates(slug),
+    getLobehubSlugCandidates(slug),
   ]);
-  return [...new Set([...selfhst, ...dashboardicons])];
+  return [...new Set([...selfhst, ...dashboardicons, ...lobehub])];
 }
 
 async function resolveServiceSlug(slug) {
@@ -283,6 +567,13 @@ function resolveServiceSlugSync(slug) {
   return aliasToSlug.get(queryKey) || queryKey;
 }
 
+function resolveLobehubSlugSync(slug) {
+  const queryKey = normalizeServiceAliasKey(slug);
+  if (!queryKey) return '';
+  const { aliasToSlug } = ensureLobehubSyncIndex();
+  return aliasToSlug.get(queryKey) || queryKey;
+}
+
 function getServiceSlugCandidatesSync(slug) {
   const queryKey = normalizeServiceAliasKey(slug);
   const { aliasToSlug, slugs } = ensureDashboardSyncIndex();
@@ -291,18 +582,21 @@ function getServiceSlugCandidatesSync(slug) {
 
 async function resolveServiceMatches(slug) {
   const input = normalizeServiceAliasKey(slug);
-  const [selfhstIndex, dashboardIndex] = await Promise.all([
+  const [selfhstIndex, dashboardIndex, lobehubIndex] = await Promise.all([
     ensureSelfhstIndex(),
     ensureDashboardIndex(),
+    ensureLobehubIndex(),
   ]);
 
   const selfhstCandidates = searchSelfhstMatches(input, selfhstIndex.entries);
   const dashboardCandidates = searchDashboardMatches(input, dashboardIndex);
+  const lobehubCandidates = searchLobehubMatches(input, lobehubIndex);
   const allCandidates = [
     ...new Set([
       input,
       ...selfhstCandidates.map((match) => match.slug),
       ...dashboardCandidates.map((match) => match.slug),
+      ...lobehubCandidates.map((match) => match.slug),
     ]),
   ];
 
@@ -319,6 +613,10 @@ async function resolveServiceMatches(slug) {
         resolved: pickResolvedSlug(dashboardCandidates, input),
         candidates: dashboardCandidates,
       },
+      lobehub: {
+        resolved: pickResolvedSlug(lobehubCandidates, input),
+        candidates: lobehubCandidates,
+      },
     },
   };
 }
@@ -329,6 +627,7 @@ function resolveServiceSlugForProviderSync(slug, provider) {
   const staticHit = STATIC_PROVIDER_ALIASES[provider]?.[queryKey];
   if (staticHit) return staticHit;
   if (provider === 'dashboardicons') return resolveServiceSlugSync(slug);
+  if (provider === 'lobehub') return resolveLobehubSlugSync(slug);
   return queryKey;
 }
 
@@ -342,6 +641,8 @@ module.exports = {
   getServiceSlugCandidatesSync,
   getSelfhstSlugCandidates,
   getDashboardIconsSlugCandidates,
+  getLobehubSlugCandidates,
   ensureDashboardIndex,
   ensureSelfhstIndex,
+  ensureLobehubIndex,
 };

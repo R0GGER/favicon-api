@@ -11,6 +11,7 @@ const {
   fetchLogoDev,
   fetchSelfhst,
   fetchDashboardIcons,
+  fetchLobehub,
   fetchScraper,
 } = require('./providers');
 const cache = require('./cache');
@@ -18,7 +19,7 @@ const cache = require('./cache');
 const VALID_DEFAULT_PROVIDERS = new Set([
   'scraper', 'google', 'googlev2', 'duckduckgo', 'yandex',
   'faviconso', 'vemetric', 'favicondev', 'faviconkit', 'logodev',
-  'selfhst', 'dashboardicons',
+  'selfhst', 'dashboardicons', 'lobehub',
 ]);
 
 const DEFAULT_PROVIDER = (() => {
@@ -108,6 +109,8 @@ function buildFallbackFetchers(domain) {
     all.selfhst = () => fetchWithCache('selfhst', slug, null, () => fetchSelfhst(slug));
     all.dashboardicons = () =>
       fetchWithCache('dashboardicons', slug, null, () => fetchDashboardIcons(slug));
+    all.lobehub = () =>
+      fetchWithCache('lobehub', slug, '128_c_v2', () => fetchLobehub(slug, 'color', 128));
   }
 
   const defaultOrder = [

@@ -39,8 +39,13 @@ function looksLikeIco(buffer) {
 }
 
 async function rasterizeSvg(buffer) {
-  return sharp(buffer, { density: SVG_DENSITY })
-    .resize(TARGET_SIZE, TARGET_SIZE, resizeOptions())
+  return rasterizeSvgToSize(buffer, TARGET_SIZE);
+}
+
+async function rasterizeSvgToSize(buffer, size = TARGET_SIZE) {
+  const density = Math.max(72, Math.round(size * 1.5));
+  return sharp(buffer, { density })
+    .resize(size, size, resizeOptions())
     .png()
     .toBuffer();
 }
@@ -152,6 +157,7 @@ const toPng256 = toPng;
 module.exports = {
   toPng256,
   toPng,
+  rasterizeSvgToSize,
   TARGET_SIZE,
   MIN_SOURCE_SIZE,
 };

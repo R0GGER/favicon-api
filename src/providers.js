@@ -1,5 +1,6 @@
 const cheerio = require('cheerio');
 const sharp = require('sharp');
+const { rasterizeSvgToSize } = require('./imageNormalize');
 const { LRUCache } = require('lru-cache');
 const { upstreamFetch, ipv4Dispatcher, ipv4Http1Dispatcher } = require('./upstreamFetch');
 
@@ -322,6 +323,12 @@ const PROVIDERS = {
     const suffix = variant === 'light' ? '-light' : variant === 'dark' ? '-dark' : '';
     return `https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/${encodeURIComponent(service)}${suffix}.png`;
   },
+  lobehub: (service, variant = 'color') => {
+    const slug = encodeURIComponent(service);
+    const base = `https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg@latest/icons/${slug}`;
+    if (variant === 'light' || variant === 'dark') return `${base}.svg`;
+    return `${base}.svg`;
+  },
 };
 
 async function fetchFavicon(url, requestHeaders) {
@@ -370,7 +377,16 @@ async function fetchDuckDuckGo(domain) {
 async function fetchYandex(domain) {
   const url = PROVIDERS.yandex(domain);
   const result = await fetchFavicon(url);
-  return result ? { ...result, provider: 'yandex' } : null;
+  if (!result) return null;
+
+  try {
+    const meta = await sharp(result.buffer).metadata();
+    if ((meta.width || 0) <= 1 && (meta.height || 0) <= 1) return null;
+  } catch {
+    /* keep result if metadata probe fails */
+  }
+
+  return { ...result, provider: 'yandex' };
 }
 
 async function fetchFaviconSo(domain) {
@@ -408,6 +424,9 @@ async function fetchLogoDev(domain) {
 const {
   getSelfhstSlugCandidates,
   getDashboardIconsSlugCandidates,
+  getLobehubSlugCandidates,
+  ensureSelfhstIndex,
+  ensureLobehubIndex,
 } = require('./serviceAliases');
 
 async function fetchServiceIcon(buildUrl, getCandidates, service, variant, provider) {
@@ -424,7 +443,45 @@ async function fetchServiceIcon(buildUrl, getCandidates, service, variant, provi
 }
 
 async function fetchSelfhst(service, variant = 'color') {
-  return fetchServiceIcon(PROVIDERS.selfhst, getSelfhstSlugCandidates, service, variant, 'selfhst');
+  const { entries } = await ensureSelfhstIndex();
+  const entryBySlug = new Map(entries.map((entry) => [entry.slug, entry]));
+  const candidates = await getSelfhstSlugCandidates(service);
+  const variants = variant === 'color' ? ['color', 'light', 'dark'] : [variant];
+
+  for (const slug of candidates) {
+    const entry = entryBySlug.get(slug);
+    for (const v of variants) {
+      const suffix = v === 'light' ? '-light' : v === 'dark' ? '-dark' : '';
+      const encoded = encodeURIComponent(slug);
+      const urls = [];
+
+      if (entry?.hasSvg && v === 'color') {
+        urls.push(`https://cdn.jsdelivr.net/gh/selfhst/icons/svg/${encoded}.svg`);
+      }
+      urls.push(`https://cdn.jsdelivr.net/gh/selfhst/icons/png/${encoded}${suffix}.png`);
+
+      for (const url of urls) {
+        const result = await fetchFavicon(url);
+        if (!result) continue;
+
+        const isSvg = url.endsWith('.svg') || (result.contentType || '').toLowerCase().includes('svg');
+        if (isSvg) {
+          const buffer = await rasterizeSvgToSize(result.buffer, 128);
+          return {
+            buffer,
+            contentType: 'image/png',
+            url: result.url,
+            provider: 'selfhst',
+            service: slug,
+            variant: v,
+          };
+        }
+
+        return { ...result, provider: 'selfhst', service: slug, variant: v };
+      }
+    }
+  }
+  return null;
 }
 
 async function fetchDashboardIcons(service, variant = 'color') {
@@ -435,6 +492,79 @@ async function fetchDashboardIcons(service, variant = 'color') {
     variant,
     'dashboardicons'
   );
+}
+
+function lobehubUrlsForSlug(slug, variant, entry) {
+  const base = `https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg@latest/icons/${encodeURIComponent(slug)}`;
+
+  if (variant === 'light' || variant === 'dark') {
+    return [`${base}.svg`];
+  }
+
+  const urls = [];
+  if (entry?.hasColor) urls.push(`${base}-color.svg`);
+  if (entry?.hasBrandColor) urls.push(`${base}-brand-color.svg`);
+  urls.push(`${base}.svg`);
+  if (entry?.hasBrand) urls.push(`${base}-brand.svg`);
+  return urls;
+}
+
+async function recolorLobehubPng(png, tone) {
+  const { data, info } = await sharp(png).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const rgb = tone === 'light' ? 255 : 0;
+  for (let i = 0; i < data.length; i += info.channels) {
+    if (data[i + 3] > 0) {
+      data[i] = rgb;
+      data[i + 1] = rgb;
+      data[i + 2] = rgb;
+    }
+  }
+  return sharp(data, {
+    raw: { width: info.width, height: info.height, channels: info.channels },
+  })
+    .png()
+    .toBuffer();
+}
+
+async function rasterizeLobehubSvg(buffer, size, variant) {
+  const png = await rasterizeSvgToSize(buffer, size);
+  if (variant === 'light') return recolorLobehubPng(png, 'light');
+  if (variant === 'dark') return recolorLobehubPng(png, 'dark');
+  return png;
+}
+
+async function fetchLobehub(service, variant = 'color', size = 128) {
+  const index = await ensureLobehubIndex();
+  const candidates = await getLobehubSlugCandidates(service);
+  const variants = [variant];
+
+  for (const slug of candidates) {
+    const entry = index.entries.get(slug);
+    for (const v of variants) {
+      for (const url of lobehubUrlsForSlug(slug, v, entry)) {
+        const result = await fetchFavicon(url);
+        if (!result) continue;
+
+        const contentType = (result.contentType || '').toLowerCase();
+        const isSvg = contentType.includes('svg') || url.toLowerCase().endsWith('.svg');
+        if (isSvg) {
+          const buffer = await rasterizeLobehubSvg(result.buffer, size, v);
+          return {
+            buffer,
+            contentType: 'image/png',
+            url: result.url,
+            provider: 'lobehub',
+            service: slug,
+            variant: v,
+            size,
+          };
+        }
+
+        return { ...result, provider: 'lobehub', service: slug, variant: v, size };
+      }
+    }
+  }
+  return null;
 }
 
 // Parse "16x16" / "32x32 64x64" sizes attribute, return largest square dimension or 0.
@@ -852,6 +982,7 @@ module.exports = {
   fetchLogoDev,
   fetchSelfhst,
   fetchDashboardIcons,
+  fetchLobehub,
   fetchScraper,
   fetchScraperAsset,
   fetchScraperPage,

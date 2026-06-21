@@ -19,6 +19,7 @@ const {
   fetchLogoDev,
   fetchSelfhst,
   fetchDashboardIcons,
+  fetchLobehub,
   fetchScraper,
   fetchScraperAsset,
   fetchScraperAllIcons,
@@ -177,6 +178,9 @@ const VALID_FAVICONKIT_SIZES = new Set([16, 32, 64, 128, 256]);
 const VALID_VEMETRIC_FORMATS = new Set(['png', 'jpg', 'webp']);
 const VALID_SELFHST_VARIANTS = new Set(['color', 'light', 'dark']);
 const VALID_DASHBOARDICONS_VARIANTS = new Set(['color', 'light', 'dark']);
+const VALID_LOBEHUB_VARIANTS = new Set(['color', 'light', 'dark']);
+const VALID_LOBEHUB_SIZES = new Set([64, 128, 256]);
+const DEFAULT_LOBEHUB_SIZE = 128;
 const SERVICE_SLUG_RE = /^[a-z0-9][a-z0-9._-]*$/;
 const CACHE_CONTROL = 'public, max-age=86400';
 
@@ -498,6 +502,37 @@ app.get('/di/:service', async (req, res) => {
   }
 });
 
+// LobeHub icons (service-name based): /lb/:service[?variant=color|light|dark][&size=64|128|256]
+app.get('/lb/:service', async (req, res) => {
+  const service = extractService(req.params.service);
+  if (!service) return res.status(400).json({ error: 'Invalid service name.' });
+
+  const variant = (req.query.variant || 'color').toString().toLowerCase();
+  if (!VALID_LOBEHUB_VARIANTS.has(variant)) {
+    return res.status(400).json({ error: 'Invalid variant. Use color, light, or dark.' });
+  }
+
+  const size = parseInt(req.query.size || String(DEFAULT_LOBEHUB_SIZE), 10);
+  if (!VALID_LOBEHUB_SIZES.has(size)) {
+    return res.status(400).json({ error: 'Invalid size. Use 64, 128, or 256.' });
+  }
+
+  try {
+    const cacheKey = `${size}_${variant === 'color' ? 'c' : variant}_v2`;
+    const entry = await fetchWithCache(
+      'lobehub',
+      service,
+      cacheKey,
+      () => fetchLobehub(service, variant, size)
+    );
+    if (!entry) return res.status(404).json({ error: 'Service icon not found.' });
+    sendFavicon(res, entry);
+  } catch (err) {
+    console.error('LobeHub proxy error:', err.message);
+    res.status(500).json({ error: 'Internal error.' });
+  }
+});
+
 // Provider availability/config: /providers
 app.get('/providers', (req, res) => {
   res.set('Cache-Control', 'no-store');
@@ -582,12 +617,18 @@ app.get('/:domain/json', async (req, res) => {
   const dashboardServiceSlug = serviceSlug
     ? resolveServiceSlugForProviderSync(serviceSlug, 'dashboardicons')
     : null;
+  const lobehubServiceSlug = serviceSlug
+    ? resolveServiceSlugForProviderSync(serviceSlug, 'lobehub')
+    : null;
 
   const selfhstSlugEncoded = selfhstServiceSlug
     ? encodeURIComponent(selfhstServiceSlug)
     : null;
   const dashboardSlugEncoded = dashboardServiceSlug
     ? encodeURIComponent(dashboardServiceSlug)
+    : null;
+  const lobehubSlugEncoded = lobehubServiceSlug
+    ? encodeURIComponent(lobehubServiceSlug)
     : null;
   const selfhst = selfhstServiceSlug
     ? {
@@ -634,6 +675,35 @@ app.get('/:domain/json', async (req, res) => {
         },
       }
     : { service: null, query: null, proxy: null, source: null, variants: null };
+
+  const lobehubSizes = [64, 128, 256];
+  const lobehub = lobehubServiceSlug
+    ? {
+        service: lobehubServiceSlug,
+        query: serviceSlug,
+        proxy: `${host}/lb/${lobehubSlugEncoded}?size=${DEFAULT_LOBEHUB_SIZE}`,
+        source: PROVIDERS.lobehub(lobehubServiceSlug),
+        sizes: sizedEntries(
+          lobehubSizes,
+          (size) => `/lb/${lobehubSlugEncoded}?size=${size}`,
+          () => PROVIDERS.lobehub(lobehubServiceSlug)
+        ),
+        variants: {
+          color: {
+            proxy: `${host}/lb/${lobehubSlugEncoded}?size=${DEFAULT_LOBEHUB_SIZE}`,
+            source: PROVIDERS.lobehub(lobehubServiceSlug, 'color'),
+          },
+          light: {
+            proxy: `${host}/lb/${lobehubSlugEncoded}?size=${DEFAULT_LOBEHUB_SIZE}&variant=light`,
+            source: PROVIDERS.lobehub(lobehubServiceSlug, 'light'),
+          },
+          dark: {
+            proxy: `${host}/lb/${lobehubSlugEncoded}?size=${DEFAULT_LOBEHUB_SIZE}&variant=dark`,
+            source: PROVIDERS.lobehub(lobehubServiceSlug, 'dark'),
+          },
+        },
+      }
+    : { service: null, query: null, proxy: null, source: null, sizes: null, variants: null };
 
   res.set('Cache-Control', CACHE_CONTROL);
   res.json({
@@ -683,6 +753,7 @@ app.get('/:domain/json', async (req, res) => {
       },
       selfhst,
       dashboardicons,
+      lobehub,
     },
   });
 });
