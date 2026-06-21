@@ -22,6 +22,36 @@ const DOMAIN_ICON_TAGS = [
   { domain: 'outlook.office.com', iconTag: 'microsoft-outlook' },
   { domain: 'teams.microsoft.com', iconTag: 'microsoft-teams' },
   { domain: 'onedrive.live.com', iconTag: 'microsoft-onedrive' },
+  
+  // Proton
+  { domain: 'proton.me', iconTag: 'proton' },
+  { domain: 'protonmail.com', iconTag: 'protonmail' },
+  { domain: 'protoncalendar.com', iconTag: 'protoncalendar' },
+  { domain: 'protondrive.com', iconTag: 'protondrive' },
+  { domain: 'protoncontacts.com', iconTag: 'protoncontacts' },
+  { domain: 'protonpass.com', iconTag: 'protonpass' },
+  { domain: 'protoncalendar.com', iconTag: 'protoncalendar' },
+  { domain: 'protondrive.com', iconTag: 'protondrive' },
+  { domain: 'protoncontacts.com', iconTag: 'protoncontacts' },
+
+  // Email providers
+  { domain: 'gmail.com', iconTag: 'gmail' },
+  { domain: 'outlook.com', iconTag: 'outlook' },
+  { domain: 'yahoo.com', iconTag: 'yahoo' },
+  { domain: 'hotmail.com', iconTag: 'outlook' },
+  { domain: 'live.com', iconTag: 'outlook' },
+  
+  // password managers
+  { domain: 'lastpass.com', iconTag: 'lastpass' },
+  { domain: 'dashlane.com', iconTag: 'dashlane' },
+  { domain: '1password.com', iconTag: '1password' },
+  { domain: 'keeper.com', iconTag: 'keeper' },
+  { domain: 'bitwarden.com', iconTag: 'bitwarden' },
+  { domain: 'passbolt.com', iconTag: 'passbolt' },
+  { domain: 'keepassxc.org', iconTag: 'keepassxc' },
+  { domain: 'keepass.info', iconTag: 'keepass' },
+  { domain: 'aliasvault.com', iconTag: 'aliasvault' },
+  
 ];
 
 const DOMAIN_ICON_TAG_MAP = new Map(
