@@ -5,12 +5,13 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.1.0] — 2026-06-25
 
 ### Added
 
 - **HTML scraper www-fallback** — when scraping a bare domain (e.g. `nu.nl`) finds no usable icons, automatically retries on `www.{domain}` before giving up. Implemented in `fetchScraper` (`src/providers.js`) and `fetchBySourcePriority` (`src/apiScraper.js`); applies transparently to `GET /s/{domain}` and `GET /api/v1/favicon`. `/{domain}/json` exposes `endpoints.scraper.wwwFallback` (`{ domain, icons, proxy }`) when the bare domain has an empty icon list but the www variant has icons.
 - **Web UI — HTML Scraper www-fallback notice** (`index.html`) — when icons are loaded from the www variant, shows a compact amber banner (`No icons on {domain}: {www.domain}`) with a clickable link to search the www hostname directly.
+- **`UI_INCLUDE_APP_ICONS` environment variable** (default `true`) — controls whether the homepage checkbox “Also include app icon lookups” is checked on load. Set to `false` (or `0` / `no` / `off`) to leave it unchecked. Documented in `.env.example`; exposed to the UI via `includeAppIcons` on `GET /providers`.
 
 - **Optional scraper discovery disk cache** (`SCRAPER_DISK_CACHE`, `SCRAPER_DISK_CACHE_DIR` in `.env.example`)
   - When `SCRAPER_DISK_CACHE=true`, homepage HTML, enriched icon lists (`/{domain}/json`), besticon JSON, parsed web manifests and icon-probe metadata are persisted as JSON under `{CACHE_DIR}/scraper-discovery/` (default `/cache/scraper-discovery` in Docker). Entries survive container restarts and are shared across cluster workers.

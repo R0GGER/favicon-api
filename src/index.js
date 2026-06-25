@@ -44,11 +44,19 @@ const apiRoutes = require('./apiRoutes');
 const apiStore = require('./apiStore');
 const { extractDomainFromInput } = require('./domainValidation');
 
+const { version: APP_VERSION } = require('../package.json');
+
 // Mirror of the parsing logic in src/apiRoutes.js (kept local so the homepage
 // /providers endpoint can advertise the current API mode to the docs page
 // without importing the router itself).
 const API_REQUIRE_KEY = (() => {
   const raw = String(process.env.API_REQUIRE_KEY ?? '').trim().toLowerCase();
+  if (raw === '') return true;
+  return !['false', '0', 'no', 'off'].includes(raw);
+})();
+
+const UI_INCLUDE_APP_ICONS = (() => {
+  const raw = String(process.env.UI_INCLUDE_APP_ICONS ?? '').trim().toLowerCase();
   if (raw === '') return true;
   return !['false', '0', 'no', 'off'].includes(raw);
 })();
@@ -62,6 +70,7 @@ app.set('trust proxy', true);
 // in the <head> (canonical, Open Graph, Twitter Card, JSON-LD) so absolute
 // URLs resolve to whichever public origin the deployment is reached on,
 // without requiring the operator to bake the hostname into the image.
+// `__VERSION__` is substituted from package.json for the page footer.
 const INDEX_HTML_TEMPLATE = fs.readFileSync(
   path.join(__dirname, 'public', 'index.html'),
   'utf8'
@@ -77,7 +86,9 @@ function getBaseUrl(req) {
 
 function renderTemplate(template) {
   return (req, res) => {
-    const html = template.replace(/__BASE_URL__/g, getBaseUrl(req));
+    const html = template
+      .replace(/__BASE_URL__/g, getBaseUrl(req))
+      .replace(/__VERSION__/g, APP_VERSION);
     res.set('Content-Type', 'text/html; charset=utf-8');
     res.set('Cache-Control', 'no-cache');
     res.send(html);
@@ -702,6 +713,7 @@ app.get('/providers', (req, res) => {
     logoDev: !!process.env.LOGODEV_TOKEN,
     logoDevToken: process.env.LOGODEV_TOKEN || null,
     defaultProvider: (process.env.DEFAULT_PROVIDER || '').trim().toLowerCase() || null,
+    includeAppIcons: UI_INCLUDE_APP_ICONS,
     upstreamIpv4: true,
     api: {
       requireKey: API_REQUIRE_KEY,
