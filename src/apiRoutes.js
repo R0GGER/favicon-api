@@ -5,6 +5,10 @@ const sharp = require('sharp');
 const apiStore = require('./apiStore');
 const { fetchBySourcePriority } = require('./apiScraper');
 const { toPng256, TARGET_SIZE } = require('./imageNormalize');
+const {
+  extractDomainFromUrl,
+  isValidHostname,
+} = require('./domainValidation');
 
 const API_CACHE_DIR = process.env.API_CACHE_DIR || '/cache/api';
 const API_CACHE_TTL_MS =
@@ -21,10 +25,6 @@ const REQUIRE_KEY = (() => {
   if (raw === '') return true;
   return !['false', '0', 'no', 'off'].includes(raw);
 })();
-
-// Same conservative shape as src/index.js#SERVICE_SLUG_RE, but for domains —
-// also has to match the on-disk filename so we can serve it back from /cdn.
-const SAFE_DOMAIN_RE = /^[a-z0-9][a-z0-9.-]*$/i;
 
 let cacheDirEnsured = false;
 async function ensureCacheDir() {
@@ -43,29 +43,6 @@ function metaPath(domain) {
 
 function jsonError(res, status, code, message, extra = {}) {
   return res.status(status).json({ error: message, code, ...extra });
-}
-
-function extractDomainFromUrl(rawUrl) {
-  if (!rawUrl || typeof rawUrl !== 'string') return null;
-  const trimmed = rawUrl.trim();
-  if (!trimmed) return null;
-
-  let candidate = trimmed;
-  if (!/^https?:\/\//i.test(candidate)) {
-    candidate = `https://${candidate}`;
-  }
-
-  let parsed;
-  try {
-    parsed = new URL(candidate);
-  } catch {
-    return null;
-  }
-
-  const host = parsed.hostname.toLowerCase();
-  if (!host || !host.includes('.')) return null;
-  if (!SAFE_DOMAIN_RE.test(host)) return null;
-  return host;
 }
 
 function getRawKeyFromRequest(req) {
@@ -261,7 +238,7 @@ router.get('/cdn/favicons/:domainPng', async (req, res) => {
     return res.status(404).json({ error: 'Not found.' });
   }
   const domain = raw.slice(0, -4).toLowerCase();
-  if (!SAFE_DOMAIN_RE.test(domain)) {
+  if (!isValidHostname(domain)) {
     return res.status(400).json({ error: 'Invalid domain.' });
   }
 

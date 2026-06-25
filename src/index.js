@@ -41,6 +41,7 @@ const { toDisplayPng } = require('./imageNormalize');
 const cache = require('./cache');
 const apiRoutes = require('./apiRoutes');
 const apiStore = require('./apiStore');
+const { extractDomainFromInput } = require('./domainValidation');
 
 // Mirror of the parsing logic in src/apiRoutes.js (kept local so the homepage
 // /providers endpoint can advertise the current API mode to the docs page
@@ -202,10 +203,7 @@ function sendFavicon(res, entry) {
 }
 
 function extractDomain(raw) {
-  if (!raw || typeof raw !== 'string') return null;
-  const domain = raw.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim();
-  if (!domain || !domain.includes('.')) return null;
-  return domain;
+  return extractDomainFromInput(raw);
 }
 
 function normalizeServiceSlug(raw) {

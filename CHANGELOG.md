@@ -329,6 +329,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Bot scanner paths polluting the disk cache** — the catch-all `GET /{domain}` route (and all `/{provider}/…` domain routes) previously accepted any string containing a dot as a hostname, so internet scanners probing paths like `/wp-login.php`, `/phpinfo.php`, `/.env` or `/README.md` triggered upstream favicon fetches and wrote thousands of junk entries under `/cache`. New shared module `src/domainValidation.js` centralises hostname checks for `src/index.js` and `src/apiRoutes.js`: hostnames must match `SAFE_DOMAIN_RE` **and** must not end in a known file/config extension (`.php`, `.env`, `.md`, `.json`, `.html`, `.ini`, `.yaml`, `.sql`, `.bak`, `.properties`, `.amplifyrc`, …; any suffix starting with `php` is also rejected). Invalid inputs now return `400 Invalid domain` / `400 invalid_url` immediately — no upstream work, no cache write. **Note:** existing junk files on disk are not removed automatically; clear them manually or rely on `CACHE_SIZE_MB` eviction.
+
 - **HTML scraper missed manifest icons on SPA / bot-interstitial homepages** (e.g. `ah.nl`) — when HTML lacks a `<link rel="manifest">`, the scraper now walks `Link` headers, well-known manifest paths, icon-directory heuristics and `STATIC_MANIFEST_HINTS` before giving up. The v1 API manifest tier benefits from the same pipeline via `loadManifestIconCandidates`.
 - **HTML scraper `NxN` variant ladder on `/favicon/` paths** — `faviconVariantGroupAllowsLargeJump()` keeps probing consecutive sizes under `/favicon/` or `/favicons/` (e.g. Reddit 192 → 512 in the same folder) while the existing `MAX_FAVICON_SIZE_JUMP` guard still blocks unrelated marketing art on other URL patterns.
 
@@ -360,6 +362,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Internal
 
 - `src/cache.js` exports `purgeDomain(domain)` — removes all provider cache keys whose filename ends with `_{domain}` from memory and disk.
+- `src/domainValidation.js` — shared `extractDomainFromInput`, `extractDomainFromUrl`, `isValidHostname` and `BLOCKED_FILE_EXTENSIONS` blocklist; consumed by `src/index.js` (`extractDomain`) and `src/apiRoutes.js` (`/api/v1/favicon`, `/cdn/favicons/{domain}.png`).
 - `src/providers.js` exports `purgeScraperIconsCache(domain)` — evicts the merged scraper icon list for one domain from the in-memory LRU.
 - New dependencies: `better-sqlite3` (synchronous SQLite driver in WAL mode so the API key store is safe across cluster workers writing into the same `/cache/api-keys.sqlite` file) and `decode-ico` (multi-frame ICO decoder retained for legacy code paths; the v1 API no longer selects ICO sources).
 - The v1 API cache is **namespaced separately** from the existing provider-based cache (`src/cache.js`): PNGs live at `${API_CACHE_DIR}/{domain}.png` with a sibling `.meta.json` (`{ sourceType, width, height, cachedAt }`) so the two schemes can coexist in `/cache` without key collisions. The existing `CACHE_SIZE_MB` LRU rescan picks up `${API_CACHE_DIR}/...` files alongside the rest of the cache directory, so the global disk-size cap also covers the v1 API output.
