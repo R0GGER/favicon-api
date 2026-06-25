@@ -765,6 +765,23 @@ app.get('/:domain/json', async (req, res) => {
     ensureLobehubIndex(),
   ]);
 
+  // www-fallback: when scraper finds no icons for a bare domain, try www.domain.
+  let wwwFallback = null;
+  if (
+    (!scraperAllIcons || scraperAllIcons.length === 0) &&
+    !domain.startsWith('www.')
+  ) {
+    const wwwDomain = `www.${domain}`;
+    const wwwIcons = await fetchScraperAllIcons(wwwDomain);
+    if (wwwIcons && wwwIcons.length > 0) {
+      wwwFallback = {
+        domain: wwwDomain,
+        icons: wwwIcons,
+        proxy: `${req.protocol}://${req.get('host')}/s/${encodeURIComponent(wwwDomain)}`,
+      };
+    }
+  }
+
   const googleSizes = [16, 32, 64, 128];
   const googleV2Sizes = [16, 32, 64, 128, 256];
   const faviconkitSizes = [16, 32, 64, 128, 256];
@@ -874,6 +891,7 @@ app.get('/:domain/json', async (req, res) => {
         source: scraperCached?.url || null,
         maxIconSize: getScraperMaxIconSize(),
         icons: scraperAllIcons,
+        wwwFallback,
       },
       selfhst,
       dashboardicons,

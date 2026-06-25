@@ -1414,7 +1414,7 @@ async function fetchBesticonCandidates(domain) {
   return besticonIconsToCandidates(await fetchBesticonAllIcons(domain));
 }
 
-async function fetchScraper(domain) {
+async function fetchScraperForDomain(domain) {
   const referer = `https://${domain}/`;
   const { html, finalBaseUrl, linkHeader } = await fetchScraperPage(domain);
 
@@ -1460,6 +1460,21 @@ async function fetchScraper(domain) {
   if (bestPrimary) return bestPrimary;
 
   return probeScraperCandidates(rankedFallback, finalBaseUrl);
+}
+
+async function fetchScraper(domain) {
+  const result = await fetchScraperForDomain(domain);
+  if (result) return result;
+
+  if (!domain.startsWith('www.')) {
+    const wwwResult = await fetchScraperForDomain(`www.${domain}`);
+    if (wwwResult) {
+      wwwResult.fallbackDomain = `www.${domain}`;
+      return wwwResult;
+    }
+  }
+
+  return null;
 }
 
 const VARIANT_AVAILABILITY_TTL_MS = 24 * 60 * 60 * 1000;

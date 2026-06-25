@@ -766,6 +766,26 @@
       white-space: nowrap;
     }
 
+    .www-fallback-notice {
+      font-size: 0.7rem;
+      color: #7c5a2a;
+      background: #fef3cd;
+      border: 1px solid #f5d67a;
+      border-radius: 4px;
+      padding: 0.15rem 0.4rem;
+      margin: -0.45rem 0 0.35rem;
+      line-height: 1.25;
+    }
+    .www-fallback-notice a {
+      color: #5b2e7e;
+      font-weight: 600;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+    .www-fallback-notice a:hover {
+      color: #3d1a5e;
+    }
+
     .meta {
       display: flex;
       align-items: center;
@@ -1286,6 +1306,7 @@
           <img id="scraper-img" style="display:none" alt="Scraped favicon">
           <span class="copied-toast">URL copied!</span>
         </div>
+        <div class="www-fallback-notice" id="scraper-www-fallback" style="display:none"></div>
         <div class="size-buttons" id="scraper-sizes" style="display:none"></div>
         <div class="meta" id="scraper-meta"></div>
       </div>
@@ -2645,11 +2666,19 @@
       const img = document.getElementById('scraper-img');
       const spinner = document.getElementById('scraper-spinner');
       const meta = document.getElementById('scraper-meta');
+      const wwwNotice = document.getElementById('scraper-www-fallback');
       img.style.display = 'none';
       spinner.style.display = 'block';
       meta.textContent = '';
+      wwwNotice.style.display = 'none';
+      wwwNotice.innerHTML = '';
 
       loadScraperSizes(domain, refresh);
+    }
+
+    function searchDomain(domain) {
+      input.value = domain;
+      fetchFavicons();
     }
 
     function refreshScraper() {
@@ -2670,7 +2699,9 @@
     async function loadScraperSizes(domain, refresh) {
       const requestedFor = domain;
       const sizesEl = document.getElementById('scraper-sizes');
+      const wwwNotice = document.getElementById('scraper-www-fallback');
       let icons = [];
+      let wwwFallback = null;
       try {
         const url = `/${encodeURIComponent(domain)}/json${refresh ? '?_=' + Date.now() : ''}`;
         const res = await fetch(url, { headers: { Accept: 'application/json' } });
@@ -2678,6 +2709,7 @@
           const body = await res.json();
           icons = body?.endpoints?.scraper?.icons || [];
           scraperMaxIconSize = Number(body?.endpoints?.scraper?.maxIconSize) || 0;
+          wwwFallback = body?.endpoints?.scraper?.wwwFallback || null;
         }
       } catch {
         // fall through to proxy fallback
@@ -2685,7 +2717,7 @@
 
       if (currentDomain !== requestedFor) return;
 
-      const sorted = (Array.isArray(icons) ? icons : [])
+      let sorted = (Array.isArray(icons) ? icons : [])
         .filter((i) => i && typeof i.url === 'string' && (i.width || 0) > 0)
         .slice()
         .sort((a, b) => {
@@ -2695,6 +2727,25 @@
           return (b.width || 0) - (a.width || 0);
         });
 
+      // www-fallback: if no icons found on bare domain, use www variant icons.
+      if (sorted.length === 0 && wwwFallback && Array.isArray(wwwFallback.icons) && wwwFallback.icons.length > 0) {
+        sorted = wwwFallback.icons
+          .filter((i) => i && typeof i.url === 'string' && (i.width || 0) > 0)
+          .slice()
+          .sort((a, b) => {
+            const areaA = (a.width || 0) * (a.height || a.width || 0);
+            const areaB = (b.width || 0) * (b.height || b.width || 0);
+            if (areaB !== areaA) return areaB - areaA;
+            return (b.width || 0) - (a.width || 0);
+          });
+        if (sorted.length > 0) {
+          wwwNotice.innerHTML =
+            `No icons on <strong>${escapeHtml(domain)}</strong>: ` +
+            `<a href="javascript:void(0)" onclick="searchDomain('${escapeHtml(wwwFallback.domain)}')">${escapeHtml(wwwFallback.domain)}</a>`;
+          wwwNotice.style.display = '';
+        }
+      }
+
       if (sorted.length === 0) {
         loadScraperFallback(domain, refresh);
         return;
@@ -2703,9 +2754,15 @@
       scraperIcons = sorted;
       renderScraperSizes();
       sizesEl.style.display = '';
-      currentScraperSelection = 0;
-      setActiveScraperButton(0);
-      loadScraperVariant(0);
+      if (scraperMaxIconSize > 0) {
+        currentScraperSelection = 'proxy';
+        setActiveScraperButton('proxy');
+        loadScraperProxyVariant();
+      } else {
+        currentScraperSelection = 0;
+        setActiveScraperButton(0);
+        loadScraperVariant(0);
+      }
     }
 
     function buildScraperSizeEntries() {

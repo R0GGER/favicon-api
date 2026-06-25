@@ -260,6 +260,22 @@ async function gatherCandidates(domain) {
 }
 
 async function fetchBySourcePriority(domain) {
+  const result = await fetchBySourcePriorityForDomain(domain);
+  if (result) return result;
+
+  // www-fallback: if the bare domain yielded nothing, try www.domain.
+  if (!domain.startsWith('www.')) {
+    const wwwResult = await fetchBySourcePriorityForDomain(`www.${domain}`);
+    if (wwwResult) {
+      wwwResult.fallbackDomain = `www.${domain}`;
+      return wwwResult;
+    }
+  }
+
+  return null;
+}
+
+async function fetchBySourcePriorityForDomain(domain) {
   const { buckets, referer } = await gatherCandidates(domain);
 
   let minimumFallback = null;
