@@ -55,15 +55,15 @@ docker compose up -d
 ```yaml
 services:
   maflplus-favicon-api:
+    #build: .
     image: ghcr.io/r0gger/maflplus-favicon-api:latest
-    # build: .   # use instead of image: to build locally
     container_name: maflplus-favicon-api
     restart: unless-stopped
     ports:
       - "3100:3000"
     volumes:
       - favicon-cache:/cache
-    env_file: .env
+    env_file: .env.example
     depends_on:
       besticon:
         condition: service_healthy
@@ -75,15 +75,23 @@ services:
     container_name: besticon
     restart: unless-stopped
     environment:
-      TZ: Europe/Amsterdam
-      CACHE_SIZE_MB: 1024
-      HOST_ONLY_DOMAINS: "*"
-      HTTP_CLIENT_TIMEOUT: 5s
-      HTTP_MAX_AGE_DURATION: 720h
-      PORT: 8080
-      SERVER_MODE: redirect
+      TZ: ${BESTICON_TZ:-Europe/Amsterdam}
+      ADDRESS: ${BESTICON_ADDRESS:-}
+      CACHE_SIZE_MB: ${BESTICON_CACHE_SIZE_MB:-1024}
+      HOST_ONLY_DOMAINS: ${BESTICON_HOST_ONLY_DOMAINS:-*}
+      HTTP_CLIENT_TIMEOUT: ${BESTICON_HTTP_CLIENT_TIMEOUT:-5s}
+      HTTP_MAX_AGE_DURATION: ${BESTICON_HTTP_MAX_AGE_DURATION:-720h}
+      HTTP_USER_AGENT: ${BESTICON_HTTP_USER_AGENT:-}
+      PORT: ${BESTICON_PORT:-8080}
+      SERVER_MODE: ${BESTICON_SERVER_MODE:-redirect}
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/up"]
+      test:
+        - CMD
+        - wget
+        - --quiet
+        - --tries=1
+        - --spider
+        - http://localhost:8080/up
       interval: 30s
       timeout: 5s
       retries: 3
@@ -93,6 +101,7 @@ services:
 
 networks:
   besticon:
+    name: besticon
     driver: bridge
 
 volumes:
