@@ -826,28 +826,6 @@
       fill: currentColor;
     }
 
-    .scraper-alt-hint {
-      display: none;
-      margin-top: 0.35rem;
-      font-size: 0.75rem;
-      line-height: 1.45;
-      color: #6b6560;
-    }
-
-    .scraper-alt-hint a {
-      color: #5b2e7e;
-      text-decoration: none;
-      font-weight: 600;
-    }
-
-    .scraper-alt-hint a:hover {
-      text-decoration: underline;
-    }
-
-    .scraper-alt-hint.is-resolved {
-      color: #8a8480;
-    }
-
     .service-candidates {
       margin-top: 1rem;
       padding-top: 0.9rem;
@@ -1310,7 +1288,6 @@
         </div>
         <div class="size-buttons" id="scraper-sizes" style="display:none"></div>
         <div class="meta" id="scraper-meta"></div>
-        <div class="scraper-alt-hint" id="scraper-alt-hint" aria-live="polite"></div>
       </div>
 
       <!-- Google (v1 + v2 combined) -->
@@ -2652,63 +2629,6 @@
       if (display) display.style.minHeight = '';
     }
 
-    function clearScraperAlternativeHint() {
-      const el = document.getElementById('scraper-alt-hint');
-      if (!el) return;
-      el.style.display = 'none';
-      el.className = 'scraper-alt-hint';
-      el.innerHTML = '';
-    }
-
-    function bindScraperAlternativeLinks(container) {
-      container.querySelectorAll('a[data-domain]').forEach((link) => {
-        link.addEventListener('click', (e) => {
-          e.preventDefault();
-          const altDomain = link.dataset.domain;
-          if (!altDomain) return;
-          document.getElementById('domain-input').value = altDomain;
-          runDomainSearch(altDomain);
-        });
-      });
-    }
-
-    function showScraperResolvedNote(requested, resolved) {
-      const el = document.getElementById('scraper-alt-hint');
-      if (!el || !resolved || resolved === requested) {
-        clearScraperAlternativeHint();
-        return;
-      }
-      el.style.display = '';
-      el.className = 'scraper-alt-hint is-resolved';
-      el.innerHTML =
-        `No icon on <strong>${escapeHtml(requested)}</strong>. ` +
-        `Showing icon from <a href="#" data-domain="${escapeHtml(resolved)}">${escapeHtml(resolved)}</a>.`;
-      bindScraperAlternativeLinks(el);
-    }
-
-    function showScraperAlternativeHint(requested, alternatives) {
-      const el = document.getElementById('scraper-alt-hint');
-      if (!el) return;
-      const alts = (Array.isArray(alternatives) ? alternatives : [])
-        .map((item) => (typeof item === 'string' ? item : item?.domain))
-        .filter((d) => d && d !== requested);
-      if (alts.length === 0) {
-        clearScraperAlternativeHint();
-        return;
-      }
-      el.style.display = '';
-      el.className = 'scraper-alt-hint';
-      const links = alts
-        .map(
-          (d) =>
-            `<a href="#" data-domain="${escapeHtml(d)}">${escapeHtml(d)}</a>`
-        )
-        .join(', ');
-      el.innerHTML =
-        `No icon found for <strong>${escapeHtml(requested)}</strong>. Try ${links}.`;
-      bindScraperAlternativeLinks(el);
-    }
-
     function loadScraperFallback(domain, refresh) {
       const proxyUrl = refresh ? `/s/${domain}?refresh=1` : `/s/${domain}`;
       loadFavicon('scraper', proxyUrl, `${location.origin}/s/${domain}`);
@@ -2718,7 +2638,6 @@
       scraperIcons = [];
       scraperMaxIconSize = 0;
       currentScraperSelection = 0;
-      clearScraperAlternativeHint();
       const sizesEl = document.getElementById('scraper-sizes');
       sizesEl.style.display = 'none';
       sizesEl.innerHTML = '';
@@ -2752,24 +2671,13 @@
       const requestedFor = domain;
       const sizesEl = document.getElementById('scraper-sizes');
       let icons = [];
-      let fetchedFrom = domain;
-      let alternatives = [];
       try {
         const url = `/${encodeURIComponent(domain)}/json${refresh ? '?_=' + Date.now() : ''}`;
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 20000);
-        const res = await fetch(url, {
-          headers: { Accept: 'application/json' },
-          signal: controller.signal,
-        });
-        clearTimeout(timeoutId);
+        const res = await fetch(url, { headers: { Accept: 'application/json' } });
         if (res.ok) {
           const body = await res.json();
-          const scraper = body?.endpoints?.scraper || {};
-          icons = scraper.icons || [];
-          scraperMaxIconSize = Number(scraper.maxIconSize) || 0;
-          fetchedFrom = scraper.fetchedFrom || domain;
-          alternatives = scraper.alternatives || [];
+          icons = body?.endpoints?.scraper?.icons || [];
+          scraperMaxIconSize = Number(body?.endpoints?.scraper?.maxIconSize) || 0;
         }
       } catch {
         // fall through to proxy fallback
@@ -2788,12 +2696,10 @@
         });
 
       if (sorted.length === 0) {
-        showScraperAlternativeHint(domain, alternatives);
         loadScraperFallback(domain, refresh);
         return;
       }
 
-      showScraperResolvedNote(domain, fetchedFrom);
       scraperIcons = sorted;
       renderScraperSizes();
       sizesEl.style.display = '';

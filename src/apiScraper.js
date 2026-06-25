@@ -1,4 +1,3 @@
-const { scraperDomainAlternatives } = require('./domainAlternatives');
 const {
   fetchScraperPage,
   parseIconCandidatesFromHtml,
@@ -260,7 +259,7 @@ async function gatherCandidates(domain) {
   return { buckets, referer };
 }
 
-async function fetchBySourcePriorityForDomain(domain) {
+async function fetchBySourcePriority(domain) {
   const { buckets, referer } = await gatherCandidates(domain);
 
   let minimumFallback = null;
@@ -292,18 +291,6 @@ async function fetchBySourcePriorityForDomain(domain) {
       sourceUrl: minimumFallback.sourceUrl,
       sourceType: minimumFallbackType,
     };
-  }
-
-  return null;
-}
-
-async function fetchBySourcePriority(domain) {
-  const primary = await fetchBySourcePriorityForDomain(domain);
-  if (primary) return primary;
-
-  for (const alt of scraperDomainAlternatives(domain)) {
-    const hit = await fetchBySourcePriorityForDomain(alt);
-    if (hit) return hit;
   }
 
   return null;

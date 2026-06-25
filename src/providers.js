@@ -4,10 +4,8 @@ const { rasterizeSvgToSize, readImageDimensions, toDisplayPng } = require('./ima
 const { LRUCache } = require('lru-cache');
 const { upstreamFetch, ipv4Dispatcher, ipv4Http1Dispatcher } = require('./upstreamFetch');
 const scraperDiskCache = require('./scraperDiskCache');
-const { scraperDomainAlternatives } = require('./domainAlternatives');
 
 const UPSTREAM_TIMEOUT = parseInt(process.env.UPSTREAM_TIMEOUT || '5000', 10);
-const BESTICON_TIMEOUT = parseInt(process.env.BESTICON_TIMEOUT || '15000', 10);
 
 const BESTICON_URL = (process.env.BESTICON_URL || '').replace(/\/+$/, '');
 
@@ -45,22 +43,13 @@ const probeMetadataCache = new LRUCache({
   ttl: SCRAPER_ICONS_CACHE_TTL_MS,
 });
 const scraperPageInflight = new Map();
-const scraperResolvedDomainCache = new LRUCache({
-  max: SCRAPER_ICONS_CACHE_MAX,
-  ttl: SCRAPER_ICONS_CACHE_TTL_MS,
-});
 
 function invalidateScraperDomainCaches(domain) {
   scraperIconsCache.delete(domain);
   scraperPageCache.delete(domain);
   besticonIconsCache.delete(domain);
   scraperPageInflight.delete(domain);
-  scraperResolvedDomainCache.delete(domain);
   scraperDiskCache.invalidateDomain(domain).catch(() => {});
-}
-
-function getScraperResolvedDomain(domain) {
-  return scraperResolvedDomainCache.get(domain) || domain;
 }
 
 const SCRAPER_USER_AGENT =
@@ -1080,7 +1069,7 @@ async function probeIconMetadata(href, referer) {
 // besticon's discoveries plus anything we can reach ourselves via the static
 // CDN hints and sized-variant expansion. This is the source of truth for the
 // /:domain/json icons array shown as the size-button strip on the UI.
-async function fetchScraperAllIconsForDomain(domain) {
+async function fetchScraperAllIcons(domain) {
   const cached = scraperIconsCache.get(domain);
   if (cached) return cached;
 
@@ -1091,29 +1080,13 @@ async function fetchScraperAllIconsForDomain(domain) {
   }
 
   const referer = `https://${domain}/`;
-  const [{ html, finalBaseUrl, linkHeader }, besticonIcons] = await Promise.all([
-    fetchScraperPage(domain),
-    BESTICON_URL ? fetchBesticonAllIcons(domain) : Promise.resolve([]),
-  ]);
+  const { html, finalBaseUrl, linkHeader } = await fetchScraperPage(domain);
+  const besticonIcons = BESTICON_URL ? await fetchBesticonAllIcons(domain) : [];
 
   const byUrl = new Map();
   for (const icon of besticonIcons) {
     if (!icon || !icon.url || byUrl.has(icon.url)) continue;
     byUrl.set(icon.url, { ...icon });
-  }
-
-  // Besticon already scraped HTML, manifests and probed icon sizes. Skip the
-  // expensive manifest / hint probes when it returned usable icons.
-  if (besticonIcons.length > 0) {
-    const sorted = [...byUrl.values()].sort((a, b) => {
-      const areaA = (a.width || 0) * (a.height || a.width || 0);
-      const areaB = (b.width || 0) * (b.height || b.width || 0);
-      if (areaB !== areaA) return areaB - areaA;
-      return (b.width || 0) - (a.width || 0);
-    });
-    scraperIconsCache.set(domain, sorted);
-    scraperDiskCache.setIcons(domain, sorted);
-    return sorted;
   }
 
   const iconCandidates = [...byUrl.keys()].map((href) => ({ href }));
@@ -1163,32 +1136,9 @@ async function fetchScraperAllIconsForDomain(domain) {
     return (b.width || 0) - (a.width || 0);
   });
 
-  if (sorted.length > 0) {
-    scraperIconsCache.set(domain, sorted);
-    scraperDiskCache.setIcons(domain, sorted);
-  }
+  scraperIconsCache.set(domain, sorted);
+  scraperDiskCache.setIcons(domain, sorted);
   return sorted;
-}
-
-async function fetchScraperAllIcons(domain) {
-  let icons = await fetchScraperAllIconsForDomain(domain);
-  let resolved = domain;
-
-  if (icons.length === 0) {
-    for (const alt of scraperDomainAlternatives(domain)) {
-      const altIcons = await fetchScraperAllIconsForDomain(alt);
-      if (altIcons.length > 0) {
-        icons = altIcons;
-        resolved = alt;
-        scraperIconsCache.set(domain, icons);
-        scraperDiskCache.setIcons(domain, icons);
-        break;
-      }
-    }
-  }
-
-  scraperResolvedDomainCache.set(domain, resolved);
-  return icons;
 }
 
 async function fetchScraperPageUncached(domain) {
@@ -1216,12 +1166,7 @@ async function fetchScraperPageUncached(domain) {
     },
   ];
 
-  let best = null;
-  let bestIconCount = -1;
-
   for (const pageUrl of pageUrlsForDomain(domain)) {
-    let pageResult = null;
-
     for (const attempt of attempts) {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT);
@@ -1240,13 +1185,12 @@ async function fetchScraperPageUncached(domain) {
         const html = await res.text();
         if (html.length >= HTML_MIN_BYTES) {
           const linkHeader = res.headers.get('link') || res.headers.get('Link') || null;
-          pageResult = {
+          return {
             html,
             finalBaseUrl: res.url || pageUrl,
             htmlFetchMethod: `${attempt.label} ${pageUrl}`,
             linkHeader,
           };
-          break;
         }
       } catch {
         /* try next */
@@ -1254,28 +1198,9 @@ async function fetchScraperPageUncached(domain) {
         clearTimeout(timer);
       }
     }
-
-    if (!pageResult) continue;
-
-    let iconCount = 0;
-    try {
-      iconCount = parseIconCandidatesFromHtml(
-        pageResult.html,
-        pageResult.finalBaseUrl
-      ).primaryCandidates.length;
-    } catch {
-      /* ignore parse errors */
-    }
-
-    if (iconCount > bestIconCount) {
-      bestIconCount = iconCount;
-      best = pageResult;
-    }
-    // Bare hostnames without icon tags may still expose icons on www.{domain}.
-    if (bestIconCount > 0) break;
   }
 
-  return best || { html: null, finalBaseUrl: baseUrl, htmlFetchMethod: null, linkHeader: null };
+  return { html: null, finalBaseUrl: baseUrl, htmlFetchMethod: null, linkHeader: null };
 }
 
 async function fetchScraperPage(domain, { bypassCache = false } = {}) {
@@ -1430,7 +1355,7 @@ async function fetchBesticonAllIcons(domain, { bypassCache = false } = {}) {
 
   const url = `${BESTICON_URL}/allicons.json?url=${encodeURIComponent(domain)}`;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), BESTICON_TIMEOUT);
+  const timer = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT);
 
   try {
     const res = await fetch(url, {
@@ -1489,7 +1414,7 @@ async function fetchBesticonCandidates(domain) {
   return besticonIconsToCandidates(await fetchBesticonAllIcons(domain));
 }
 
-async function fetchScraperForDomain(domain) {
+async function fetchScraper(domain) {
   const referer = `https://${domain}/`;
   const { html, finalBaseUrl, linkHeader } = await fetchScraperPage(domain);
 
@@ -1535,25 +1460,6 @@ async function fetchScraperForDomain(domain) {
   if (bestPrimary) return bestPrimary;
 
   return probeScraperCandidates(rankedFallback, finalBaseUrl);
-}
-
-async function fetchScraper(domain) {
-  const primary = await fetchScraperForDomain(domain);
-  if (primary) {
-    scraperResolvedDomainCache.set(domain, domain);
-    return primary;
-  }
-
-  for (const alt of scraperDomainAlternatives(domain)) {
-    const result = await fetchScraperForDomain(alt);
-    if (result) {
-      scraperResolvedDomainCache.set(domain, alt);
-      return result;
-    }
-  }
-
-  scraperResolvedDomainCache.set(domain, domain);
-  return null;
 }
 
 const VARIANT_AVAILABILITY_TTL_MS = 24 * 60 * 60 * 1000;
@@ -1646,7 +1552,6 @@ module.exports = {
   loadManifestIconCandidates,
   fetchBesticonAllIcons,
   fetchScraperAllIcons,
-  getScraperResolvedDomain,
   parseSizesAttr,
   expandSizedVariants,
   getScraperMaxIconSize,
