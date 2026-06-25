@@ -1,69 +1,168 @@
 # FaviconAPI
 
-A lightweight favicon proxy that fetches favicons from multiple providers (HTML scraper, Google, Google v2, DuckDuckGo, Yandex, Favicon.so, Vemetric, Favicon-3j1, Faviconkit, logo.dev) plus service-name lookups against the [selfhst icons](https://github.com/selfhst/icons) and [homarr-labs/dashboard-icons](https://github.com/homarr-labs/dashboard-icons) catalogs. Includes a web UI and a simple API to grab any website's favicon.
+Lightweight favicon proxy with a web UI and a FaviconAPIs-compatible JSON API.
 
-## Documentation
+**Favicon providers** (raced in parallel on `/{domain}`; each also has a dedicated route):
 
-Soon..!
+| Provider | Route | Notes |
+|---|---|---|
+| HTML scraper | `/s/{domain}` | Parses `<link rel="icon">`, manifest, and fallbacks; optional [besticon](https://github.com/mat/besticon) sidecar via `BESTICON_URL` |
+| [Google](https://www.google.com/s2/favicons) | `/g/{size}/{domain}` | Sizes 16, 32, 64, 128 |
+| [Google v2](https://developers.google.com/search/docs/appearance/favicon-in-search) | `/g2/{size}/{domain}` | `faviconV2`; sizes 16, 32, 64, 128, 256 |
+| [DuckDuckGo](https://icons.duckduckgo.com/) | `/d/{domain}` | |
+| [Yandex](https://favicon.yandex.net/) | `/y/{domain}` | |
+| [Favicon.so](https://favicon.so/) | `/f/{domain}` | |
+| [Vemetric](https://favicon.vemetric.com/) | `/v/{domain}` | `?size=`, `?format=` |
+| [Favicon-3j1](https://favicon-3j1.pages.dev/) | `/p/{domain}` | |
+| [Faviconkit](https://faviconkit.net/) | `/k/{size}/{domain}` | Sizes 16, 32, 64, 128, 256 |
+| [logo.dev](https://www.logo.dev/) | `/l/{domain}` | Requires `LOGODEV_TOKEN` |
 
-Interactive API docs and a live playground are also available at `/api` on a running instance.
+**Service-icon catalogs** (lookup by service name, e.g. `jellyfin`):
 
-## API
+| Catalog | Route |
+|---|---|
+| [selfhst icons](https://github.com/selfhst/icons) | `/sh/{service}` |
+| [Dashboard Icons](https://github.com/homarr-labs/dashboard-icons) | `/di/{service}` |
+| [LobeHub icons](https://github.com/lobehub/lobe-icons) | `/lb/{service}` |
+
+Service routes support `?variant=color|light|dark` where applicable.
+
+Interactive API docs and a live playground: `/api` on a running instance.
+
+## Docker
+
+Minimal `docker-compose.yml` - copy [`.env.example`](.env.example) to `.env`, adjust values, then:
+
+```bash
+docker compose up -d
+```
+
+```yaml
+services:
+  maflplus-favicon-api:
+    image: ghcr.io/r0gger/maflplus-favicon-api:latest
+    # build: .   # use instead of image: to build locally
+    container_name: maflplus-favicon-api
+    restart: unless-stopped
+    ports:
+      - "3100:3000"
+    volumes:
+      - favicon-cache:/cache
+    env_file: .env
+    depends_on:
+      besticon:
+        condition: service_healthy
+    networks:
+      - besticon
+
+  besticon:
+    image: matthiasluedtke/iconserver:latest
+    container_name: besticon
+    restart: unless-stopped
+    environment:
+      TZ: Europe/Amsterdam
+      CACHE_SIZE_MB: 1024
+      HOST_ONLY_DOMAINS: "*"
+      HTTP_CLIENT_TIMEOUT: 5s
+      HTTP_MAX_AGE_DURATION: 720h
+      PORT: 8080
+      SERVER_MODE: redirect
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/up"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - besticon
+
+networks:
+  besticon:
+    driver: bridge
+
+volumes:
+  favicon-cache:
+```
+
+**Notes**
+
+- **besticon** has no `ports:` mapping - only `maflplus-favicon-api` can reach it on `http://besticon:8080`. Set `BESTICON_URL=http://besticon:8080` in `.env`.
+- **Without besticon:** remove the `besticon` service, `depends_on`, `networks`, and `BESTICON_URL`. The built-in HTML scraper is used instead.
+- **Host cache path:** use `- /path/to/cache:/cache` instead of the named volume; run `chown 100:101 /path/to/cache`and `chmod 755 /path/to/cache` so the container user can write.
+
+## Environment variables
+
+All settings are documented in [`.env.example`](.env.example). Copy it to `.env` and pass it via `env_file: .env` in Compose (or set `environment:` entries manually).
+
+| Variable | Default | Description |
+|---|---|---|
+| `PORT` | `3000` | TCP port the HTTP server listens on. |
+| `CACHE_DIR` | `./cache` (`/cache` in Docker) | Base directory for on-disk favicon cache files. |
+| `MEMORY_CACHE_MAX` | `2000` | Max favicons in the per-worker in-memory LRU cache. |
+| `MEMORY_CACHE_TTL` | `3600` | In-memory cache entry lifetime (seconds). |
+| `DISK_CACHE_TTL` | `86400` | On-disk cache entry lifetime (seconds). |
+| `CACHE_SIZE_MB` | `0` | Max total disk cache size (MB). Oldest entries are evicted when exceeded. `0` = no size cap (TTL eviction only). |
+| `UPSTREAM_TIMEOUT` | `5000` | Upstream HTTP timeout (ms) for providers, besticon, and scrape targets. |
+| `UV_THREADPOOL_SIZE` | `16` | Node libuv thread pool size for disk I/O, DNS, etc. Must be set before process start. |
+| `WORKERS` | CPU core count | Number of cluster workers. Set explicitly in Docker when CPU is limited. `1` disables clustering. |
+| `SCRAPER_PROBE_BATCH_SIZE` | `4` | HTML scraper icon candidates probed in parallel per batch (`/s/{domain}` and `/{domain}`). |
+| `PICK_HEAD_START_MS` | `150` | Head-start (ms) for `DEFAULT_PROVIDER` on `/{domain}` before other providers start. |
+| `LOGODEV_TOKEN` | _(unset)_ | [logo.dev](https://www.logo.dev/) publishable key. Enables `/l/{domain}`; without it the route returns 503. |
+| `DEFAULT_PROVIDER` | `scraper` | Preferred provider for `/{domain}` (gets the head-start). Values: `scraper`, `google`, `googlev2`, `duckduckgo`, `yandex`, `faviconso`, `vemetric`, `favicondev`, `faviconkit`, `logodev`, `selfhst`, `dashboardicons`, `lobehub`. `logodev` requires `LOGODEV_TOKEN`. |
+| `BESTICON_URL` | _(unset)_ | Base URL of a sidecar [besticon](https://github.com/mat/besticon) instance (e.g. `http://besticon:8080`). `/s/{domain}` asks besticon first, then falls back to the built-in scraper. |
+| `SCRAPER_ICONS_CACHE_TTL` | `3600` | TTL (seconds) for the in-memory cache of enriched scraper icon lists (`/{domain}/json`). |
+| `SCRAPER_ICONS_CACHE_MAX` | `500` | Max domains in that scraper-icons LRU cache. |
+| `MANIFEST_PROBE_MAX` | `12` | Max manifest URLs to probe per domain when HTML does not link one directly. |
+| `SCRAPER_MAX_ICON_SIZE` | `0` | Max output dimension for `/s/{domain}`. Larger sources are downscaled; `0` = native resolution. |
+| `API_KEYS_DB` | `/cache/api-keys.sqlite` | SQLite file for hashed API keys and monthly usage counters. Keep on the same volume as `CACHE_DIR`. |
+| `API_CACHE_DIR` | `/cache/api` | Directory for normalized 256×256 PNGs from `/api/v1/favicon`. Served via `/cdn/favicons/{domain}.png`. |
+| `API_CACHE_TTL` | `604800` | How long a generated PNG counts as cached (seconds, 7 days). Also used as `Cache-Control` max-age on the CDN route. |
+| `API_REQUIRE_KEY` | `true` | `false` makes `/api/v1/favicon` public: no key required, quotas not enforced. A provided key is silently ignored. |
+| `PLAN_FREE_LIMIT` | `25` | Monthly call quota for `free` plan keys. `0` = unlimited. |
+| `PLAN_PRO_LIMIT` | `2500` | Monthly call quota for `pro` plan keys. `0` = unlimited. |
+| `PLAN_ENTERPRISE_LIMIT` | `0` | Monthly call quota for `enterprise` plan keys. `0` = unlimited. |
+
+## API overview
 
 | Endpoint | Description |
 |---|---|
-| `/{domain}` | Best favicon (parallel provider race; optional head-start for `DEFAULT_PROVIDER`) |
-| `/s/{domain}` | HTML scraper: parses the site's `<link rel="icon">`, web manifest and standard fallbacks. When `BESTICON_URL` is set, candidate discovery is delegated to a sidecar [besticon](https://github.com/mat/besticon) instance via `/allicons.json?url=...` and falls back to the built-in scraper if besticon yields nothing. Append `?refresh=1` to bypass the cache and re-scrape (see below). |
-| `/g/{size}/{domain}` | Google favicon (sizes 16, 32, 64, 128) |
-| `/g2/{size}/{domain}` | Google v2 (`faviconV2`) favicon (sizes 16, 32, 64, 128, 256) |
-| `/d/{domain}` | DuckDuckGo favicon |
-| `/y/{domain}` | Yandex favicon |
-| `/f/{domain}` | Favicon.so favicon |
-| `/v/{domain}` | Vemetric favicon |
-| `/v/{domain}?size=64` | Vemetric favicon resized |
-| `/v/{domain}?format=webp` | Vemetric favicon in webp/png/jpg |
-| `/p/{domain}` | Favicon-3j1 favicon |
-| `/k/{size}/{domain}` | Faviconkit favicon (sizes 16, 32, 64, 128, 256) |
-| `/l/{domain}` | logo.dev logo (requires `LOGODEV_TOKEN`, otherwise returns 503) |
-| `/sh/{service}` | [selfhst icons](https://github.com/selfhst/icons) lookup by service name (e.g. `/sh/jellyfin`). Supports `?variant=color\|light\|dark`. |
-| `/di/{service}` | [homarr-labs/dashboard-icons](https://github.com/homarr-labs/dashboard-icons) lookup by service name (e.g. `/di/jellyfin`). Supports `?variant=color\|light\|dark`. |
-| `/s-asset?url=...` | Server-side asset proxy used by the web UI to render every icon discovered by the scraper/besticon. Cached on disk + LRU keyed by SHA-1 of the URL; SSRF-guarded against localhost / private IPv4 ranges and link-local / ULA IPv6; only `http(s)` and a max URL length of 2048. Useful for upstream icons whose CDN blocks direct browser `<img>` loads via Referer/UA filtering. |
-| `/search?q={query}` | Browser custom search engine entry point. Redirects to the homepage with the query pre-filled and favicon results loaded (e.g. `/search?q=github.com`). Use `https://your-host/search?q=%s` when adding a search engine in Chrome, Firefox or Edge. |
-| `/opensearch.xml` | OpenSearch descriptor for one-click "Add search engine" in supported browsers. Linked from the homepage `<head>`. |
-| `/providers` | JSON config indicating which optional providers are enabled |
-| `/{domain}/json` | JSON list of every endpoint URL for the domain |
-| `/api/v1/favicon?url=...` | **FaviconAPIs-compatible JSON endpoint.** Returns a JSON response (not the image bytes) with a CDN URL to a normalized 256x256 PNG, the detected `sourceType` (`svg` > `manifest` > `apple-touch-icon` > `png` > `ico`), and cache metadata. Requires an API key (Bearer or `?key=`). See [API v1](#api-v1-faviconapis-style) below. |
-| `/cdn/favicons/{domain}.png` | Public CDN route that serves the 256x256 PNG cached by `/api/v1/favicon`. Sends `Cache-Control: public, max-age=604800, immutable`. |
-| `/robots.txt` | Search-engine crawl directives. Allows indexing of the homepage, API docs (`/api`), and static assets (`/favicon.png`, `/logo.png`, `/sitemap.xml`); disallows every favicon endpoint so crawlers don't waste budget on the unbounded `/{domain}` URL space. The `Sitemap:` line is auto-built from the request host. |
-| `/sitemap.xml` | Sitemap for the homepage and API docs page. The `<loc>` is auto-built from `req.protocol`/`req.get('host')`, so the correct public origin is used behind any reverse proxy (relies on Express `trust proxy`). |
+| `/{domain}` | Best favicon (parallel provider race) |
+| `/s/{domain}` | HTML scraper (or besticon when `BESTICON_URL` is set) |
+| `/g/{size}/{domain}` | Google favicon (16, 32, 64, 128) |
+| `/g2/{size}/{domain}` | Google v2 favicon (16, 32, 64, 128, 256) |
+| `/d/{domain}` | DuckDuckGo |
+| `/y/{domain}` | Yandex |
+| `/f/{domain}` | Favicon.so |
+| `/v/{domain}` | Vemetric (`?size=`, `?format=`) |
+| `/p/{domain}` | Favicon-3j1 |
+| `/k/{size}/{domain}` | Faviconkit (16, 32, 64, 128, 256) |
+| `/l/{domain}` | logo.dev (requires `LOGODEV_TOKEN`) |
+| `/sh/{service}` | selfhst icons (`?variant=color\|light\|dark`) |
+| `/di/{service}` | Dashboard Icons (`?variant=color\|light\|dark`) |
+| `/lb/{service}` | LobeHub icons (`?variant=color\|light\|dark`) |
+| `/{domain}/json` | JSON list of all endpoint URLs for a domain |
+| `/api/v1/favicon?url=` | FaviconAPIs-compatible JSON API — see below |
+| `/cdn/favicons/{domain}.png` | Public CDN route for cached API v1 PNGs |
+| `/providers` | JSON: which optional providers are enabled |
+| `/search?q=` | Custom search engine redirect to the homepage |
 
-**Example:** `https://your-host/github.com`
+**Examples:** `https://your-host/github.com` · `https://your-host/s/github.com` · `https://your-host/sh/jellyfin`
 
-**Scraper example:** `https://your-host/s/github.com`
+### Scraper cache bypass
 
-**Scraper cache bypass:** `https://your-host/s/{domain}?refresh=1`
+```
+https://your-host/s/{domain}?refresh=1
+```
 
-Forces a fresh scrape for that domain by clearing the cached scraper entry (memory and disk) before fetching again. Use this when a site has changed its favicon, after deploying scraper fixes, or when debugging stale results. `?nocache=1` is accepted as an alias for `?refresh=1`.
+Forces a fresh scrape by clearing the cached scraper entry (memory and disk) before fetching again. Use when a site changed its favicon, after scraper fixes, or when debugging stale results. `?nocache=1` is an alias for `?refresh=1`.
 
-**JSON example:** `https://your-host/github.com/json`
+## API v1
 
-When `BESTICON_URL` is set, the JSON output also exposes every icon besticon found for the domain under `endpoints.scraper.icons` (each entry has `url`, `width`, `height`, `format`, `bytes`).
-
-**selfhst example:** `https://your-host/sh/jellyfin`
-
-**Dashboard Icons example:** `https://your-host/di/jellyfin`
-
-The web UI accepts both a domain (e.g. `example.com`) and a bare service name without a TLD (e.g. `radarr`, `sonarr`); when no dot is present the input is treated as a service-icon name and the selfh.st and Dashboard Icons (homarr) cards are shown side-by-side. The "Also include service icon lookups" toggle controls whether they are also probed for domain searches (derived slug = first label of the domain).
-
-## API v1 (FaviconAPIs-style)
-
-`GET /api/v1/favicon?url=<website>` is a JSON-returning endpoint modeled on [faviconapis.com](https://www.faviconapis.com/docs). It runs the HTML scraper, picks the best source in priority order (`svg` > `manifest` > `apple-touch-icon` > `png` > root `/favicon.ico`), normalizes the result to a 256x256 PNG, caches that PNG on disk for 7 days and returns a CDN URL plus metadata. The image is **not** sent in the response body; clients fetch it from the returned `url` via `/cdn/favicons/{domain}.png`.
+`GET /api/v1/favicon?url=<website>` returns JSON (not image bytes) with a CDN URL to a normalized 256×256 PNG, `sourceType` (`svg` > `manifest` > `apple-touch-icon` > `png` > `ico`), and cache metadata. Clients fetch the image from the returned `url` via `/cdn/favicons/{domain}.png`.
 
 ### Authentication
 
-By default API keys are required. For self-hosted setups that want a fully public, anonymous endpoint, set `API_REQUIRE_KEY=false` in the environment (see [docker-compose.yml](docker-compose.yml)). In that mode the route accepts any request without an `Authorization` header or `?key=`, and per-key plans/quotas are not enforced. A provided key is silently ignored — it is not validated and its usage counter is not incremented.
-
-When `API_REQUIRE_KEY=true` (default), pass the key in one of two ways:
+When `API_REQUIRE_KEY=true` (default), pass the key as a Bearer header or `?key=`:
 
 ```bash
 curl "https://your-host/api/v1/favicon?url=https://github.com" \
@@ -74,14 +173,14 @@ curl "https://your-host/api/v1/favicon?url=https://github.com" \
 curl "https://your-host/api/v1/favicon?url=https://github.com&key=fa_your_key_here"
 ```
 
-On Windows PowerShell, `curl` is an alias for `Invoke-WebRequest` and will not accept `-H "Authorization: ..."` as a string. Use `curl.exe` (the real curl binary that ships with Windows 10+), or use native PowerShell:
+On Windows PowerShell, use `curl.exe` or:
 
 ```powershell
 Invoke-RestMethod "https://your-host/api/v1/favicon?url=https://github.com" `
   -Headers @{ Authorization = "Bearer fa_your_key_here" }
 ```
 
-Only the SHA-256 hash of each key is stored. The raw key is shown exactly once at creation time.
+Set `API_REQUIRE_KEY=false` for a fully public endpoint (no key, no quotas).
 
 ### Successful response
 
@@ -98,180 +197,41 @@ Only the SHA-256 hash of each key is stored. The raw key is shown exactly once a
 }
 ```
 
-`sourceType` is one of `svg`, `manifest`, `apple-touch-icon`, `png`, `ico`. `cached` is `true` when the PNG was served from the 7-day disk cache, `false` when it was just generated.
-
 ### Errors
-
-All error responses are JSON with `error`, `code` and (where useful) extra context.
 
 | Status | Code | Meaning |
 |---|---|---|
-| 400 | `missing_url` / `invalid_url` | Missing or unparseable `url` query parameter. |
-| 401 | `missing_api_key` / `invalid_api_key` | No key, or key not recognised / revoked. |
-| 422 | `favicon_not_found` / `favicon_not_processable` | No usable icon was found, or it could not be decoded. |
-| 429 | `quota_exceeded` | Monthly call quota for this key reached. The response body includes `plan`, `limit`, `used`, `period`. |
-| 500 | `internal_error` | Internal error. |
+| 400 | `missing_url` / `invalid_url` | Missing or invalid `url` parameter |
+| 401 | `missing_api_key` / `invalid_api_key` | No key, or key not recognised / revoked |
+| 422 | `favicon_not_found` / `favicon_not_processable` | No usable icon, or decode failed |
+| 429 | `quota_exceeded` | Monthly quota reached (`plan`, `limit`, `used`, `period` in body) |
+| 500 | `internal_error` | Internal error |
 
-A request counts toward the monthly quota only when the API returns `200`, matching FaviconAPIs' behaviour. Quotas reset each calendar month (UTC, `YYYY-MM`).
+Only `200` responses count toward the monthly quota. Quotas reset each calendar month (UTC).
 
-### Plans and quotas
+## CLI: managing API keys (Docker)
 
-Quotas per plan are configured via env vars (defaults shown):
+Keys are stored in SQLite at `API_KEYS_DB` (default `/cache/api-keys.sqlite` on the cache volume). Only the SHA-256 hash is persisted; the raw key is shown once at creation.
 
-| Plan | Env var | Default |
-|---|---|---|
-| `free` | `PLAN_FREE_LIMIT` | `25` |
-| `pro` | `PLAN_PRO_LIMIT` | `2500` |
-| `enterprise` | `PLAN_ENTERPRISE_LIMIT` | `0` (unlimited) |
-
-`0` means no limit. The plan you assign at key creation time is what determines the monthly cap. To disable plans entirely (and run as a public API), set `API_REQUIRE_KEY=false` — see [Authentication](#authentication) above.
-
-### CLI: managing API keys
-
-The bundled `scripts/manage-keys.js` reads/writes the SQLite file at `API_KEYS_DB` (default `/cache/api-keys.sqlite`, shared with the cache volume).
+Run inside the running container so the CLI uses the same database as the server:
 
 ```bash
-# Create a key for a customer on the pro plan.
-# The raw key is printed once and only its SHA-256 hash is stored.
-npm run keys:create -- --label "customer A" --plan pro
+# Create a key (raw key printed once)
+docker compose exec maflplus-favicon-api npm run keys:create -- --label "customer A" --plan pro
 
-# List active keys with this month's usage counter.
-# Pass --all to also see revoked keys (kept for audit history).
-npm run keys:list
-npm run keys:list -- --all
+# List active keys with this month's usage
+docker compose exec maflplus-favicon-api npm run keys:list
 
-# Revoke a key by its visible prefix. The key stops validating immediately
-# but the row is kept in the DB (and is excluded from `keys:list` by default).
-npm run keys:revoke -- --prefix fa_abcdefgh
+# Include revoked keys
+docker compose exec maflplus-favicon-api npm run keys:list -- --all
 
-# Permanently remove a key and its usage history from the database.
-npm run keys:delete -- --prefix fa_abcdefgh
+# Revoke (stops validating immediately; row kept for audit)
+docker compose exec maflplus-favicon-api npm run keys:revoke -- --prefix fa_abcdefgh
+
+# Permanently delete key and usage history
+docker compose exec maflplus-favicon-api npm run keys:delete -- --prefix fa_abcdefgh
 ```
 
-Inside Docker, run these via `docker compose exec maflplus-favicon-api npm run keys:create -- --label "..." --plan pro` so the script writes to the same SQLite file the running server reads from.
+Plans: `free`, `pro`, `enterprise`. Monthly limits are set via `PLAN_*_LIMIT` env vars.
 
-### Cached images and the CDN route
-
-`GET /cdn/favicons/{domain}.png` is the public read-only mirror of `API_CACHE_DIR` (default `/cache/api/`). It sends `Content-Type: image/png` and `Cache-Control: public, max-age=604800, immutable` so HTTP intermediaries (or a CDN in front of this service) can hold on to the PNG for the full 7 days. The route returns `404` when no PNG has been generated for the given domain yet, so it is safe to expose publicly — callers must hit `/api/v1/favicon` (with a valid key) to populate it.
-
-## SEO
-
-The homepage (`/` and `/index.html`) is rendered through a small template route that substitutes `__BASE_URL__` tokens in `src/public/index.html` with the request's absolute origin (`${req.protocol}://${req.get('host')}`). This populates `<link rel="canonical">`, the Open Graph (`og:url`, `og:image`), Twitter Card (`twitter:image`) and JSON-LD (`schema.org/WebApplication`) tags with the correct public URL automatically — no environment variable or rebuild required when you put the service behind a new hostname or reverse proxy. The Express app already runs with `trust proxy` enabled so `X-Forwarded-Proto` is honoured.
-
-The `<head>` ships with a descriptive `<title>`, meta `description` / `keywords` / `author` / `theme-color`, Open Graph, Twitter Card and `schema.org/WebApplication` JSON-LD — all crawler/share-card friendly.
-
-`/robots.txt` and `/sitemap.xml` are served from dynamic routes (no static file in `src/public/`), again with the host derived from the request. The robots.txt is an allow-list: the homepage, API docs page (`/api`), and static assets (`/favicon.png`, `/logo.png`, `/sitemap.xml`) are indexable; everything else (`/g/...`, `/d/...`, `/s/...`, `/{domain}`, …) is disallowed so search engines don't try to enumerate the unbounded favicon URL space.
-
-## Docker
-
-The bundled `docker-compose.yml` runs two services: `maflplus-favicon-api` and a sidecar [besticon](https://github.com/mat/besticon) instance used by the HTML scraper. Besticon is joined to an internal `besticon` bridge network and has no `ports:` mapping, so its frontend at `/` is **not** publicly reachable — only `maflplus-favicon-api` can talk to it on hostname `besticon`.
-
-```yaml
-services:
-  maflplus-favicon-api:
-    image: ghcr.io/r0gger/maflplus-favicon-api:latest
-    container_name: maflplus-favicon-api
-    restart: unless-stopped
-    ports:
-      - "3100:3000"
-    volumes:
-      - favicon-cache:/cache
-    environment:
-      - PORT=3000
-      - CACHE_DIR=/cache
-      - MEMORY_CACHE_MAX=2000
-      - MEMORY_CACHE_TTL=3600
-      - DISK_CACHE_TTL=86400
-      - CACHE_SIZE_MB=512
-      - UPSTREAM_TIMEOUT=5000
-      - UV_THREADPOOL_SIZE=16
-      - WORKERS=8
-      - SCRAPER_PROBE_BATCH_SIZE=8
-      - PICK_HEAD_START_MS=150
-      - DEFAULT_PROVIDER=scraper
-      - LOGODEV_TOKEN=
-      - BESTICON_URL=http://besticon:8080
-    depends_on:
-      besticon:
-        condition: service_healthy
-    networks:
-      - besticon
-
-  besticon:
-    image: matthiasluedtke/iconserver:latest
-    container_name: besticon
-    restart: unless-stopped
-    # No ports: besticon is only reachable from other containers on the
-    # `besticon` network. The frontend at "/" is therefore not exposed.
-    environment:
-      TZ: Europe/Amsterdam
-      ADDRESS: ""
-      CACHE_SIZE_MB: 1024
-      HOST_ONLY_DOMAINS: "*"
-      HTTP_CLIENT_TIMEOUT: 5s
-      HTTP_MAX_AGE_DURATION: 720h
-      HTTP_USER_AGENT: ""
-      PORT: 8080
-      SERVER_MODE: redirect
-    healthcheck:
-      test:
-        - CMD
-        - wget
-        - --quiet
-        - --tries=1
-        - --spider
-        - http://localhost:8080/up
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
-    networks:
-      - besticon
-
-networks:
-  besticon:
-    name: besticon
-    driver: bridge
-
-volumes:
-  favicon-cache:
-```
-
-To build the image locally instead of pulling the published one, swap `image:` for `build: .` on `maflplus-favicon-api`. To run without besticon, drop the `besticon` service, the `BESTICON_URL` environment variable, the `depends_on` block and the `networks` section — the HTML scraper will then transparently fall back to its built-in implementation.
-
-### Using a host path for the cache volume
-
-If you prefer to use a full host path instead of a named volume, set the correct ownership so the container's `app` user (UID 100) can write to it:
-
-```bash
-mkdir -p /path/to/cache
-chown 100:101 /path/to/cache
-```
-
-Then use the host path in your `docker-compose.yml`:
-
-```yaml
-    volumes:
-      - /path/to/cache:/cache
-```
-
-## Environment Variables
-
-| Variable | Default | Description |
-|---|---|---|
-| `PORT` | `3000` | Server port |
-| `CACHE_DIR` | `/cache` | Disk cache directory |
-| `MEMORY_CACHE_MAX` | `2000` | Max entries in the per-worker LRU memory cache. Each cached favicon is typically 1-10 KB, so the default uses ~10-20 MB per worker. Increase if you serve many unique domains and want a higher hit ratio; decrease to reduce memory usage. |
-| `MEMORY_CACHE_TTL` | `3600` | Memory cache TTL (seconds) |
-| `DISK_CACHE_TTL` | `86400` | Disk cache TTL (seconds) |
-| `CACHE_SIZE_MB` | `0` | Maximum total size of the disk cache (in MB), shared across all cluster workers via the `CACHE_DIR` volume. When the directory exceeds this limit, the oldest entries (by mtime) are evicted until the cache is back under the cap. Set to `0` to disable the size cap (TTL-based eviction only). |
-| `UPSTREAM_TIMEOUT` | `5000` | Upstream request timeout (ms) |
-| `UV_THREADPOOL_SIZE` | `16` | Size of the libuv thread pool used by Node.js for disk I/O (cache reads/writes), DNS lookups and other blocking work. Node's built-in default is `4`; `16` gives more headroom under concurrent load. Max is `1024`. |
-| `WORKERS` | _(CPU cores)_ | Number of cluster workers to spawn. When unset, defaults to `os.cpus().length`. Note: in Docker, Node reports the host's CPU count, not the container's CPU limit — set this explicitly (e.g. `WORKERS=2`) when you constrain CPU via `--cpus` or `deploy.resources.limits`. Use `WORKERS=1` to disable clustering and run everything in a single process. |
-| `PICK_HEAD_START_MS` | `150` | Head-start (ms) given to the preferred provider in `/{domain}` requests. The first provider in priority order (typically `DEFAULT_PROVIDER`) starts immediately; the remaining providers start after this delay (or sooner if the preferred provider already failed). Lower = more parallel/faster fallback but more wasted upstream calls; higher = stronger preference for the favored provider. |
-| `SCRAPER_PROBE_BATCH_SIZE` | `4` | Number of HTML scraper icon candidates probed in parallel per batch (in `/s/{domain}` and as part of `/{domain}`). Higher values speed up scraping of sites with many `<link rel="icon">` entries but increase concurrent upstream load. |
-| `LOGODEV_TOKEN` | _(unset)_ | Optional [logo.dev](https://www.logo.dev/) publishable key. When unset, `/l/{domain}` returns 503 and the logo.dev card is hidden in the UI. |
-| `DEFAULT_PROVIDER` | _(unset)_ | Optional preferred provider for `/{domain}` requests. Since providers are now raced in parallel, this provider gets a `PICK_HEAD_START_MS` ms head-start over the others — so it usually wins when reachable, but a slow/failing favorite no longer blocks the response. Valid values: `scraper`, `google`, `googlev2`, `duckduckgo`, `yandex`, `faviconso`, `vemetric`, `favicondev`, `faviconkit`, `logodev`, `selfhst`, `dashboardicons`. Note: `logodev` requires `LOGODEV_TOKEN`. |
-| `BESTICON_URL` | _(unset)_ | Optional base URL of a sidecar [besticon](https://github.com/mat/besticon) instance (e.g. `http://besticon:8080`). When set, `/s/{domain}` first asks besticon's `/allicons.json?url={domain}` for the icon list, then probes/picks the best one locally. Falls back to the built-in HTML scraper when besticon is unreachable or returns no candidates. The bundled `docker-compose.yml` runs besticon as an internal-only service (no exposed port; its frontend at `/` is not publicly reachable). |
-
-For API v1 settings (`API_KEYS_DB`, `API_CACHE_DIR`, `API_REQUIRE_KEY`, `PLAN_*_LIMIT`, etc.) see [docs/configuration.md](docs/configuration.md) and [`.env.example`](.env.example).
+Outside Docker, the same commands work via `npm run keys:create`, `keys:list`, `keys:revoke`, and `keys:delete`.

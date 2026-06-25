@@ -8,24 +8,7 @@ services:
       - "3100:3000"
     volumes:
       - favicon-cache:/cache
-    environment:
-      - PORT=3000
-      - CACHE_DIR=/cache
-      - MEMORY_CACHE_MAX=500 # default is 500
-      - MEMORY_CACHE_TTL=3600 # default is 3600
-      - DISK_CACHE_TTL=86400 # default is 86400
-      - CACHE_SIZE_MB=512 # max total disk cache size in MB; 0 = unlimited
-      - UPSTREAM_TIMEOUT=5000 # default is 5000
-      - UV_THREADPOOL_SIZE=16 # default is 16
-      - WORKERS=2 # default is 2
-      - SCRAPER_PROBE_BATCH_SIZE=4 # default is 4
-      - PICK_HEAD_START_MS=150 # default is 150
-      - DEFAULT_PROVIDER=scraper # default is scraper
-      - LOGODEV_TOKEN=
-      - BESTICON_URL=http://besticon:8080
-      - API_CACHE_DIR=/cache/api
-      - API_CACHE_TTL=604800 # 7 days, in seconds
-      - API_REQUIRE_KEY=false
+    env_file: .env.example
     depends_on:
       besticon:
         condition: service_healthy
@@ -37,15 +20,15 @@ services:
     container_name: besticon
     restart: unless-stopped
     environment:
-      TZ: Europe/Amsterdam
-      ADDRESS: ""
-      CACHE_SIZE_MB: 1024
-      HOST_ONLY_DOMAINS: "*"
-      HTTP_CLIENT_TIMEOUT: 5s
-      HTTP_MAX_AGE_DURATION: 720h
-      HTTP_USER_AGENT: ""
-      PORT: 8080
-      SERVER_MODE: redirect
+      TZ: ${BESTICON_TZ:-Europe/Amsterdam}
+      ADDRESS: ${BESTICON_ADDRESS:-}
+      CACHE_SIZE_MB: ${BESTICON_CACHE_SIZE_MB:-1024}
+      HOST_ONLY_DOMAINS: ${BESTICON_HOST_ONLY_DOMAINS:-*}
+      HTTP_CLIENT_TIMEOUT: ${BESTICON_HTTP_CLIENT_TIMEOUT:-5s}
+      HTTP_MAX_AGE_DURATION: ${BESTICON_HTTP_MAX_AGE_DURATION:-720h}
+      HTTP_USER_AGENT: ${BESTICON_HTTP_USER_AGENT:-}
+      PORT: ${BESTICON_PORT:-8080}
+      SERVER_MODE: ${BESTICON_SERVER_MODE:-redirect}
     healthcheck:
       test:
         - CMD

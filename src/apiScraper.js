@@ -1,7 +1,7 @@
 const {
   fetchScraperPage,
   parseIconCandidatesFromHtml,
-  fetchManifestIcons,
+  loadManifestIconCandidates,
   fetchScraperAsset,
   parseSizesAttr,
   expandSizedVariants,
@@ -9,7 +9,6 @@ const {
 } = require('./providers');
 const { resolveServiceSlugForProviderSync } = require('./serviceAliases');
 const { serviceSlugFromDomain } = require('./serviceSlugFromDomain');
-const cheerio = require('cheerio');
 
 // FaviconAPIs source priority. The first tier to produce a usable icon wins;
 // within a tier we try the largest declared size first.
@@ -149,13 +148,13 @@ async function gatherCandidates(domain) {
     external: [],
   };
 
-  const { html, finalBaseUrl } = await fetchScraperPage(domain);
+  const { html, finalBaseUrl, linkHeader } = await fetchScraperPage(domain);
   const baseUrl = `https://${domain}/`;
   const referer = finalBaseUrl || baseUrl;
 
   if (html) {
     try {
-      const { primaryCandidates, resolveBase } = parseIconCandidatesFromHtml(
+      const { primaryCandidates } = parseIconCandidatesFromHtml(
         html,
         finalBaseUrl || baseUrl
       );
@@ -168,28 +167,44 @@ async function gatherCandidates(domain) {
       }
 
       try {
-        const $ = cheerio.load(html);
-        const manifestHref = $('link[rel="manifest"]').attr('href');
-        if (manifestHref) {
-          const manifestUrl = new URL(manifestHref, resolveBase).toString();
-          const manifestIcons = await fetchManifestIcons(
-            manifestUrl,
-            finalBaseUrl || baseUrl
-          );
-          for (const icon of manifestIcons) {
-            buckets.manifest.push({
-              href: icon.href,
-              sizes: icon.sizes || '',
-              type: icon.type || '',
-              rel: 'manifest',
-            });
-          }
+        const manifestIcons = await loadManifestIconCandidates(domain, {
+          html,
+          finalBaseUrl,
+          linkHeader,
+          iconCandidates: primaryCandidates,
+        });
+        for (const icon of manifestIcons) {
+          buckets.manifest.push({
+            href: icon.href,
+            sizes: icon.sizes || '',
+            type: icon.type || '',
+            rel: 'manifest',
+          });
         }
       } catch {
         /* manifest parsing/fetching is best-effort */
       }
     } catch {
       /* HTML parsing failure */
+    }
+  } else {
+    try {
+      const manifestIcons = await loadManifestIconCandidates(domain, {
+        html: null,
+        finalBaseUrl,
+        linkHeader,
+        iconCandidates: [],
+      });
+      for (const icon of manifestIcons) {
+        buckets.manifest.push({
+          href: icon.href,
+          sizes: icon.sizes || '',
+          type: icon.type || '',
+          rel: 'manifest',
+        });
+      }
+    } catch {
+      /* manifest discovery without HTML is best-effort */
     }
   }
 

@@ -23,6 +23,7 @@ const {
   fetchScraper,
   fetchScraperAsset,
   fetchScraperAllIcons,
+  getScraperMaxIconSize,
   PROVIDERS,
   getSelfhstVariantAvailability,
   getDashboardIconsVariantAvailability,
@@ -625,7 +626,7 @@ app.get('/sh/:service', async (req, res) => {
   }
 
   try {
-    const cacheKey = variant === 'color' ? null : variant;
+    const cacheKey = variant === 'color' ? null : `${variant}_v3`;
     const entry = await fetchWithCache('selfhst', service, cacheKey, () => fetchSelfhst(service, variant));
     if (!entry) return res.status(404).json({ error: 'Service icon not found.' });
     sendFavicon(res, entry);
@@ -646,7 +647,7 @@ app.get('/di/:service', async (req, res) => {
   }
 
   try {
-    const cacheKey = variant === 'color' ? null : variant;
+    const cacheKey = variant === 'color' ? null : `${variant}_v3`;
     const entry = await fetchWithCache(
       'dashboardicons',
       service,
@@ -677,7 +678,7 @@ app.get('/lb/:service', async (req, res) => {
   }
 
   try {
-    const cacheKey = `${size}_${variant === 'color' ? 'c' : variant}_v2`;
+    const cacheKey = `${size}_${variant === 'color' ? 'c' : variant}_v3`;
     const entry = await fetchWithCache(
       'lobehub',
       service,
@@ -869,6 +870,7 @@ app.get('/:domain/json', async (req, res) => {
       scraper: {
         proxy: `${host}/s/${encoded}`,
         source: scraperCached?.url || null,
+        maxIconSize: getScraperMaxIconSize(),
         icons: scraperAllIcons,
       },
       selfhst,

@@ -45,8 +45,11 @@
   <meta name="twitter:description" content="Free favicon API and web UI that fetches the highest-resolution favicon for any domain from 10+ providers, plus selfh.st and homarr-labs/dashboard-icons service icon lookups by name.">
   <meta name="twitter:image" content="__BASE_URL__/logo.png">
   <meta name="twitter:image:alt" content="FaviconAPI logo">
-
-  <!-- analytic -->
+  
+  <!-- iconify -->
+  <script defer src="https://code.iconify.design/iconify-icon/2.3.0/iconify-icon.min.js"></script>
+  
+  <!-- analytics  -->
   <script defer src="https://analytics.hibbit.cloud/script.js" data-website-id="dada58c3-cc4e-4b0d-9961-9390d9b74143"></script>
 
   <!-- JSON-LD structured data -->
@@ -101,11 +104,23 @@
       margin: 0 auto;
     }
 
+    .site-logo-link {
+      display: block;
+      width: fit-content;
+      margin: 0 auto 0.8rem;
+      line-height: 0;
+      text-decoration: none;
+    }
+
+    .site-logo-link:hover .site-logo {
+      opacity: 0.85;
+    }
+
     .site-logo {
       display: block;
-      margin: 0 auto 0.8rem;
       width: 64px;
       height: 64px;
+      transition: opacity 0.15s;
     }
 
     h1 {
@@ -146,6 +161,20 @@
     }
 
     .tip code:hover { background: rgba(0,0,0,0.12); }
+
+    .tip button.tip-link {
+      background: none;
+      border: none;
+      padding: 0;
+      font: inherit;
+      font-weight: 600;
+      color: #5b2e7e;
+      cursor: pointer;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+
+    .tip button.tip-link:hover { color: #7b3fa8; }
 
     .tool-card {
       background: #f3eaf7;
@@ -432,6 +461,38 @@
       transition: background 0.2s;
     }
 
+    .search-bar button.search-reset {
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      color: #a8a29c;
+      padding: 0 0.55rem 0 0.35rem;
+      transition: color 0.15s, opacity 0.15s, width 0.15s, padding 0.15s;
+    }
+
+    .search-bar button.search-reset svg {
+      width: 17px;
+      height: 17px;
+    }
+
+    .search-bar button.search-reset:hover:not(:disabled) {
+      background: transparent;
+      color: #5b2e7e;
+    }
+
+    .search-bar button.search-reset:disabled {
+      width: 0;
+      min-width: 0;
+      padding: 0;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      background: transparent;
+      cursor: default;
+    }
+
     .search-bar button:hover { background: #7b3fa8; }
     .search-bar button:disabled { background: #a08aaf; cursor: wait; }
 
@@ -549,10 +610,10 @@
 
     .favicon-display:hover { background: #ece6de; }
 
-    .favicon-display.variant-light { background: #2d2a26; }
-    .favicon-display.variant-light:hover { background: #1f1c19; }
-    .favicon-display.variant-dark { background: #ffffff; }
-    .favicon-display.variant-dark:hover { background: #f0eee9; }
+    .favicon-display.variant-light { background: #ffffff; }
+    .favicon-display.variant-light:hover { background: #f0eee9; }
+    .favicon-display.variant-dark { background: #2d2a26; }
+    .favicon-display.variant-dark:hover { background: #1f1c19; }
 
     .favicon-display .unavailable {
       color: #8a8480;
@@ -561,7 +622,7 @@
       text-align: center;
       padding: 0 0.5rem;
     }
-    .favicon-display.variant-light .unavailable { color: #b8b1aa; }
+    .favicon-display.variant-dark .unavailable { color: #b8b1aa; }
 
     .favicon-display img {
       image-rendering: pixelated;
@@ -591,6 +652,7 @@
       gap: 0.4rem;
       margin-bottom: 0.6rem;
       flex-wrap: wrap;
+      overflow: visible;
     }
 
     .size-btn {
@@ -608,6 +670,100 @@
     .size-btn:hover, .size-btn.active {
       background: #5b2e7e;
       color: #fff;
+    }
+
+    .size-btn.size-btn-proxy {
+      position: relative;
+      overflow: visible;
+      border-color: #C8A8CF;
+      color: #5b3d63;
+      background: rgba(200, 168, 207, 0.22);
+      border-style: dashed;
+      font-weight: 600;
+    }
+
+    .size-btn.size-btn-proxy:hover,
+    .size-btn.size-btn-proxy.active {
+      background: #C8A8CF;
+      color: #fff;
+      border-color: #C8A8CF;
+      border-style: solid;
+    }
+
+    .size-btn.size-btn-proxy .proxy-tip {
+      position: absolute;
+      left: 50%;
+      bottom: calc(100% + 10px);
+      transform: translateX(-50%);
+      z-index: 40;
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      width: max-content;
+      max-width: min(18rem, 72vw);
+      padding: 0.55rem 0.7rem;
+      border: 1px solid #c8b8cc;
+      border-radius: 8px;
+      background: #fff;
+      color: #4a4450;
+      box-shadow: 0 8px 24px rgba(48, 32, 56, 0.14);
+      font-size: 0.72rem;
+      font-weight: 400;
+      line-height: 1.45;
+      text-align: left;
+      white-space: normal;
+      pointer-events: none;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.15s ease, visibility 0.15s ease, transform 0.15s ease;
+    }
+
+    .size-btn.size-btn-proxy .proxy-tip::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 100%;
+      transform: translateX(-50%);
+      border: 7px solid transparent;
+      border-top-color: #fff;
+      filter: drop-shadow(0 2px 1px rgba(48, 32, 56, 0.08));
+    }
+
+    .size-btn.size-btn-proxy:hover .proxy-tip,
+    .size-btn.size-btn-proxy:focus-visible .proxy-tip {
+      opacity: 1;
+      visibility: visible;
+      transform: translateX(-50%) translateY(-2px);
+    }
+
+    .proxy-tip-head {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      color: #5b2e7e;
+      font-weight: 600;
+      font-size: 0.76rem;
+    }
+
+    .proxy-tip-head iconify-icon {
+      flex: 0 0 auto;
+      width: 1.05rem;
+      height: 1.05rem;
+      color: #5b2e7e;
+    }
+
+    .proxy-tip-body {
+      color: #5f5962;
+    }
+
+    .proxy-tip-url {
+      display: block;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.68rem;
+      color: #7a7280;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .meta {
@@ -1078,26 +1234,31 @@
     </a>
   </nav>
   <div class="container">
-    <img src="/logo.svg" alt="FaviconAPI" class="site-logo">
+    <a href="/" class="site-logo-link" aria-label="FaviconAPI home">
+      <img src="/logo.svg" alt="" class="site-logo">
+    </a>
     <h1>FaviconAPI</h1>
     <p class="subtitle">Get the highest resolution favicon for any domain - or look up a service icon by name.</p>
 
     <div class="tip">
       <strong><span class="icon">&#9881;</span> Tip</strong>
-      Use the favicon directly via <code id="api-example" onclick="copyApiUrl()">https://&lt;this-host&gt;/{domain}</code>
-      or <code>{app-name}</code> (e.g. jellyfin, firefox). Click any image to copy its URL.
+      Use the favicon directly via <code id="api-example" onclick="copyApiUrl()">https://&lt;this-host&gt;/{domain-or-appname}</code>
+      (e.g. reddit.com, jellyfin, immich). Click any image to copy its URL.
     </div>
 
     <div class="search-section">
-      <label for="domain-input">Domain or service name</label>
+      <label for="domain-input">Domain or app name</label>
       <div class="search-bar">
-        <input type="text" id="domain-input" placeholder="example.com  or  radarr" autofocus>
-        <button id="fetch-btn" onclick="fetchFavicons()">Fetch</button>
+        <input type="text" id="domain-input" placeholder="example.com  or  immich" autofocus>
+        <button type="button" id="reset-btn" class="search-reset" onclick="resetSearch()" disabled aria-label="Reset search" title="Reset">
+          <svg viewBox="0 0 21 21" aria-hidden="true"><g fill="none" fill-rule="evenodd" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3.578 6.487A8 8 0 1 1 2.5 10.5"/><path d="M7.5 6.5h-4v-4"/></g></svg>
+        </button>
+        <button type="button" id="fetch-btn" onclick="fetchFavicons()">Fetch</button>
       </div>
       <div class="search-options">
         <label for="selfhst-toggle">
           <input type="checkbox" id="selfhst-toggle" checked onchange="toggleServiceCards()">
-          <span>Also include service icon lookups</span>
+          <span>Also include app icon lookups</span>
         </label>
       </div>
       <div class="quick-links">
@@ -1105,9 +1266,9 @@
         <a href="?q=github.com" onclick="quickFetch('github.com'); return false;">github.com</a>
         <a class="quick-hide-mobile" href="?q=reddit.com" onclick="quickFetch('reddit.com'); return false;">reddit.com</a>
         <a href="?q=proton.me" onclick="quickFetch('proton.me'); return false;">proton.me</a>
-        <a class="quick-hide-mobile" href="?q=firefox" onclick="quickFetch('firefox'); return false;">firefox</a>
+        <a class="quick-hide-mobile" href="?q=google" onclick="quickFetch('google'); return false;">google</a>
         <a href="?q=immich" onclick="quickFetch('immich'); return false;">immich</a>
-        <a href="?q=jellyfin" onclick="quickFetch('jellyfin'); return false;">jellyfin</a>
+        <a href="?q=bitwarden" onclick="quickFetch('bitwarden'); return false;">bitwarden</a>
       </div>
     </div>
 
@@ -1416,7 +1577,7 @@
   </div>
 
   <script>
-    document.getElementById('api-example').textContent = `${location.origin}/{domain}`;
+    document.getElementById('api-example').textContent = `${location.origin}/{domain-or-appname}`;
 
     const searchEngineUrl = `${location.origin}/search?q=%s`;
 
@@ -1518,12 +1679,18 @@
     let currentFaviconkitSize = 128;
     let currentSelfhstSlug = '';
     let currentSelfhstVariant = 'color';
+    let selfhstProbeSeq = 0;
     let currentDashboardIconsSlug = '';
     let currentDashboardIconsVariant = 'color';
+    let dashboardIconsProbeSeq = 0;
     let currentLobehubSlug = '';
     let currentLobehubVariant = 'color';
+    let lobehubProbeSeq = 0;
     let currentLobehubSize = 128;
     const SERVICE_ICON_PROVIDERS = ['selfhst', 'dashboardicons', 'lobehub'];
+    const DOMAIN_FAVICON_PROVIDERS = [
+      'scraper', 'google', 'ddg', 'yandex', 'faviconso', 'vemetric', 'favicondev', 'faviconkit', 'logodev',
+    ];
     const SERVICE_PROXY_PREFIX = { selfhst: '/sh', dashboardicons: '/di', lobehub: '/lb' };
     let providersConfig = { logoDev: false, logoDevToken: null };
 
@@ -1543,6 +1710,86 @@
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') fetchFavicons();
     });
+    input.addEventListener('input', updateResetButton);
+
+    function updateResetButton() {
+      const btn = document.getElementById('reset-btn');
+      if (!btn) return;
+      const hasQuery = !!input.value.trim();
+      const hasResults = document.getElementById('results').classList.contains('visible');
+      btn.disabled = !hasQuery && !hasResults;
+    }
+
+    function resetFaviconCard(id) {
+      const img = document.getElementById(`${id}-img`);
+      const spinner = document.getElementById(`${id}-spinner`);
+      const meta = document.getElementById(`${id}-meta`);
+      const card = document.getElementById(`${id}-card`) || img?.closest('.card');
+      if (img) {
+        img.style.display = 'none';
+        img.removeAttribute('src');
+      }
+      if (spinner) spinner.style.display = 'none';
+      if (meta) meta.textContent = '';
+      const display = document.getElementById(`${id}-display`);
+      if (display) delete display.dataset.proxyUrl;
+      const unavailable = document.getElementById(`${id}-unavailable`);
+      if (unavailable) unavailable.style.display = 'none';
+      if (!card) return;
+      if (id === 'logodev' && !providersConfig.logoDev) {
+        card.style.display = 'none';
+      } else if (SERVICE_ICON_PROVIDERS.includes(id)) {
+        card.style.display = 'none';
+      } else {
+        card.style.display = '';
+      }
+    }
+
+    function resetSearch() {
+      currentMode = '';
+      currentDomain = '';
+      currentService = '';
+      currentGoogleSize = 128;
+      currentFaviconkitSize = 128;
+      currentSelfhstSlug = '';
+      currentSelfhstVariant = 'color';
+      currentDashboardIconsSlug = '';
+      currentDashboardIconsVariant = 'color';
+      currentLobehubSlug = '';
+      currentLobehubVariant = 'color';
+      currentLobehubSize = 128;
+      currentScraperSelection = 0;
+
+      input.value = '';
+      input.focus();
+
+      if (location.search) {
+        history.replaceState(null, '', location.pathname);
+      }
+
+      document.getElementById('api-example').textContent = `${location.origin}/{domain-or-appname}`;
+      document.getElementById('json-button-wrap').classList.remove('visible');
+      document.getElementById('results').classList.remove('visible');
+
+      DOMAIN_FAVICON_PROVIDERS.forEach(resetFaviconCard);
+      SERVICE_ICON_PROVIDERS.forEach(resetFaviconCard);
+
+      const scraperSizes = document.getElementById('scraper-sizes');
+      if (scraperSizes) {
+        scraperSizes.style.display = 'none';
+        scraperSizes.innerHTML = '';
+      }
+
+      clearServiceCandidates();
+      setServiceCardsVisible(false);
+      updateServiceIconsDivider();
+      setActiveSize('google-sizes', 128);
+      setActiveSize('faviconkit-sizes', 128);
+      resetSelfhstVariantButtons();
+      resetDashboardIconsVariantButtons();
+      resetLobehubVariantButtons();
+      updateResetButton();
+    }
 
     fetch('/providers')
       .then((r) => r.json())
@@ -1560,6 +1807,7 @@
           input.value = q.trim();
           fetchFavicons();
         }
+        updateResetButton();
       });
 
     function quickFetch(domain) {
@@ -1709,7 +1957,9 @@
       if (!slug) return;
       if (provider === 'selfhst') {
         currentSelfhstSlug = slug;
+        resetSelfhstVariantButtons();
         switchSelfhstVariant('color');
+        probeAndShowSelfhstVariants(slug);
         document.querySelectorAll('#selfhst-candidates-grid .candidate-tile').forEach((tile) => {
           tile.classList.toggle('active', tile.dataset.slug === slug);
         });
@@ -1718,7 +1968,9 @@
 
       if (provider === 'dashboardicons') {
         currentDashboardIconsSlug = slug;
+        resetDashboardIconsVariantButtons();
         switchDashboardIconsVariant('color');
+        probeAndShowDashboardIconsVariants(slug);
         document.querySelectorAll('#dashboardicons-candidates-grid .candidate-tile').forEach((tile) => {
           tile.classList.toggle('active', tile.dataset.slug === slug);
         });
@@ -1726,7 +1978,9 @@
       }
 
       currentLobehubSlug = slug;
+      resetLobehubVariantButtons();
       switchLobehubVariant('color');
+      probeAndShowLobehubVariants(slug);
       document.querySelectorAll('#lobehub-candidates-grid .candidate-tile').forEach((tile) => {
         tile.classList.toggle('active', tile.dataset.slug === slug);
       });
@@ -1887,6 +2141,7 @@
       document.getElementById('json-link-url').textContent = jsonUrl;
       document.getElementById('json-button-wrap').classList.add('visible');
       document.getElementById('results').classList.add('visible');
+      updateResetButton();
 
       showCardsByType('domain');
       setActiveSize('google-sizes', 128);
@@ -1940,6 +2195,7 @@
       document.getElementById('json-link-url').textContent = jsonUrl;
       document.getElementById('json-button-wrap').classList.add('visible');
       document.getElementById('results').classList.add('visible');
+      updateResetButton();
 
       showCardsByType('service');
 
@@ -1965,8 +2221,14 @@
       return variant === 'color' ? base : `${base}?variant=${variant}`;
     }
 
+    function pngVariantSuffix(variant) {
+      if (variant === 'light') return '-dark';
+      if (variant === 'dark') return '-light';
+      return '';
+    }
+
     function selfhstSourceUrl(slug, variant) {
-      const suffix = variant === 'light' ? '-light' : variant === 'dark' ? '-dark' : '';
+      const suffix = pngVariantSuffix(variant);
       return `https://cdn.jsdelivr.net/gh/selfhst/icons/png/${slug}${suffix}.png`;
     }
 
@@ -2018,6 +2280,8 @@
       imgEl.onerror = () => {
         if (currentSelfhstSlug !== activeSlug || currentSelfhstVariant !== variant) return;
         spinner.style.display = 'none';
+        img.removeAttribute('src');
+        img.style.display = 'none';
         if (hideOnError || variant === 'color') {
           card.style.display = 'none';
         } else {
@@ -2054,16 +2318,17 @@
         const img = new Image();
         img.onload = () => resolve(true);
         img.onerror = () => resolve(false);
-        img.src = selfhstProxyPath(slug, variant);
+        img.src = `${selfhstSourceUrl(slug, variant)}?probe=${Date.now()}`;
       });
     }
 
     async function probeAndShowSelfhstVariants(slug) {
+      const seq = ++selfhstProbeSeq;
       const variants = ['light', 'dark'];
       await Promise.all(
         variants.map(async (variant) => {
           const ok = await probeSelfhstVariant(slug, variant);
-          if (currentSelfhstSlug !== slug) return;
+          if (seq !== selfhstProbeSeq || currentSelfhstSlug !== slug) return;
           const btn = document.querySelector(`#selfhst-variants .size-btn[data-variant="${variant}"]`);
           if (btn) btn.style.display = ok ? '' : 'none';
         })
@@ -2076,7 +2341,7 @@
     }
 
     function dashboardIconsSourceUrl(slug, variant) {
-      const suffix = variant === 'light' ? '-light' : variant === 'dark' ? '-dark' : '';
+      const suffix = pngVariantSuffix(variant);
       return `https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/${slug}${suffix}.png`;
     }
 
@@ -2128,6 +2393,8 @@
       imgEl.onerror = () => {
         if (currentDashboardIconsSlug !== activeSlug || currentDashboardIconsVariant !== variant) return;
         spinner.style.display = 'none';
+        img.removeAttribute('src');
+        img.style.display = 'none';
         if (hideOnError || variant === 'color') {
           card.style.display = 'none';
         } else {
@@ -2158,16 +2425,17 @@
         const img = new Image();
         img.onload = () => resolve(true);
         img.onerror = () => resolve(false);
-        img.src = dashboardIconsProxyPath(slug, variant);
+        img.src = `${dashboardIconsSourceUrl(slug, variant)}?probe=${Date.now()}`;
       });
     }
 
     async function probeAndShowDashboardIconsVariants(slug) {
+      const seq = ++dashboardIconsProbeSeq;
       const variants = ['light', 'dark'];
       await Promise.all(
         variants.map(async (variant) => {
           const ok = await probeDashboardIconsVariant(slug, variant);
-          if (currentDashboardIconsSlug !== slug) return;
+          if (seq !== dashboardIconsProbeSeq || currentDashboardIconsSlug !== slug) return;
           const btn = document.querySelector(`#dashboardicons-variants .size-btn[data-variant="${variant}"]`);
           if (btn) btn.style.display = ok ? '' : 'none';
         })
@@ -2271,16 +2539,17 @@
         const img = new Image();
         img.onload = () => resolve(true);
         img.onerror = () => resolve(false);
-        img.src = lobehubProxyPath(slug, variant, currentLobehubSize);
+        img.src = `${lobehubSourceUrl(slug, variant)}?probe=${Date.now()}`;
       });
     }
 
     async function probeAndShowLobehubVariants(slug) {
+      const seq = ++lobehubProbeSeq;
       const variants = ['light', 'dark'];
       await Promise.all(
         variants.map(async (variant) => {
           const ok = await probeLobehubVariant(slug, variant);
-          if (currentLobehubSlug !== slug) return;
+          if (seq !== lobehubProbeSeq || currentLobehubSlug !== slug) return;
           const btn = document.querySelector(`#lobehub-variants .size-btn[data-variant="${variant}"]`);
           if (btn) btn.style.display = ok ? '' : 'none';
         })
@@ -2310,7 +2579,47 @@
     }
 
     let scraperIcons = [];
-    let currentScraperIdx = 0;
+    let scraperMaxIconSize = 0;
+    let currentScraperSelection = 0;
+    let scraperLoadToken = 0;
+
+    function scraperEmbedUrl() {
+      return `${location.origin}/s/${currentDomain}`;
+    }
+
+    function setActiveScraperButton(selection) {
+      document.querySelectorAll('#scraper-sizes .size-btn').forEach((btn) => {
+        const isProxy = btn.dataset.scraperSource === 'proxy';
+        const idx = Number(btn.dataset.scraperIdx);
+        const active =
+          selection === 'proxy' ? isProxy : !isProxy && idx === selection;
+        btn.classList.toggle('active', active);
+      });
+    }
+
+    function writeScraperMeta(meta, { w, h, displayUrl, copyLabel }) {
+      const escapedUrl = escapeHtml(displayUrl);
+      meta.innerHTML =
+        `<span class="dimensions">${w}x${h}</span>` +
+        `<a class="src-url" href="${escapedUrl}" target="_blank" rel="noopener" title="${escapedUrl}">${escapedUrl}</a>` +
+        `<button class="copy-btn" type="button" title="${copyLabel}" aria-label="${copyLabel}">${COPY_ICON_SVG}</button>`;
+      const copyBtn = meta.querySelector('.copy-btn');
+      copyBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        copySource(copyBtn, displayUrl);
+      });
+    }
+
+    function resetScraperDisplay(img, spinner, meta, display) {
+      img.style.display = 'none';
+      spinner.style.display = 'block';
+      meta.textContent = '';
+      img.style.maxHeight = '';
+      img.style.maxWidth = '';
+      img.style.imageRendering = '';
+      if (display) display.style.minHeight = '';
+    }
 
     function loadScraperFallback(domain, refresh) {
       const proxyUrl = refresh ? `/s/${domain}?refresh=1` : `/s/${domain}`;
@@ -2319,7 +2628,8 @@
 
     function loadScraperFavicon(domain, refresh) {
       scraperIcons = [];
-      currentScraperIdx = 0;
+      scraperMaxIconSize = 0;
+      currentScraperSelection = 0;
       const sizesEl = document.getElementById('scraper-sizes');
       sizesEl.style.display = 'none';
       sizesEl.innerHTML = '';
@@ -2359,6 +2669,7 @@
         if (res.ok) {
           const body = await res.json();
           icons = body?.endpoints?.scraper?.icons || [];
+          scraperMaxIconSize = Number(body?.endpoints?.scraper?.maxIconSize) || 0;
         }
       } catch {
         // fall through to proxy fallback
@@ -2382,20 +2693,83 @@
       }
 
       scraperIcons = sorted;
-      currentScraperIdx = 0;
       renderScraperSizes();
       sizesEl.style.display = '';
+      currentScraperSelection = 0;
+      setActiveScraperButton(0);
       loadScraperVariant(0);
+    }
+
+    function buildScraperSizeEntries() {
+      const entries = scraperIcons.map((icon, idx) => ({
+        type: 'icon',
+        idx,
+        sortSize: Math.max(icon.width || 0, icon.height || icon.width || 0),
+      }));
+      if (scraperMaxIconSize > 0) {
+        entries.push({ type: 'proxy', sortSize: scraperMaxIconSize });
+      }
+      entries.sort((a, b) => {
+        if (b.sortSize !== a.sortSize) return b.sortSize - a.sortSize;
+        if (a.type === 'icon' && b.type === 'proxy') return -1;
+        if (a.type === 'proxy' && b.type === 'icon') return 1;
+        return 0;
+      });
+      return entries;
+    }
+
+    function attachScraperProxyTooltip(btn, maxSize, embedUrl) {
+      const sizeLabel = `${maxSize}\u00d7${maxSize}`;
+      btn.setAttribute(
+        'aria-label',
+        `Fast proxy URL: largest icon downscaled to ${sizeLabel} for faster loading`
+      );
+      btn.appendChild(document.createTextNode(String(maxSize)));
+
+      const tip = document.createElement('span');
+      tip.className = 'proxy-tip';
+      tip.setAttribute('role', 'tooltip');
+      tip.innerHTML =
+        '<span class="proxy-tip-head">' +
+        '<iconify-icon icon="f7:hare-fill" aria-hidden="true"></iconify-icon>' +
+        '<span>Fast proxy URL</span>' +
+        '</span>' +
+        `<span class="proxy-tip-body">Uses the largest available icon, downscaled to ${escapeHtml(sizeLabel)} for faster page loads and smaller downloads. Embed with <code>/s/{domain}</code>.</span>` +
+        `<span class="proxy-tip-url" title="${escapeHtml(embedUrl)}">${escapeHtml(embedUrl)}</span>`;
+      btn.appendChild(tip);
     }
 
     function renderScraperSizes() {
       const sizesEl = document.getElementById('scraper-sizes');
       sizesEl.innerHTML = '';
       const frag = document.createDocumentFragment();
-      scraperIcons.forEach((icon, idx) => {
+
+      for (const entry of buildScraperSizeEntries()) {
+        if (entry.type === 'proxy') {
+          const proxyBtn = document.createElement('button');
+          proxyBtn.type = 'button';
+          proxyBtn.dataset.scraperSource = 'proxy';
+          proxyBtn.className =
+            'size-btn size-btn-proxy' +
+            (currentScraperSelection === 'proxy' ? ' active' : '');
+          const embedUrl = scraperEmbedUrl();
+          attachScraperProxyTooltip(proxyBtn, scraperMaxIconSize, embedUrl);
+          proxyBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            switchScraperProxy();
+          });
+          frag.appendChild(proxyBtn);
+          continue;
+        }
+
+        const icon = scraperIcons[entry.idx];
+        const idx = entry.idx;
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.className = 'size-btn' + (idx === currentScraperIdx ? ' active' : '');
+        btn.dataset.scraperIdx = String(idx);
+        btn.className =
+          'size-btn' + (currentScraperSelection === idx ? ' active' : '');
         const w = icon.width || 0;
         const h = icon.height || w;
         btn.textContent = w === h ? String(w) : `${w}\u00d7${h}`;
@@ -2412,30 +2786,81 @@
           switchScraperSize(idx);
         });
         frag.appendChild(btn);
-      });
+      }
       sizesEl.appendChild(frag);
+    }
+
+    function switchScraperProxy() {
+      if (!currentDomain || scraperMaxIconSize <= 0) return;
+      currentScraperSelection = 'proxy';
+      setActiveScraperButton('proxy');
+      loadScraperProxyVariant();
     }
 
     function switchScraperSize(idx) {
       if (!currentDomain) return;
       if (idx < 0 || idx >= scraperIcons.length) return;
-      currentScraperIdx = idx;
-      document.querySelectorAll('#scraper-sizes .size-btn').forEach((b, i) => {
-        b.classList.toggle('active', i === idx);
-      });
+      currentScraperSelection = idx;
+      setActiveScraperButton(idx);
       loadScraperVariant(idx);
+    }
+
+    function loadScraperProxyVariant() {
+      if (!currentDomain || scraperMaxIconSize <= 0) return;
+      const token = ++scraperLoadToken;
+      const embedUrl = scraperEmbedUrl();
+      const proxyUrl = `/s/${currentDomain}`;
+
+      const img = document.getElementById('scraper-img');
+      const spinner = document.getElementById('scraper-spinner');
+      const meta = document.getElementById('scraper-meta');
+      const display = img.closest('.favicon-display');
+      resetScraperDisplay(img, spinner, meta, display);
+
+      const imgEl = new Image();
+      imgEl.crossOrigin = 'anonymous';
+      let retriedStale = false;
+      imgEl.onload = () => {
+        if (scraperLoadToken !== token || currentScraperSelection !== 'proxy') return;
+        const nw = imgEl.naturalWidth || 0;
+        const nh = imgEl.naturalHeight || 0;
+        if (!retriedStale && nw > scraperMaxIconSize && nh > scraperMaxIconSize) {
+          retriedStale = true;
+          imgEl.src = `${proxyUrl}?refresh=1&_=${Date.now()}`;
+          return;
+        }
+        img.src = imgEl.src;
+        img.style.display = 'block';
+        spinner.style.display = 'none';
+        display.dataset.proxyUrl = embedUrl;
+        writeScraperMeta(meta, {
+          w: scraperMaxIconSize,
+          h: scraperMaxIconSize,
+          displayUrl: embedUrl,
+          copyLabel: 'Copy proxy URL',
+        });
+      };
+      imgEl.onerror = () => {
+        if (scraperLoadToken !== token || currentScraperSelection !== 'proxy') return;
+        spinner.style.display = 'none';
+        writeScraperMeta(meta, {
+          w: scraperMaxIconSize,
+          h: scraperMaxIconSize,
+          displayUrl: embedUrl,
+          copyLabel: 'Copy proxy URL',
+        });
+      };
+      imgEl.src = `${proxyUrl}?_=${Date.now()}`;
     }
 
     function loadScraperVariant(idx) {
       const icon = scraperIcons[idx];
       if (!icon) return;
 
-      // Idx 0 (largest) keeps the canonical /s/{domain} proxy URL so clicking
-      // the image still copies the embeddable scraper URL. Other sizes go
-      // through /s-asset so CDN Referer/hotlink filtering on the upstream
-      // host (Reddit etc.) can't break direct <img> loads.
-      const isPrimary = idx === 0;
-      const proxyUrl = isPrimary
+      const token = ++scraperLoadToken;
+      const embedUrl = scraperEmbedUrl();
+      const useEmbedProxy = scraperMaxIconSize <= 0 && idx === 0;
+      const proxyUrl = useEmbedProxy
         ? `/s/${currentDomain}`
         : `/s-asset?url=${encodeURIComponent(icon.url)}`;
 
@@ -2443,69 +2868,34 @@
       const spinner = document.getElementById('scraper-spinner');
       const meta = document.getElementById('scraper-meta');
       const display = img.closest('.favicon-display');
-
-      img.style.display = 'none';
-      spinner.style.display = 'block';
-      meta.textContent = '';
-
-      const writeMeta = (w, h) => {
-        const displayUrl = isPrimary
-          ? `${location.origin}/s/${currentDomain}`
-          : icon.url;
-        const copyLabel = isPrimary ? 'Copy proxy URL' : 'Copy source URL';
-        const escapedUrl = escapeHtml(displayUrl);
-        meta.innerHTML =
-          `<span class="dimensions">${w}x${h}</span>` +
-          `<a class="src-url" href="${escapedUrl}" target="_blank" rel="noopener" title="${escapedUrl}">${escapedUrl}</a>` +
-          `<button class="copy-btn" type="button" title="${copyLabel}" aria-label="${copyLabel}">${COPY_ICON_SVG}</button>`;
-        const copyBtn = meta.querySelector('.copy-btn');
-        copyBtn.addEventListener('click', (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          copySource(copyBtn, displayUrl);
-        });
-      };
+      resetScraperDisplay(img, spinner, meta, display);
 
       const imgEl = new Image();
       imgEl.crossOrigin = 'anonymous';
       imgEl.onload = () => {
-        if (currentScraperIdx !== idx) return;
+        if (scraperLoadToken !== token || currentScraperSelection !== idx) return;
         img.src = imgEl.src;
         img.style.display = 'block';
         spinner.style.display = 'none';
-        display.dataset.proxyUrl = `${location.origin}${proxyUrl}`;
-        writeMeta(
-          icon.width || imgEl.naturalWidth || 0,
-          icon.height || imgEl.naturalHeight || 0
-        );
+        display.dataset.proxyUrl = useEmbedProxy
+          ? embedUrl
+          : `${location.origin}${proxyUrl}`;
+        writeScraperMeta(meta, {
+          w: imgEl.naturalWidth || icon.width || 0,
+          h: imgEl.naturalHeight || icon.height || 0,
+          displayUrl: useEmbedProxy ? embedUrl : icon.url,
+          copyLabel: useEmbedProxy ? 'Copy proxy URL' : 'Copy source URL',
+        });
       };
       imgEl.onerror = () => {
-        if (currentScraperIdx !== idx) return;
-        if (isPrimary && icon.url) {
-          const fallbackEl = new Image();
-          fallbackEl.crossOrigin = 'anonymous';
-          const assetProxy = `/s-asset?url=${encodeURIComponent(icon.url)}`;
-          fallbackEl.onload = () => {
-            if (currentScraperIdx !== idx) return;
-            img.src = fallbackEl.src;
-            img.style.display = 'block';
-            spinner.style.display = 'none';
-            display.dataset.proxyUrl = `${location.origin}${assetProxy}`;
-            writeMeta(
-              icon.width || fallbackEl.naturalWidth || 0,
-              icon.height || fallbackEl.naturalHeight || 0
-            );
-          };
-          fallbackEl.onerror = () => {
-            if (currentScraperIdx !== idx) return;
-            spinner.style.display = 'none';
-            writeMeta(icon.width || 0, icon.height || 0);
-          };
-          fallbackEl.src = `${assetProxy}&_=${Date.now()}`;
-          return;
-        }
+        if (scraperLoadToken !== token || currentScraperSelection !== idx) return;
         spinner.style.display = 'none';
-        writeMeta(icon.width || 0, icon.height || 0);
+        writeScraperMeta(meta, {
+          w: icon.width || 0,
+          h: icon.height || 0,
+          displayUrl: useEmbedProxy ? embedUrl : icon.url,
+          copyLabel: useEmbedProxy ? 'Copy proxy URL' : 'Copy source URL',
+        });
       };
       imgEl.src = `${proxyUrl}${proxyUrl.includes('?') ? '&' : '?'}_=${Date.now()}`;
     }

@@ -81,11 +81,23 @@
       margin: 0 auto;
     }
 
+    .site-logo-link {
+      display: block;
+      width: fit-content;
+      margin: 0 auto 0.8rem;
+      line-height: 0;
+      text-decoration: none;
+    }
+
+    .site-logo-link:hover .site-logo {
+      opacity: 0.85;
+    }
+
     .site-logo {
       display: block;
-      margin: 0 auto 0.8rem;
       width: 64px;
       height: 64px;
+      transition: opacity 0.15s;
     }
 
     h1 {
@@ -1106,7 +1118,9 @@
   </div>
 
   <div class="container">
-    <img src="/logo.svg" alt="FaviconAPI" class="site-logo">
+    <a href="/" class="site-logo-link" aria-label="FaviconAPI home">
+      <img src="/logo.svg" alt="" class="site-logo">
+    </a>
     <h1>API Reference</h1>
     <p class="subtitle">A simple JSON API to fetch a normalized 128&times;128 PNG favicon for any domain.</p>
 
@@ -1121,7 +1135,7 @@
     <!-- Quick start -->
     <section class="block" id="quick-start">
       <h2>Quick start <a class="anchor" href="#quick-start" aria-label="Anchor link">#</a></h2>
-      <p class="lead">One <code>GET</code> request returns a JSON object containing a CDN URL to a normalized 128&times;128 PNG favicon plus cache metadata. The PNG itself is served separately by <code>/cdn/favicons/{domain}.png</code> and is cached on disk for 7 days.</p>
+      <p class="lead">One <code>GET</code> request returns a JSON object containing a CDN URL to a normalized 128&times;128 PNG favicon plus cache metadata. The PNG itself is served separately by <code>/cdn/favicons/{domain}.png</code> and is cached for 7 days.</p>
 
       <div class="endpoint-line">
         <span class="pill method">GET</span>
@@ -1286,7 +1300,7 @@ docker compose exec maflplus-favicon-api npm run keys:revoke -- --prefix fa_abcd
             <td>Yes</td>
             <td>Absolute URL (or bare domain) of the website to look up. The host is extracted, lowercased and validated.</td>
           </tr>
-          <tr>
+          <tr id="docs-query-param-key">
             <td><code>key</code></td>
             <td>If keys are required</td>
             <td>Optional alternative to the <code>Authorization: Bearer</code> header. Ignored when this instance does not require a key.</td>
@@ -1336,9 +1350,9 @@ docker compose exec maflplus-favicon-api npm run keys:revoke -- --prefix fa_abcd
         </thead>
         <tbody>
           <tr><td><span class="pill s400">400</span></td><td><code>missing_url</code><br><code>invalid_url</code></td><td>The <code>url</code> query parameter is missing or could not be parsed.</td></tr>
-          <tr><td><span class="pill s401">401</span></td><td><code>missing_api_key</code><br><code>invalid_api_key</code></td><td>No key was sent, or the provided key is not recognized / has been revoked.</td></tr>
+          <tr id="docs-error-api-key"><td><span class="pill s401">401</span></td><td><code>missing_api_key</code><br><code>invalid_api_key</code></td><td>No key was sent, or the provided key is not recognized / has been revoked.</td></tr>
           <tr><td><span class="pill s422">422</span></td><td><code>favicon_not_found</code><br><code>favicon_not_processable</code></td><td>No usable icon could be discovered for the domain, or the bytes could not be decoded.</td></tr>
-          <tr><td><span class="pill s429">429</span></td><td><code>quota_exceeded</code></td><td>The monthly call quota for this key has been reached. Resets on the 1st of next month (UTC).</td></tr>
+          <tr id="docs-error-quota"><td><span class="pill s429">429</span></td><td><code>quota_exceeded</code></td><td>The monthly call quota for this key has been reached. Resets on the 1st of next month (UTC).</td></tr>
           <tr><td><span class="pill s500">500</span></td><td><code>internal_error</code></td><td>Unexpected server error.</td></tr>
         </tbody>
       </table>
@@ -1652,13 +1666,20 @@ print(data["url"])`;
       document.getElementById('pg-key-hint').textContent = placeholderKeyHint(api.requireKey);
 
       // When the server runs without API keys, the playground key field, the
+      // `key` query-parameter row, the 401/429 auth-quota error rows, the
       // Authentication section and the Plans & quotas section are pure noise:
       // hide them so the docs match the actual behaviour of this instance.
       const keyRow = document.getElementById('pg-key-row');
+      const docsKeyParam = document.getElementById('docs-query-param-key');
+      const docsErrorApiKey = document.getElementById('docs-error-api-key');
+      const docsErrorQuota = document.getElementById('docs-error-quota');
       const authSection = document.getElementById('authentication');
       const plansSection = document.getElementById('plans');
       const quotaCountNote = document.getElementById('quota-count-note');
       if (keyRow) keyRow.style.display = api.requireKey ? '' : 'none';
+      if (docsKeyParam) docsKeyParam.style.display = api.requireKey ? '' : 'none';
+      if (docsErrorApiKey) docsErrorApiKey.style.display = api.requireKey ? '' : 'none';
+      if (docsErrorQuota) docsErrorQuota.style.display = api.requireKey ? '' : 'none';
       if (authSection) authSection.style.display = api.requireKey ? '' : 'none';
       if (plansSection) plansSection.style.display = api.requireKey ? '' : 'none';
       if (quotaCountNote) quotaCountNote.style.display = api.requireKey ? '' : 'none';

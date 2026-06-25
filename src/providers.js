@@ -39,6 +39,25 @@ const STATIC_CDN_HINTS = {
   'www.reddit.com': 'https://www.redditstatic.com/shreddit/assets/favicon/64x64.png',
 };
 
+// Direct manifest URLs for domains whose homepage HTML does not expose a
+// <link rel="manifest"> to the scraper (SPA shells, bot interstitials).
+const STATIC_MANIFEST_HINTS = {
+  'ah.nl': 'https://static.ah.nl/ah-static/favicon/nld/site.webmanifest',
+  'www.ah.nl': 'https://static.ah.nl/ah-static/favicon/nld/site.webmanifest',
+};
+
+const MANIFEST_BASENAMES = [
+  'manifest.webmanifest',
+  'site.webmanifest',
+  'manifest.json',
+  'app.webmanifest',
+  'webmanifest.json',
+];
+
+const MANIFEST_ROOT_PREFIXES = ['', 'favicon/', 'favicons/', 'assets/', 'static/'];
+
+const MANIFEST_PROBE_MAX = parseInt(process.env.MANIFEST_PROBE_MAX || '12', 10);
+
 const HTML_MIN_BYTES = 256;
 
 function scraperDocumentHeaders(referer, dest = 'document') {
@@ -154,15 +173,66 @@ function dedupeCandidates(candidates) {
   return unique;
 }
 
-// Stop probing larger NxN variants when pixel size jumps too sharply — some CDNs
-// host unrelated marketing art at 512x512 while 64–192 are the actual favicon set
-// (e.g. redditstatic.com/shreddit/assets/favicon/).
+// Stop treating the largest NxN variant as unrelated marketing art when the
+// size jump is sharp but the URL is still under a /favicon(s)/ path (Reddit
+// serves 192 and 512 in the same folder; 256 may 404 in between).
 const MAX_FAVICON_SIZE_JUMP = 2.5;
+
+function faviconVariantGroupAllowsLargeJump(url) {
+  try {
+    const path = new URL(url).pathname.toLowerCase();
+    return path.includes('/favicon/') || path.includes('/favicons/');
+  } catch {
+    return false;
+  }
+}
 
 const SCRAPER_PROBE_BATCH_SIZE = parseInt(
   process.env.SCRAPER_PROBE_BATCH_SIZE || '4',
   10
 );
+
+// Max output dimension for /s/:domain. Picks the largest available source icon,
+// then downscales to this size when the source is larger. 0 = no cap.
+const SCRAPER_MAX_ICON_SIZE = parseInt(process.env.SCRAPER_MAX_ICON_SIZE || '0', 10);
+
+function scraperMaxIconSizeEnabled() {
+  return Number.isFinite(SCRAPER_MAX_ICON_SIZE) && SCRAPER_MAX_ICON_SIZE > 0;
+}
+
+async function capScraperProxyOutput(entry) {
+  if (!entry?.buffer || !scraperMaxIconSizeEnabled()) return entry;
+
+  const dims = await readImageDimensions(entry.buffer, {
+    contentType: entry.contentType,
+    url: entry.url,
+  });
+  if (!dims || dims.width <= 0) return entry;
+
+  const side = Math.min(dims.width, dims.height || dims.width);
+  if (side <= SCRAPER_MAX_ICON_SIZE) return entry;
+
+  try {
+    const buffer = await sharp(entry.buffer)
+      .resize(SCRAPER_MAX_ICON_SIZE, SCRAPER_MAX_ICON_SIZE, {
+        fit: 'contain',
+        background: { r: 0, g: 0, b: 0, alpha: 0 },
+      })
+      .png()
+      .toBuffer();
+    return {
+      ...entry,
+      buffer,
+      contentType: 'image/png',
+    };
+  } catch {
+    return entry;
+  }
+}
+
+function getScraperMaxIconSize() {
+  return scraperMaxIconSizeEnabled() ? SCRAPER_MAX_ICON_SIZE : 0;
+}
 
 async function runInBatches(items, batchSize, worker) {
   const results = [];
@@ -259,20 +329,27 @@ async function probeScraperCandidates(candidates, referer, limit = 16) {
     return { result, width, format };
   }
 
-  // Variant groups: process groups in parallel, but keep the sequential
-  // size-jump heuristic inside each group intact.
+  // Variant groups: probe every declared size, then drop a suspiciously large
+  // outlier only when it is not on a /favicon(s)/ path.
   async function processGroup(group) {
     const sorted = [...group].sort(
-      (a, b) => candidateDeclaredSize(a) - candidateDeclaredSize(b) || a.href.localeCompare(b.href)
+      (a, b) => candidateDeclaredSize(b) - candidateDeclaredSize(a) || a.href.localeCompare(b.href)
     );
     const hits = [];
-    let lastWidth = 0;
     for (const candidate of sorted) {
       const hit = await probeOne(candidate);
-      if (!hit) continue;
-      if (lastWidth > 0 && hit.width > lastWidth * MAX_FAVICON_SIZE_JUMP) break;
-      lastWidth = hit.width;
-      hits.push(hit);
+      if (hit) hits.push(hit);
+    }
+    hits.sort((a, b) => b.width - a.width);
+    if (hits.length >= 2) {
+      const [largest, second] = hits;
+      const largestUrl = largest.result.url || '';
+      if (
+        largest.width > second.width * MAX_FAVICON_SIZE_JUMP &&
+        !faviconVariantGroupAllowsLargeJump(largestUrl)
+      ) {
+        hits.shift();
+      }
     }
     return hits;
   }
@@ -295,15 +372,23 @@ async function probeScraperCandidates(candidates, referer, limit = 16) {
       contentType: best.contentType,
       url: best.url,
     });
-    return {
+    return capScraperProxyOutput({
       ...best,
       buffer: displayed.buffer,
       contentType: displayed.contentType,
       provider: 'scraper',
-    };
+    });
   } catch {
-    return best;
+    return capScraperProxyOutput({ ...best, provider: 'scraper' });
   }
+}
+
+// Upstream PNG catalogs suffix files by icon tone (-light = pale icon, -dark = dark icon).
+// Our API variants name the target background theme (light = dark icon on light bg).
+function pngVariantSuffix(variant) {
+  if (variant === 'light') return '-dark';
+  if (variant === 'dark') return '-light';
+  return '';
 }
 
 const PROVIDERS = {
@@ -331,11 +416,11 @@ const PROVIDERS = {
   logoDev: (domain, token) =>
     `https://img.logo.dev/${encodeURIComponent(domain)}?token=${encodeURIComponent(token || '')}`,
   selfhst: (service, variant = 'color') => {
-    const suffix = variant === 'light' ? '-light' : variant === 'dark' ? '-dark' : '';
+    const suffix = pngVariantSuffix(variant);
     return `https://cdn.jsdelivr.net/gh/selfhst/icons/png/${encodeURIComponent(service)}${suffix}.png`;
   },
   dashboardIcons: (service, variant = 'color') => {
-    const suffix = variant === 'light' ? '-light' : variant === 'dark' ? '-dark' : '';
+    const suffix = pngVariantSuffix(variant);
     return `https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/${encodeURIComponent(service)}${suffix}.png`;
   },
   lobehub: (service, variant = 'color') => {
@@ -442,6 +527,9 @@ const {
   getLobehubSlugCandidates,
   ensureSelfhstIndex,
   ensureLobehubIndex,
+  resolveServiceSlug,
+  resolveSelfhstSlugSync,
+  normalizeServiceAliasKey,
 } = require('./serviceAliases');
 
 async function fetchServiceIcon(buildUrl, getCandidates, service, variant, provider) {
@@ -460,13 +548,31 @@ async function fetchServiceIcon(buildUrl, getCandidates, service, variant, provi
 async function fetchSelfhst(service, variant = 'color') {
   const { entries } = await ensureSelfhstIndex();
   const entryBySlug = new Map(entries.map((entry) => [entry.slug, entry]));
+
+  if (variant !== 'color') {
+    const slug = resolveSelfhstSlugSync(service) || normalizeServiceAliasKey(service);
+    if (!slug) return null;
+
+    const entry = entryBySlug.get(slug);
+    const suffix = pngVariantSuffix(variant);
+    const encoded = encodeURIComponent(slug);
+    const urls = [`https://cdn.jsdelivr.net/gh/selfhst/icons/png/${encoded}${suffix}.png`];
+
+    for (const url of urls) {
+      const result = await fetchFavicon(url);
+      if (!result) continue;
+      return { ...result, provider: 'selfhst', service: slug, variant };
+    }
+    return null;
+  }
+
   const candidates = await getSelfhstSlugCandidates(service);
-  const variants = variant === 'color' ? ['color', 'light', 'dark'] : [variant];
+  const variants = ['color', 'light', 'dark'];
 
   for (const slug of candidates) {
     const entry = entryBySlug.get(slug);
     for (const v of variants) {
-      const suffix = v === 'light' ? '-light' : v === 'dark' ? '-dark' : '';
+      const suffix = pngVariantSuffix(v);
       const encoded = encodeURIComponent(slug);
       const urls = [];
 
@@ -500,6 +606,14 @@ async function fetchSelfhst(service, variant = 'color') {
 }
 
 async function fetchDashboardIcons(service, variant = 'color') {
+  if (variant !== 'color') {
+    const slug = await resolveServiceSlug(service);
+    const result = await fetchFavicon(PROVIDERS.dashboardIcons(slug, variant));
+    return result
+      ? { ...result, provider: 'dashboardicons', service: slug, variant }
+      : null;
+  }
+
   return fetchServiceIcon(
     PROVIDERS.dashboardIcons,
     getDashboardIconsSlugCandidates,
@@ -526,7 +640,7 @@ function lobehubUrlsForSlug(slug, variant, entry) {
 
 async function recolorLobehubPng(png, tone) {
   const { data, info } = await sharp(png).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-  const rgb = tone === 'light' ? 255 : 0;
+  const rgb = tone === 'light' ? 0 : 255;
   for (let i = 0; i < data.length; i += info.channels) {
     if (data[i + 3] > 0) {
       data[i] = rgb;
@@ -627,7 +741,9 @@ async function fetchManifestIcons(manifestUrl, referer) {
       .filter((icon) => {
         if (!icon || !icon.src || isMonochromeManifestIcon(icon)) return false;
         const size = parseSizesAttr(icon.sizes || '');
-        return size >= 128;
+        // Empty/missing sizes are probed later; only skip when a size is declared below 128.
+        if (size > 0 && size < 128) return false;
+        return true;
       })
       .map((icon) => ({
         href: new URL(icon.src, manifestUrl).toString(),
@@ -639,6 +755,178 @@ async function fetchManifestIcons(manifestUrl, referer) {
   } finally {
     clearTimeout(timer);
   }
+}
+
+function relIncludesToken(rel, token) {
+  return String(rel || '')
+    .toLowerCase()
+    .split(/\s+/)
+    .includes(token);
+}
+
+function parseManifestHrefsFromHtml(html, resolveBase) {
+  if (!html || !resolveBase) return [];
+  const $ = cheerio.load(html);
+  const urls = [];
+  $('link[rel]').each((_, el) => {
+    const rel = $(el).attr('rel') || '';
+    if (!relIncludesToken(rel, 'manifest')) return;
+    const href = $(el).attr('href');
+    if (!href) return;
+    try {
+      urls.push(new URL(href, resolveBase).toString());
+    } catch {
+      /* ignore invalid URLs */
+    }
+  });
+  return urls;
+}
+
+function parseLinkHeaderManifestUrls(linkHeader, baseUrl) {
+  if (!linkHeader || !baseUrl) return [];
+  const urls = [];
+  for (const part of String(linkHeader).split(/,(?=\s*<)/)) {
+    if (!/\brel\s*=\s*["']?[^"']*\bmanifest\b/i.test(part)) continue;
+    const m = part.match(/<\s*([^>]+)\s*>/);
+    if (!m) continue;
+    try {
+      urls.push(new URL(m[1].trim(), baseUrl).toString());
+    } catch {
+      /* ignore invalid URLs */
+    }
+  }
+  return urls;
+}
+
+function directoryOfUrl(href) {
+  try {
+    const u = new URL(href);
+    const path = u.pathname;
+    const lastSlash = path.lastIndexOf('/');
+    if (lastSlash < 0) return null;
+    const dir = lastSlash === 0 ? '/' : path.slice(0, lastSlash + 1);
+    return `${u.origin}${dir}`;
+  } catch {
+    return null;
+  }
+}
+
+function manifestUrlsFromDirectories(directories) {
+  const urls = [];
+  const seenDirs = new Set();
+  for (const dir of directories) {
+    if (!dir || seenDirs.has(dir)) continue;
+    seenDirs.add(dir);
+    const base = dir.endsWith('/') ? dir : `${dir}/`;
+    for (const name of MANIFEST_BASENAMES) {
+      try {
+        urls.push(new URL(name, base).toString());
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+  return urls;
+}
+
+function wellKnownManifestUrlsForOrigin(origin) {
+  const urls = [];
+  const base = origin.endsWith('/') ? origin : `${origin}/`;
+  for (const prefix of MANIFEST_ROOT_PREFIXES) {
+    for (const name of MANIFEST_BASENAMES) {
+      try {
+        urls.push(new URL(prefix + name, base).toString());
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+  return urls;
+}
+
+function originsForDomain(domain) {
+  const origins = new Set();
+  try {
+    origins.add(new URL(`https://${domain}/`).origin);
+  } catch {
+    /* ignore */
+  }
+  if (!domain.startsWith('www.')) {
+    try {
+      origins.add(new URL(`https://www.${domain}/`).origin);
+    } catch {
+      /* ignore */
+    }
+  }
+  return [...origins];
+}
+
+function staticManifestHint(domain) {
+  const lower = domain.toLowerCase();
+  const bare = lower.replace(/^www\./, '');
+  return STATIC_MANIFEST_HINTS[lower] || STATIC_MANIFEST_HINTS[bare] || null;
+}
+
+function discoverManifestUrls(
+  domain,
+  { html = null, finalBaseUrl = null, iconCandidates = [], linkHeader = null } = {}
+) {
+  const ordered = [];
+  const seen = new Set();
+
+  function push(url) {
+    if (!url || seen.has(url)) return;
+    seen.add(url);
+    ordered.push(url);
+  }
+
+  const baseUrl = finalBaseUrl || `https://${domain}/`;
+  let resolveBase = baseUrl;
+  if (html) {
+    const parsed = parseIconCandidatesFromHtml(html, baseUrl);
+    resolveBase = parsed.resolveBase || baseUrl;
+  }
+
+  const hint = staticManifestHint(domain);
+  if (hint) push(hint);
+
+  for (const u of parseManifestHrefsFromHtml(html, resolveBase)) push(u);
+  for (const u of parseLinkHeaderManifestUrls(linkHeader, baseUrl)) push(u);
+
+  const iconHrefs = iconCandidates
+    .map((c) => (typeof c === 'string' ? c : c && c.href))
+    .filter(Boolean);
+  const dirs = iconHrefs.map(directoryOfUrl).filter(Boolean);
+  for (const u of manifestUrlsFromDirectories(dirs)) push(u);
+
+  for (const origin of originsForDomain(domain)) {
+    for (const u of wellKnownManifestUrlsForOrigin(origin)) push(u);
+  }
+
+  return ordered;
+}
+
+async function resolveManifestIcons(manifestUrls, referer, { maxAttempts = MANIFEST_PROBE_MAX } = {}) {
+  const slice = manifestUrls.slice(0, maxAttempts);
+  for (const manifestUrl of slice) {
+    const icons = await fetchManifestIcons(manifestUrl, referer);
+    if (icons.length > 0) return icons;
+  }
+  return [];
+}
+
+async function loadManifestIconCandidates(
+  domain,
+  { html = null, finalBaseUrl = null, linkHeader = null, iconCandidates = [] } = {}
+) {
+  const referer = finalBaseUrl || `https://${domain}/`;
+  const urls = discoverManifestUrls(domain, {
+    html,
+    finalBaseUrl,
+    iconCandidates,
+    linkHeader,
+  });
+  return resolveManifestIcons(urls, referer);
 }
 
 function pageUrlsForDomain(domain) {
@@ -712,12 +1000,42 @@ async function fetchScraperAllIcons(domain) {
   if (cached) return cached;
 
   const referer = `https://${domain}/`;
+  const { html, finalBaseUrl, linkHeader } = await fetchScraperPage(domain);
   const besticonIcons = BESTICON_URL ? await fetchBesticonAllIcons(domain) : [];
 
   const byUrl = new Map();
   for (const icon of besticonIcons) {
     if (!icon || !icon.url || byUrl.has(icon.url)) continue;
     byUrl.set(icon.url, { ...icon });
+  }
+
+  const iconCandidates = [...byUrl.keys()].map((href) => ({ href }));
+  if (html) {
+    try {
+      const parsed = parseIconCandidatesFromHtml(html, finalBaseUrl || referer);
+      iconCandidates.push(...parsed.primaryCandidates);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  try {
+    const manifestIcons = await loadManifestIconCandidates(domain, {
+      html,
+      finalBaseUrl,
+      linkHeader,
+      iconCandidates,
+    });
+    if (manifestIcons.length > 0) {
+      const probed = await runInBatches(manifestIcons, SCRAPER_PROBE_BATCH_SIZE, (c) =>
+        probeIconMetadata(c.href, referer)
+      );
+      for (const p of probed) {
+        if (p && p.url && !byUrl.has(p.url)) byUrl.set(p.url, p);
+      }
+    }
+  } catch {
+    /* manifest discovery is best-effort */
   }
 
   const extras = deriveHintCandidates(domain, [...byUrl.keys()]);
@@ -785,10 +1103,12 @@ async function fetchScraperPage(domain) {
         if (!res.ok) continue;
         const html = await res.text();
         if (html.length >= HTML_MIN_BYTES) {
+          const linkHeader = res.headers.get('link') || res.headers.get('Link') || null;
           return {
             html,
             finalBaseUrl: res.url || pageUrl,
             htmlFetchMethod: `${attempt.label} ${pageUrl}`,
+            linkHeader,
           };
         }
       } catch {
@@ -799,7 +1119,7 @@ async function fetchScraperPage(domain) {
     }
   }
 
-  return { html: null, finalBaseUrl: baseUrl, htmlFetchMethod: null };
+  return { html: null, finalBaseUrl: baseUrl, htmlFetchMethod: null, linkHeader: null };
 }
 
 
@@ -847,31 +1167,31 @@ function parseIconCandidatesFromHtml(html, finalBaseUrl) {
   };
 }
 
-async function buildScraperCandidates(domain, html, finalBaseUrl) {
+async function buildScraperCandidates(domain, html, finalBaseUrl, linkHeader = null) {
   const baseUrl = `https://${domain}/`;
   const primaryCandidates = [];
   const fallbackCandidates = [];
 
+  let parsed = { primaryCandidates: [], resolveBase: finalBaseUrl || baseUrl };
   if (html) {
     try {
-      const parsed = parseIconCandidatesFromHtml(html, finalBaseUrl);
+      parsed = parseIconCandidatesFromHtml(html, finalBaseUrl);
       primaryCandidates.push(...parsed.primaryCandidates);
-
-      const $ = cheerio.load(html);
-      const manifestHref = $('link[rel="manifest"]').attr('href');
-      if (manifestHref) {
-        try {
-          const resolveBase = parsed.resolveBase;
-          const manifestUrl = new URL(manifestHref, resolveBase).toString();
-          const manifestIcons = await fetchManifestIcons(manifestUrl, finalBaseUrl);
-          primaryCandidates.push(...manifestIcons);
-        } catch {
-          /* ignore invalid manifest URL */
-        }
-      }
     } catch {
-      /* parsing failed - fall through to fallbacks */
+      /* parsing failed - fall through */
     }
+  }
+
+  try {
+    const manifestIcons = await loadManifestIconCandidates(domain, {
+      html,
+      finalBaseUrl,
+      linkHeader,
+      iconCandidates: parsed.primaryCandidates,
+    });
+    primaryCandidates.push(...manifestIcons);
+  } catch {
+    /* manifest discovery is best-effort */
   }
 
   if (primaryCandidates.length === 0) {
@@ -958,25 +1278,46 @@ async function fetchBesticonCandidates(domain) {
 }
 
 async function fetchScraper(domain) {
+  const referer = `https://${domain}/`;
+  const { html, finalBaseUrl, linkHeader } = await fetchScraperPage(domain);
+
   if (BESTICON_URL) {
     const besticonCandidates = await fetchBesticonCandidates(domain);
     if (besticonCandidates.length > 0) {
-      const referer = `https://${domain}/`;
-      // Augment besticon's discoveries with static CDN hints + sized variants
-      // so domains whose origin blocks besticon's datacenter IP (Reddit, etc.)
-      // still get the full size ladder probed and the largest icon picked.
+      let parsed = { primaryCandidates: [] };
+      if (html) {
+        try {
+          parsed = parseIconCandidatesFromHtml(html, finalBaseUrl);
+        } catch {
+          /* ignore */
+        }
+      }
+      const manifestIcons = await loadManifestIconCandidates(domain, {
+        html,
+        finalBaseUrl,
+        linkHeader,
+        iconCandidates: [...parsed.primaryCandidates, ...besticonCandidates],
+      });
       const hintCandidates = deriveHintCandidates(
         domain,
         besticonCandidates.map((c) => c.href)
       );
-      const combined = rankCandidates([...besticonCandidates, ...hintCandidates]);
+      const combined = rankCandidates([
+        ...besticonCandidates,
+        ...hintCandidates,
+        ...manifestIcons,
+      ]);
       const best = await probeScraperCandidates(combined, referer, 32);
       if (best) return best;
     }
   }
 
-  const { html, finalBaseUrl } = await fetchScraperPage(domain);
-  const { rankedPrimary, rankedFallback } = await buildScraperCandidates(domain, html, finalBaseUrl);
+  const { rankedPrimary, rankedFallback } = await buildScraperCandidates(
+    domain,
+    html,
+    finalBaseUrl,
+    linkHeader
+  );
 
   const bestPrimary = await probeScraperCandidates(rankedPrimary, finalBaseUrl);
   if (bestPrimary) return bestPrimary;
@@ -1069,10 +1410,14 @@ module.exports = {
   fetchScraperPage,
   parseIconCandidatesFromHtml,
   fetchManifestIcons,
+  discoverManifestUrls,
+  resolveManifestIcons,
+  loadManifestIconCandidates,
   fetchBesticonAllIcons,
   fetchScraperAllIcons,
   parseSizesAttr,
   expandSizedVariants,
+  getScraperMaxIconSize,
   PROVIDERS,
   getSelfhstVariantAvailability,
   getDashboardIconsVariantAvailability,

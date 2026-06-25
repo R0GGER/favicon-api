@@ -679,6 +679,7 @@ module.exports = {
   resolveServiceSlug,
   resolveServiceSlugSync,
   resolveServiceSlugForProviderSync,
+  resolveSelfhstSlugSync,
   resolveServiceMatches,
   getServiceSlugCandidates,
   getServiceSlugCandidatesSync,
