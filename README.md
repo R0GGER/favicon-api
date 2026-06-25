@@ -134,8 +134,10 @@ All settings are documented in [`.env.example`](.env.example). Copy it to `.env`
 | `LOGODEV_TOKEN` | _(unset)_ | [logo.dev](https://www.logo.dev/) publishable key. Enables `/l/{domain}`; without it the route returns 503. |
 | `DEFAULT_PROVIDER` | `scraper` | Preferred provider for `/{domain}` (gets the head-start). Values: `scraper`, `google`, `googlev2`, `duckduckgo`, `yandex`, `faviconso`, `vemetric`, `favicondev`, `faviconkit`, `logodev`, `selfhst`, `dashboardicons`, `lobehub`. `logodev` requires `LOGODEV_TOKEN`. |
 | `BESTICON_URL` | _(unset)_ | Base URL of a sidecar [besticon](https://github.com/mat/besticon) instance (e.g. `http://besticon:8080`). `/s/{domain}` asks besticon first, then falls back to the built-in scraper. |
-| `SCRAPER_ICONS_CACHE_TTL` | `3600` | TTL (seconds) for the in-memory cache of enriched scraper icon lists (`/{domain}/json`). |
+| `SCRAPER_ICONS_CACHE_TTL` | `3600` | TTL (seconds) for the in-memory cache of enriched scraper icon lists (`/{domain}/json`). Also used for scraper discovery disk cache entries when `SCRAPER_DISK_CACHE` is enabled. |
 | `SCRAPER_ICONS_CACHE_MAX` | `500` | Max domains in that scraper-icons LRU cache. |
+| `SCRAPER_DISK_CACHE` | `false` | When `true`, persist scraper discovery (HTML, icon lists, besticon JSON, manifests, probes) under `{CACHE_DIR}/scraper-discovery`. Survives restarts; shared across workers. |
+| `SCRAPER_DISK_CACHE_DIR` | `{CACHE_DIR}/scraper-discovery` | Directory for that discovery cache. Only used when `SCRAPER_DISK_CACHE=true`. |
 | `MANIFEST_PROBE_MAX` | `12` | Max manifest URLs to probe per domain when HTML does not link one directly. |
 | `SCRAPER_MAX_ICON_SIZE` | `0` | Max output dimension for `/s/{domain}`. Larger sources are downscaled; `0` = native resolution. |
 | `API_KEYS_DB` | `/cache/api-keys.sqlite` | SQLite file for hashed API keys and monthly usage counters. Keep on the same volume as `CACHE_DIR`. |

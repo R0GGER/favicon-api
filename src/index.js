@@ -24,6 +24,7 @@ const {
   fetchScraperAsset,
   fetchScraperAllIcons,
   getScraperMaxIconSize,
+  invalidateScraperDomainCaches,
   PROVIDERS,
   getSelfhstVariantAvailability,
   getDashboardIconsVariantAvailability,
@@ -581,7 +582,10 @@ app.get('/s/:domain', async (req, res) => {
   const refresh = req.query.refresh === '1' || req.query.nocache === '1';
 
   try {
-    if (refresh) await cache.del('scraper', domain, null);
+    if (refresh) {
+      await cache.del('scraper', domain, null);
+      invalidateScraperDomainCaches(domain);
+    }
     const entry = await fetchWithCache('scraper', domain, null, () => fetchScraper(domain));
     if (!entry) return res.status(502).json({ error: 'Could not scrape favicon.' });
     sendFavicon(res, entry);

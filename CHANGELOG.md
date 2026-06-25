@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Optional scraper discovery disk cache** (`SCRAPER_DISK_CACHE`, `SCRAPER_DISK_CACHE_DIR` in `.env.example`)
+  - When `SCRAPER_DISK_CACHE=true`, homepage HTML, enriched icon lists (`/{domain}/json`), besticon JSON, parsed web manifests and icon-probe metadata are persisted as JSON under `{CACHE_DIR}/scraper-discovery/` (default `/cache/scraper-discovery` in Docker). Entries survive container restarts and are shared across cluster workers.
+  - TTL follows `SCRAPER_ICONS_CACHE_TTL` (default 1 hour). New module `src/scraperDiskCache.js`; wired from `src/providers.js` on read/write alongside the existing in-memory LRU caches.
+  - Documented in `README.md` environment table.
+
+- **In-memory scraper discovery caches** (`src/providers.js`)
+  - `fetchScraperPage` now caches homepage HTML (with in-flight deduplication so parallel `/{domain}/json` + `/s/{domain}` requests share one upstream fetch), `fetchBesticonAllIcons` caches besticon JSON, `fetchManifestIcons` caches per-manifest URL results, and `probeIconMetadata` caches per-icon probe metadata. Reuses `SCRAPER_ICONS_CACHE_TTL` / `SCRAPER_ICONS_CACHE_MAX`.
+
+### Fixed
+
+- **HTML scraper re-fetched discovery data on every request** — only the final favicon PNG (`scraper_{domain}` in `CACHE_DIR`) and the enriched icon list (`scraperIconsCache`) were cached before; HTML, manifests and probe results were fetched anew on each cache miss or after restart. Discovery layers are now cached in memory and optionally on disk.
+- **`GET /s/{domain}?refresh=1` only cleared the favicon disk cache** — now also calls `invalidateScraperDomainCaches()` to drop in-memory scraper discovery state and domain-keyed disk discovery files (`page/`, `icons/`, `besticon/` under `scraper-discovery/`).
+
+## [2.0.0] — 2026-06-25
+
+### Added
+
 - **`SCRAPER_MAX_ICON_SIZE` environment variable** — optional cap on the largest side (in pixels) returned by `GET /s/{domain}`. The scraper still selects the largest available source; when it exceeds the limit, the response is downscaled with `fit: contain` and re-encoded as PNG before caching. `0` (default) serves native resolution. Does not affect `/{domain}/json` icon lists or `/s-asset`. Documented in `.env.example`; `docker-compose.yml` may ship a non-zero example (e.g. `128`).
 - **`MANIFEST_PROBE_MAX` environment variable** (default `12`) — limits how many candidate web-manifest URLs the HTML scraper fetches per domain when probing for icons outside a direct `<link rel="manifest">` (ordered list built from HTML hints, `Link` headers, well-known paths, icon-directory heuristics and `STATIC_MANIFEST_HINTS`). Stops at the first manifest that yields icons.
 - **Deep manifest discovery** (`discoverManifestUrls`, `loadManifestIconCandidates`, `resolveManifestIcons` in `src/providers.js`)

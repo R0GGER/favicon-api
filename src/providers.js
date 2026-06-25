@@ -3,6 +3,7 @@ const sharp = require('sharp');
 const { rasterizeSvgToSize, readImageDimensions, toDisplayPng } = require('./imageNormalize');
 const { LRUCache } = require('lru-cache');
 const { upstreamFetch, ipv4Dispatcher, ipv4Http1Dispatcher } = require('./upstreamFetch');
+const scraperDiskCache = require('./scraperDiskCache');
 
 const UPSTREAM_TIMEOUT = parseInt(process.env.UPSTREAM_TIMEOUT || '5000', 10);
 
@@ -21,6 +22,35 @@ const scraperIconsCache = new LRUCache({
   max: SCRAPER_ICONS_CACHE_MAX,
   ttl: SCRAPER_ICONS_CACHE_TTL_MS,
 });
+
+// Homepage HTML + related upstream probes are reused across fetchScraper,
+// fetchScraperAllIcons, and the v1 API so parallel /:domain/json + /s/ requests
+// do not each re-fetch the same origin HTML, besticon JSON, manifests, and icons.
+const scraperPageCache = new LRUCache({
+  max: SCRAPER_ICONS_CACHE_MAX,
+  ttl: SCRAPER_ICONS_CACHE_TTL_MS,
+});
+const besticonIconsCache = new LRUCache({
+  max: SCRAPER_ICONS_CACHE_MAX,
+  ttl: SCRAPER_ICONS_CACHE_TTL_MS,
+});
+const manifestFetchCache = new LRUCache({
+  max: SCRAPER_ICONS_CACHE_MAX * 8,
+  ttl: SCRAPER_ICONS_CACHE_TTL_MS,
+});
+const probeMetadataCache = new LRUCache({
+  max: SCRAPER_ICONS_CACHE_MAX * 24,
+  ttl: SCRAPER_ICONS_CACHE_TTL_MS,
+});
+const scraperPageInflight = new Map();
+
+function invalidateScraperDomainCaches(domain) {
+  scraperIconsCache.delete(domain);
+  scraperPageCache.delete(domain);
+  besticonIconsCache.delete(domain);
+  scraperPageInflight.delete(domain);
+  scraperDiskCache.invalidateDomain(domain).catch(() => {});
+}
 
 const SCRAPER_USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
@@ -724,6 +754,16 @@ function formatScore(format) {
 
 
 async function fetchManifestIcons(manifestUrl, referer) {
+  if (manifestFetchCache.has(manifestUrl)) {
+    return manifestFetchCache.get(manifestUrl);
+  }
+
+  const diskManifest = await scraperDiskCache.getManifest(manifestUrl);
+  if (diskManifest !== undefined) {
+    manifestFetchCache.set(manifestUrl, diskManifest);
+    return diskManifest;
+  }
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT);
   try {
@@ -734,10 +774,18 @@ async function fetchManifestIcons(manifestUrl, referer) {
         headers: scraperDocumentHeaders(referer, 'manifest'),
       });
     }
-    if (!res.ok) return [];
+    if (!res.ok) {
+      manifestFetchCache.set(manifestUrl, []);
+      scraperDiskCache.setManifest(manifestUrl, []);
+      return [];
+    }
     const json = await res.json();
-    if (!json || !Array.isArray(json.icons)) return [];
-    return json.icons
+    if (!json || !Array.isArray(json.icons)) {
+      manifestFetchCache.set(manifestUrl, []);
+      scraperDiskCache.setManifest(manifestUrl, []);
+      return [];
+    }
+    const icons = json.icons
       .filter((icon) => {
         if (!icon || !icon.src || isMonochromeManifestIcon(icon)) return false;
         const size = parseSizesAttr(icon.sizes || '');
@@ -750,7 +798,12 @@ async function fetchManifestIcons(manifestUrl, referer) {
         sizes: icon.sizes || '',
         type: icon.type || '',
       }));
+    manifestFetchCache.set(manifestUrl, icons);
+    scraperDiskCache.setManifest(manifestUrl, icons);
+    return icons;
   } catch {
+    manifestFetchCache.set(manifestUrl, []);
+    scraperDiskCache.setManifest(manifestUrl, []);
     return [];
   } finally {
     clearTimeout(timer);
@@ -973,22 +1026,43 @@ function deriveHintCandidates(domain, knownUrls = []) {
 }
 
 async function probeIconMetadata(href, referer) {
+  if (probeMetadataCache.has(href)) {
+    return probeMetadataCache.get(href);
+  }
+
+  const diskProbe = await scraperDiskCache.getProbe(href);
+  if (diskProbe !== undefined) {
+    probeMetadataCache.set(href, diskProbe);
+    return diskProbe;
+  }
+
   const result = await fetchScraperAsset(href, referer);
-  if (!result) return null;
+  if (!result) {
+    probeMetadataCache.set(href, null);
+    scraperDiskCache.setProbe(href, null);
+    return null;
+  }
 
   const dims = await readImageDimensions(result.buffer, {
     contentType: result.contentType,
     url: href,
   });
-  if (!dims || dims.width <= 0 || dims.height <= 0) return null;
+  if (!dims || dims.width <= 0 || dims.height <= 0) {
+    probeMetadataCache.set(href, null);
+    scraperDiskCache.setProbe(href, null);
+    return null;
+  }
 
-  return {
+  const meta = {
     url: href,
     width: dims.width,
     height: dims.height,
     format: dims.format ? String(dims.format).toLowerCase() : null,
     bytes: result.buffer.length,
   };
+  probeMetadataCache.set(href, meta);
+  scraperDiskCache.setProbe(href, meta);
+  return meta;
 }
 
 // Returns the merged + sorted list of every icon we can find for `domain`:
@@ -998,6 +1072,12 @@ async function probeIconMetadata(href, referer) {
 async function fetchScraperAllIcons(domain) {
   const cached = scraperIconsCache.get(domain);
   if (cached) return cached;
+
+  const diskIcons = await scraperDiskCache.getIcons(domain);
+  if (diskIcons !== undefined) {
+    scraperIconsCache.set(domain, diskIcons);
+    return diskIcons;
+  }
 
   const referer = `https://${domain}/`;
   const { html, finalBaseUrl, linkHeader } = await fetchScraperPage(domain);
@@ -1057,10 +1137,11 @@ async function fetchScraperAllIcons(domain) {
   });
 
   scraperIconsCache.set(domain, sorted);
+  scraperDiskCache.setIcons(domain, sorted);
   return sorted;
 }
 
-async function fetchScraperPage(domain) {
+async function fetchScraperPageUncached(domain) {
   const baseUrl = `https://${domain}/`;
   const attempts = [
     { label: 'bare-h2', dispatcher: ipv4Dispatcher, headers: null },
@@ -1122,6 +1203,36 @@ async function fetchScraperPage(domain) {
   return { html: null, finalBaseUrl: baseUrl, htmlFetchMethod: null, linkHeader: null };
 }
 
+async function fetchScraperPage(domain, { bypassCache = false } = {}) {
+  if (!bypassCache) {
+    const cached = scraperPageCache.get(domain);
+    if (cached) return cached;
+
+    const diskPage = await scraperDiskCache.getPage(domain);
+    if (diskPage !== undefined) {
+      scraperPageCache.set(domain, diskPage);
+      return diskPage;
+    }
+
+    const inflight = scraperPageInflight.get(domain);
+    if (inflight) return inflight;
+  }
+
+  const run = async () => {
+    const result = await fetchScraperPageUncached(domain);
+    if (!bypassCache) {
+      scraperPageCache.set(domain, result);
+      scraperDiskCache.setPage(domain, result);
+    }
+    return result;
+  };
+
+  if (bypassCache) return run();
+
+  const promise = run().finally(() => scraperPageInflight.delete(domain));
+  scraperPageInflight.set(domain, promise);
+  return promise;
+}
 
 function parseIconCandidatesFromHtml(html, finalBaseUrl) {
   const linkCandidates = [];
@@ -1228,8 +1339,19 @@ async function buildScraperCandidates(domain, html, finalBaseUrl, linkHeader = n
 // sorted by area (largest first). Errored entries are filtered out, all
 // successful icons are kept (including very small ones) so callers can decide
 // what to do with them.
-async function fetchBesticonAllIcons(domain) {
+async function fetchBesticonAllIcons(domain, { bypassCache = false } = {}) {
   if (!BESTICON_URL) return [];
+
+  if (!bypassCache) {
+    const cached = besticonIconsCache.get(domain);
+    if (cached) return cached;
+
+    const diskBesticon = await scraperDiskCache.getBesticon(domain);
+    if (diskBesticon !== undefined) {
+      besticonIconsCache.set(domain, diskBesticon);
+      return diskBesticon;
+    }
+  }
 
   const url = `${BESTICON_URL}/allicons.json?url=${encodeURIComponent(domain)}`;
   const controller = new AbortController();
@@ -1240,12 +1362,18 @@ async function fetchBesticonAllIcons(domain) {
       signal: controller.signal,
       headers: { Accept: 'application/json' },
     });
-    if (!res.ok) return [];
+    if (!res.ok) {
+      if (!bypassCache) {
+        besticonIconsCache.set(domain, []);
+        scraperDiskCache.setBesticon(domain, []);
+      }
+      return [];
+    }
 
     const body = await res.json();
     const list = Array.isArray(body) ? body : Array.isArray(body?.icons) ? body.icons : [];
 
-    return list
+    const icons = list
       .filter((i) => i && !i.error && typeof i.url === 'string')
       .map((i) => ({
         url: i.url,
@@ -1254,7 +1382,16 @@ async function fetchBesticonAllIcons(domain) {
         format: i.format ? String(i.format).toLowerCase() : null,
         bytes: Number.isFinite(i.bytes) ? i.bytes : 0,
       }));
+    if (!bypassCache) {
+      besticonIconsCache.set(domain, icons);
+      scraperDiskCache.setBesticon(domain, icons);
+    }
+    return icons;
   } catch {
+    if (!bypassCache) {
+      besticonIconsCache.set(domain, []);
+      scraperDiskCache.setBesticon(domain, []);
+    }
     return [];
   } finally {
     clearTimeout(timer);
@@ -1421,4 +1558,5 @@ module.exports = {
   PROVIDERS,
   getSelfhstVariantAvailability,
   getDashboardIconsVariantAvailability,
+  invalidateScraperDomainCaches,
 };
