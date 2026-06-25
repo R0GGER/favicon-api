@@ -1,0 +1,282 @@
+{
+    "domain": "reddit.com",
+    "endpoints": {
+        "best": {
+            "proxy": "http://localhost:3100/reddit.com",
+            "source": null
+        },
+        "google": {
+            "16": {
+                "proxy": "http://localhost:3100/g/16/reddit.com",
+                "source": "https://www.google.com/s2/favicons?domain=reddit.com&sz=16"
+            },
+            "32": {
+                "proxy": "http://localhost:3100/g/32/reddit.com",
+                "source": "https://www.google.com/s2/favicons?domain=reddit.com&sz=32"
+            },
+            "64": {
+                "proxy": "http://localhost:3100/g/64/reddit.com",
+                "source": "https://www.google.com/s2/favicons?domain=reddit.com&sz=64"
+            },
+            "128": {
+                "proxy": "http://localhost:3100/g/128/reddit.com",
+                "source": "https://www.google.com/s2/favicons?domain=reddit.com&sz=128"
+            }
+        },
+        "googlev2": {
+            "16": {
+                "proxy": "http://localhost:3100/g2/16/reddit.com",
+                "source": "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://reddit.com&size=16"
+            },
+            "32": {
+                "proxy": "http://localhost:3100/g2/32/reddit.com",
+                "source": "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://reddit.com&size=32"
+            },
+            "64": {
+                "proxy": "http://localhost:3100/g2/64/reddit.com",
+                "source": "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://reddit.com&size=64"
+            },
+            "128": {
+                "proxy": "http://localhost:3100/g2/128/reddit.com",
+                "source": "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://reddit.com&size=128"
+            },
+            "256": {
+                "proxy": "http://localhost:3100/g2/256/reddit.com",
+                "source": "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://reddit.com&size=256"
+            }
+        },
+        "duckduckgo": {
+            "proxy": "http://localhost:3100/d/reddit.com",
+            "source": "https://icons.duckduckgo.com/ip3/reddit.com.ico"
+        },
+        "yandex": {
+            "proxy": "http://localhost:3100/y/reddit.com",
+            "source": "https://favicon.yandex.net/favicon/reddit.com"
+        },
+        "faviconso": {
+            "proxy": "http://localhost:3100/f/reddit.com",
+            "source": "https://favicon.so/api/favicon?url=reddit.com"
+        },
+        "vemetric": {
+            "default": {
+                "proxy": "http://localhost:3100/v/reddit.com",
+                "source": "https://favicon.vemetric.com/reddit.com"
+            },
+            "sizes": {
+                "16": {
+                    "proxy": "http://localhost:3100/v/reddit.com?size=16",
+                    "source": "https://favicon.vemetric.com/reddit.com?size=16"
+                },
+                "32": {
+                    "proxy": "http://localhost:3100/v/reddit.com?size=32",
+                    "source": "https://favicon.vemetric.com/reddit.com?size=32"
+                },
+                "64": {
+                    "proxy": "http://localhost:3100/v/reddit.com?size=64",
+                    "source": "https://favicon.vemetric.com/reddit.com?size=64"
+                },
+                "128": {
+                    "proxy": "http://localhost:3100/v/reddit.com?size=128",
+                    "source": "https://favicon.vemetric.com/reddit.com?size=128"
+                },
+                "256": {
+                    "proxy": "http://localhost:3100/v/reddit.com?size=256",
+                    "source": "https://favicon.vemetric.com/reddit.com?size=256"
+                }
+            },
+            "formats": {
+                "png": {
+                    "proxy": "http://localhost:3100/v/reddit.com?format=png",
+                    "source": "https://favicon.vemetric.com/reddit.com?format=png"
+                },
+                "jpg": {
+                    "proxy": "http://localhost:3100/v/reddit.com?format=jpg",
+                    "source": "https://favicon.vemetric.com/reddit.com?format=jpg"
+                },
+                "webp": {
+                    "proxy": "http://localhost:3100/v/reddit.com?format=webp",
+                    "source": "https://favicon.vemetric.com/reddit.com?format=webp"
+                }
+            }
+        },
+        "favicondev": {
+            "proxy": "http://localhost:3100/p/reddit.com",
+            "source": "https://favicon-3j1.pages.dev/favicon/reddit.com"
+        },
+        "faviconkit": {
+            "16": {
+                "proxy": "http://localhost:3100/k/16/reddit.com",
+                "source": "https://ico.faviconkit.net/favicon/reddit.com?sz=16"
+            },
+            "32": {
+                "proxy": "http://localhost:3100/k/32/reddit.com",
+                "source": "https://ico.faviconkit.net/favicon/reddit.com?sz=32"
+            },
+            "64": {
+                "proxy": "http://localhost:3100/k/64/reddit.com",
+                "source": "https://ico.faviconkit.net/favicon/reddit.com?sz=64"
+            },
+            "128": {
+                "proxy": "http://localhost:3100/k/128/reddit.com",
+                "source": "https://ico.faviconkit.net/favicon/reddit.com?sz=128"
+            },
+            "256": {
+                "proxy": "http://localhost:3100/k/256/reddit.com",
+                "source": "https://ico.faviconkit.net/favicon/reddit.com?sz=256"
+            }
+        },
+        "logodev": {
+            "proxy": "http://localhost:3100/l/reddit.com",
+            "source": null,
+            "configured": false
+        },
+        "scraper": {
+            "proxy": "http://localhost:3100/s/reddit.com",
+            "source": "https://www.redditstatic.com/shreddit/assets/favicon/512x512.png",
+            "sizes": {
+                "16": {
+                    "proxy": "http://localhost:3100/s/reddit.com?size=16",
+                    "source": "https://www.redditstatic.com/shreddit/assets/favicon/512x512.png"
+                },
+                "32": {
+                    "proxy": "http://localhost:3100/s/reddit.com?size=32",
+                    "source": "https://www.redditstatic.com/shreddit/assets/favicon/512x512.png"
+                },
+                "64": {
+                    "proxy": "http://localhost:3100/s/reddit.com?size=64",
+                    "source": "https://www.redditstatic.com/shreddit/assets/favicon/512x512.png"
+                },
+                "128": {
+                    "proxy": "http://localhost:3100/s/reddit.com?size=128",
+                    "source": "https://www.redditstatic.com/shreddit/assets/favicon/512x512.png"
+                },
+                "256": {
+                    "proxy": "http://localhost:3100/s/reddit.com?size=256",
+                    "source": "https://www.redditstatic.com/shreddit/assets/favicon/512x512.png"
+                },
+                "512": {
+                    "proxy": "http://localhost:3100/s/reddit.com?size=512",
+                    "source": "https://www.redditstatic.com/shreddit/assets/favicon/512x512.png"
+                }
+            },
+            "maxIconSize": 128,
+            "fallback": true,
+            "fallbackProvider": null,
+            "icons": [
+                {
+                    "url": "https://www.redditstatic.com/shreddit/assets/favicon/512x512.png",
+                    "width": 512,
+                    "height": 512,
+                    "format": "png",
+                    "bytes": 51486,
+                    "proxy": "http://localhost:3100/s/reddit.com?size=512"
+                },
+                {
+                    "url": "https://www.redditstatic.com/shreddit/assets/favicon/192x192.png",
+                    "width": 192,
+                    "height": 192,
+                    "format": "png",
+                    "bytes": 16744,
+                    "proxy": "http://localhost:3100/s/reddit.com?size=192"
+                },
+                {
+                    "url": "https://www.redditstatic.com/shreddit/assets/favicon/180x180.png",
+                    "width": 180,
+                    "height": 180,
+                    "format": "png",
+                    "bytes": 15433,
+                    "proxy": "http://localhost:3100/s/reddit.com?size=180"
+                },
+                {
+                    "url": "https://www.redditstatic.com/shreddit/assets/favicon/152x152.png",
+                    "width": 152,
+                    "height": 152,
+                    "format": "png",
+                    "bytes": 12148,
+                    "proxy": "http://localhost:3100/s/reddit.com?size=152"
+                },
+                {
+                    "url": "http://reddit.com/apple-touch-icon-precomposed.png",
+                    "width": 128,
+                    "height": 128,
+                    "format": "png",
+                    "bytes": 16172,
+                    "proxy": "http://localhost:3100/s/reddit.com?size=128"
+                },
+                {
+                    "url": "https://www.redditstatic.com/shreddit/assets/favicon/128x128.png",
+                    "width": 128,
+                    "height": 128,
+                    "format": "png",
+                    "bytes": 9358,
+                    "proxy": "http://localhost:3100/s/reddit.com?size=128"
+                },
+                {
+                    "url": "https://www.redditstatic.com/shreddit/assets/favicon/64x64.png",
+                    "width": 64,
+                    "height": 64,
+                    "format": "png",
+                    "bytes": 3886,
+                    "proxy": "http://localhost:3100/s/reddit.com?size=64"
+                },
+                {
+                    "url": "http://reddit.com/apple-touch-icon.png",
+                    "width": 57,
+                    "height": 57,
+                    "format": "png",
+                    "bytes": 899,
+                    "proxy": "http://localhost:3100/s/reddit.com?size=57"
+                },
+                {
+                    "url": "http://reddit.com/favicon.ico",
+                    "width": 32,
+                    "height": 32,
+                    "format": "png",
+                    "bytes": 2441,
+                    "proxy": "http://localhost:3100/s/reddit.com?size=32"
+                }
+            ],
+            "wwwFallback": null
+        },
+        "selfhst": {
+            "service": "reddit",
+            "proxy": "http://localhost:3100/sh/reddit",
+            "source": "https://cdn.jsdelivr.net/gh/selfhst/icons/png/reddit.png",
+            "variants": {
+                "color": {
+                    "proxy": "http://localhost:3100/sh/reddit",
+                    "source": "https://cdn.jsdelivr.net/gh/selfhst/icons/png/reddit.png"
+                },
+                "light": {
+                    "proxy": "http://localhost:3100/sh/reddit?variant=light",
+                    "source": "https://cdn.jsdelivr.net/gh/selfhst/icons/png/reddit-dark.png"
+                },
+                "dark": {
+                    "proxy": "http://localhost:3100/sh/reddit?variant=dark",
+                    "source": "https://cdn.jsdelivr.net/gh/selfhst/icons/png/reddit-light.png"
+                }
+            },
+            "query": "reddit"
+        },
+        "dashboardicons": {
+            "service": "reddit",
+            "proxy": "http://localhost:3100/di/reddit",
+            "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/reddit.png",
+            "variants": {
+                "color": {
+                    "proxy": "http://localhost:3100/di/reddit",
+                    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/reddit.png"
+                }
+            },
+            "query": "reddit"
+        },
+        "lobehub": {
+            "service": null,
+            "query": null,
+            "proxy": null,
+            "source": null,
+            "variants": null,
+            "sizes": null
+        }
+    }
+}

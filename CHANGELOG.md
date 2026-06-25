@@ -5,10 +5,44 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] — 2026-06-26
+
+### Added
+
+- **SVG rasterization for scraped icons** — when the HTML scraper finds an SVG favicon (e.g. hosthatch.com), it is now rasterized to PNG instead of being served as raw SVG. Previously raw SVGs were passed through to the browser, causing them to render at an arbitrary (screen-filling) size with no fixed dimensions.
+- **`/s/{domain}?size=N` — scraper size parameter** — the scraper proxy endpoint now accepts a `?size=` query parameter with standard icon sizes (16, 32, 64, 128, 256, 512). Each size is rendered directly from the original SVG source (when available) for maximum sharpness, or downscaled from the cached raster base for non-SVG icons.
+- **`/{domain}/json` — scraper sizes in JSON** — the JSON endpoint now advertises `endpoints.scraper.sizes` with proxy URLs for all six standard sizes (e.g. `/s/example.com?size=128`).
+- **Scraper icon proxy URLs per discovered size** — `/{domain}/json` now includes a `proxy` field on every icon in `endpoints.scraper.icons[]` and `endpoints.scraper.wwwFallback.icons[]`, using the format `/s/{domain}?size={width}` (e.g. `/s/github.com?size=512`). This gives every discovered icon resolution a clean, embeddable proxy URL.
+- **`/{domain}/json` — scraper fallback metadata** — `endpoints.scraper.fallback` mirrors the `SCRAPER_FALLBACK` setting; `endpoints.scraper.fallbackProvider` reports which alternative source served the cached `/s/{domain}` icon (`selfhst`, `dashboardicons`, `googlev2`, or `null` when the icon came from direct HTML scraping).
+- **Web UI — scraper proxy size buttons from JSON** — the HTML Scraper card now dynamically renders proxy size buttons for all sizes advertised in the JSON `sizes` object (e.g. 16, 32, 64, 128), alongside the scraped icon sizes. Sizes larger than `maxIconSize` are omitted to prevent blurry upscaled versions. The static fallback row (512–16) is still shown when no scraped icons are found.
+
+### Changed
+
+- **SVG ranking boost in scraper** — SVGs are now treated as having an effective resolution of at least 512px for candidate ranking, so they are preferred over small raster icons. Previously a 105×150 SVG viewBox would lose to a 128×128 PNG.
+- **SVG render density increased** — `rasterizeSvgToSize` now uses `density = size × 4` (previously `size × 1.5`), producing a much larger internal canvas for crisp downscaling of vector content.
+- **SVG per-size direct rasterization** — when the scraped icon was originally an SVG, each `?size=N` request rasterizes directly from the preserved original SVG buffer instead of resizing from an intermediate PNG. This eliminates double-rasterization quality loss.
+- **`/s/{domain}?size=N` — flexible size parameter** — the `?size` query parameter now accepts any integer between 1 and 1024 (previously restricted to the fixed set 16, 32, 64, 128, 256, 512). This allows the proxy to serve icons at the exact resolutions discovered by the scraper (e.g. 152, 180, 192, 384).
+- **`/s/{domain}?size=N` — full-resolution source selection** — sized requests no longer resize from the SCRAPER_MAX_ICON_SIZE-capped cached icon. Instead, `serveSizedScraperIcon` queries `fetchScraperAllIcons` (cached) to find the smallest source icon that is ≥ the requested size, fetches it at full resolution via the asset cache, and resizes from that crisp source. This eliminates blurry upscaling when the cached default icon was capped (e.g. requesting `?size=512` no longer upscales a 128px cached image).
+- **Web UI — scraper size buttons show proxy URLs** — clicking a discovered icon size button now loads and displays the proxy URL (`/s/{domain}?size=N`) instead of the raw upstream source URL. The copy-to-clipboard action copies the proxy URL. Tooltips on size buttons also show the proxy URL.
+- **Web UI — no more flashing proxy-size row** — the static 512/256/128/64/32/16 proxy-size button row (`scraper-proxy-sizes`) is now hidden by default and only shown when no scraped icons are found (fallback). Previously it flashed briefly before being replaced by the discovered icon sizes.
+
+### Fixed
+
+- **`GET /s/{domain}` low-quality icons for well-known services** (e.g. `facebook.com` with `SCRAPER_MAX_ICON_SIZE=128`) — when `SCRAPER_FALLBACK=true` and the domain maps to a service slug, curated catalog icons (selfh.st SVG/PNG, dashboardicons) are now preferred **before** HTML scraping, then rasterized and capped to the configured max size. Previously the scraper could return a small website apple-touch-icon even when a sharper catalog icon existed. `X-Favicon-Source` reports the actual provider (e.g. `scraper-fallback:selfhst`).
+
+### Internal
+
+- **`serveSizedScraperIcon`** (`src/index.js`) — handles `GET /s/{domain}?size=N` by picking the smallest discovered source icon ≥ the requested size from `fetchScraperAllIcons`, fetching it at full resolution via `/s-asset` cache, and downscaling with `resizeIcon`.
+- **Scraper fallback helpers** (`src/providers.js`) — `fetchScraperCatalogFallback`, `fetchScraperGoogleFallback`, `normalizeFallbackResult`, `getScraperFallback`; catalog lookup runs before HTML scraping when `SCRAPER_FALLBACK=true`, Google faviconV2 runs only after scraping fails entirely.
+
 ## [2.1.0] — 2026-06-25
 
 ### Added
 
+- **HTML scraper provider fallback** (`SCRAPER_FALLBACK`, default `true`) — the scraper now prefers curated service-icon catalogs over direct HTML scraping for domains that map to a known service slug. Fallback chain:
+  1. **Service-icon catalogs** (selfh.st/icons, dashboardicons.com) — tried **before** HTML scraping when the domain maps to a slug via `serviceSlugFromDomain` (e.g. `facebook.com` → `facebook`). Catalog icons are typically higher resolution and visually consistent.
+  2. **Google faviconV2** — universal last-resort tried **after** HTML scraping fails completely; rejects 1×1 placeholder images.
+  When the domain has no slug or no catalog match, normal HTML scraping runs as before. Fallback results are processed through `toDisplayPng` and `capScraperProxyOutput` for consistent PNG output, cached under the same scraper cache key, and tagged with a descriptive `X-Favicon-Source` header (e.g. `scraper-fallback:selfhst`, `scraper-fallback:dashboardicons`, `scraper-fallback:googlev2`). Set `SCRAPER_FALLBACK=false` to disable and use only HTML scraping. Documented in `.env.example`.
 - **HTML scraper www-fallback** — when scraping a bare domain (e.g. `nu.nl`) finds no usable icons, automatically retries on `www.{domain}` before giving up. Implemented in `fetchScraper` (`src/providers.js`) and `fetchBySourcePriority` (`src/apiScraper.js`); applies transparently to `GET /s/{domain}` and `GET /api/v1/favicon`. `/{domain}/json` exposes `endpoints.scraper.wwwFallback` (`{ domain, icons, proxy }`) when the bare domain has an empty icon list but the www variant has icons.
 - **Web UI — HTML Scraper www-fallback notice** (`index.html`) — when icons are loaded from the www variant, shows a compact amber banner (`No icons on {domain}: {www.domain}`) with a clickable link to search the www hostname directly.
 - **`UI_INCLUDE_APP_ICONS` environment variable** (default `true`) — controls whether the homepage checkbox “Also include app icon lookups” is checked on load. Set to `false` (or `0` / `no` / `off`) to leave it unchecked. Documented in `.env.example`; exposed to the UI via `includeAppIcons` on `GET /providers`.

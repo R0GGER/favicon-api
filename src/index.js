@@ -24,6 +24,7 @@ const {
   fetchScraperAsset,
   fetchScraperAllIcons,
   getScraperMaxIconSize,
+  getScraperFallback,
   invalidateScraperDomainCaches,
   PROVIDERS,
   getSelfhstVariantAvailability,
@@ -38,7 +39,7 @@ const {
   getLobehubVariantAvailability,
 } = require('./serviceAliases');
 const { serviceSlugFromDomain, listDomainIconTags } = require('./serviceSlugFromDomain');
-const { toDisplayPng } = require('./imageNormalize');
+const { toDisplayPng, resizeIcon, rasterizeSvgToSize } = require('./imageNormalize');
 const cache = require('./cache');
 const apiRoutes = require('./apiRoutes');
 const apiStore = require('./apiStore');
@@ -196,6 +197,8 @@ app.use(apiRoutes);
 const VALID_GOOGLE_SIZES = new Set([16, 32, 64, 128]);
 const VALID_GOOGLEV2_SIZES = new Set([16, 32, 64, 128, 256]);
 const VALID_FAVICONKIT_SIZES = new Set([16, 32, 64, 128, 256]);
+const VALID_SCRAPER_SIZES = new Set([16, 32, 64, 128, 256, 512]);
+const SCRAPER_SIZES_ARRAY = [16, 32, 64, 128, 256, 512];
 const VALID_VEMETRIC_FORMATS = new Set(['png', 'jpg', 'webp']);
 const VALID_SELFHST_VARIANTS = new Set(['color', 'light', 'dark']);
 const VALID_DASHBOARDICONS_VARIANTS = new Set(['color', 'light', 'dark']);
@@ -585,26 +588,91 @@ app.get('/s-asset', async (req, res) => {
   }
 });
 
-// HTML scraper proxy: /s/:domain[?refresh=1]
+// HTML scraper proxy: /s/:domain[?size=128&refresh=1]
 app.get('/s/:domain', async (req, res) => {
   const domain = extractDomain(req.params.domain);
   if (!domain) return res.status(400).json({ error: 'Invalid domain.' });
 
   const refresh = req.query.refresh === '1' || req.query.nocache === '1';
+  const sizeParam = req.query.size ? parseInt(req.query.size, 10) : 0;
+
+  if (sizeParam && (sizeParam < 1 || sizeParam > 1024)) {
+    return res.status(400).json({ error: 'Invalid size. Use a value between 1 and 1024.' });
+  }
 
   try {
     if (refresh) {
       await cache.del('scraper', domain, null);
       invalidateScraperDomainCaches(domain);
     }
+
+    if (sizeParam) {
+      const served = await serveSizedScraperIcon(domain, sizeParam);
+      if (served) return sendFavicon(res, served);
+    }
+
     const entry = await fetchWithCache('scraper', domain, null, () => fetchScraper(domain));
     if (!entry) return res.status(502).json({ error: 'Could not scrape favicon.' });
+
+    if (sizeParam) {
+      const buf = await resizeIcon(entry.buffer, sizeParam);
+      return sendFavicon(res, { ...entry, buffer: buf, contentType: 'image/png' });
+    }
+
     sendFavicon(res, entry);
   } catch (err) {
     console.error('Scraper proxy error:', err.message);
     res.status(500).json({ error: 'Internal error.' });
   }
 });
+
+async function serveSizedScraperIcon(domain, size) {
+  let allIcons;
+  try {
+    allIcons = await fetchScraperAllIcons(domain);
+  } catch {
+    return null;
+  }
+  if (!allIcons || allIcons.length === 0) return null;
+
+  // Pick the smallest source icon that is >= the requested size (sharpest
+  // downscale). allIcons is sorted largest-first.
+  let bestIcon = allIcons[0];
+  for (let i = allIcons.length - 1; i >= 0; i--) {
+    if ((allIcons[i].width || 0) >= size) {
+      bestIcon = allIcons[i];
+      break;
+    }
+  }
+
+  const iconUrl = bestIcon.url;
+  const hash = crypto.createHash('sha1').update(iconUrl).digest('hex');
+  const referer = `https://${domain}/`;
+
+  const fullRes = await fetchWithCache('asset-v2', hash, null, async () => {
+    const fetched = await fetchScraperAsset(iconUrl, referer);
+    if (!fetched) return null;
+    try {
+      const displayed = await toDisplayPng(fetched.buffer, {
+        contentType: fetched.contentType,
+        url: iconUrl,
+      });
+      return {
+        ...fetched,
+        buffer: displayed.buffer,
+        contentType: displayed.contentType,
+        provider: 'scraper',
+      };
+    } catch {
+      return { ...fetched, provider: 'scraper' };
+    }
+  });
+
+  if (!fullRes) return null;
+
+  const buf = await resizeIcon(fullRes.buffer, size);
+  return { buffer: buf, contentType: 'image/png', provider: 'scraper', url: iconUrl };
+}
 
 // Explicit domain → icon-tag table (see src/domainIconTags.js)
 app.get('/domain-icon-tags', (req, res) => {
@@ -901,9 +969,30 @@ app.get('/:domain/json', async (req, res) => {
       scraper: {
         proxy: `${host}/s/${encoded}`,
         source: scraperCached?.url || null,
+        sizes: Object.fromEntries(
+          SCRAPER_SIZES_ARRAY.map((size) => [
+            String(size),
+            { proxy: `${host}/s/${encoded}?size=${size}`, source: scraperCached?.url || null },
+          ])
+        ),
         maxIconSize: getScraperMaxIconSize(),
-        icons: scraperAllIcons,
-        wwwFallback,
+        fallback: getScraperFallback(),
+        fallbackProvider: scraperCached?.provider?.startsWith('scraper-fallback:')
+          ? scraperCached.provider.replace('scraper-fallback:', '')
+          : null,
+        icons: scraperAllIcons.map((icon) => ({
+          ...icon,
+          proxy: `${host}/s/${encoded}?size=${icon.width || 128}`,
+        })),
+        wwwFallback: wwwFallback
+          ? {
+              ...wwwFallback,
+              icons: (wwwFallback.icons || []).map((icon) => ({
+                ...icon,
+                proxy: `${host}/s/${encodeURIComponent(wwwFallback.domain)}?size=${icon.width || 128}`,
+              })),
+            }
+          : null,
       },
       selfhst,
       dashboardicons,

@@ -6,6 +6,9 @@ const TARGET_SIZE = 128;
 const MIN_SOURCE_SIZE = 128;
 // 4x default 96 dpi so SVGs rasterize crisply at TARGET_SIZE (128px).
 const SVG_DENSITY = 192;
+// When converting a scraped SVG to a display PNG, rasterize at the largest
+// standard icon size so on-demand ?size= downsizing preserves quality.
+const SVG_DISPLAY_SIZE = 512;
 
 function transparentBackground() {
   return { r: 0, g: 0, b: 0, alpha: 0 };
@@ -43,7 +46,7 @@ async function rasterizeSvg(buffer) {
 }
 
 async function rasterizeSvgToSize(buffer, size = TARGET_SIZE) {
-  const density = Math.max(72, Math.round(size * 1.5));
+  const density = Math.max(72, size * 4);
   return sharp(buffer, { density })
     .resize(size, size, resizeOptions())
     .png()
@@ -110,15 +113,28 @@ async function readImageDimensions(buffer, { contentType = '', url = '' } = {}) 
   return null;
 }
 
-// Convert ICO (and other non-browser-friendly formats) to PNG at native size
-// for display in <img> tags. Does not enforce MIN_SOURCE_SIZE.
+// Convert ICO / SVG (and other non-browser-friendly formats) to PNG for
+// display in <img> tags. SVGs are rasterized to SVG_DISPLAY_SIZE so they
+// don't render at an arbitrary browser-chosen resolution.
 async function toDisplayPng(buffer, { contentType = '', url = '' } = {}) {
   if (!buffer || buffer.length === 0) {
     throw new Error('Empty image buffer');
   }
 
   const hint = `${contentType} ${url}`.toLowerCase();
-  const isIco = looksLikeIco(buffer) || hint.includes('ico');
+  const isSvg = looksLikeSvg(buffer) || hint.includes('svg');
+  const isIco = !isSvg && (looksLikeIco(buffer) || hint.includes('ico'));
+
+  if (isSvg) {
+    const png = await rasterizeSvgToSize(buffer, SVG_DISPLAY_SIZE);
+    return {
+      buffer: png,
+      contentType: 'image/png',
+      width: SVG_DISPLAY_SIZE,
+      height: SVG_DISPLAY_SIZE,
+      originalSvgBuffer: buffer,
+    };
+  }
 
   if (isIco) {
     const frame = pickLargestIcoFrame(decodeIco(buffer));
@@ -222,6 +238,13 @@ async function toPng(buffer, { hintFormat = null } = {}) {
   };
 }
 
+async function resizeIcon(buffer, size) {
+  return sharp(buffer)
+    .resize(size, size, resizeOptions())
+    .png()
+    .toBuffer();
+}
+
 // Keep legacy export name for compatibility
 const toPng256 = toPng;
 
@@ -230,7 +253,9 @@ module.exports = {
   toPng,
   toDisplayPng,
   readImageDimensions,
+  resizeIcon,
   looksLikeIco,
+  looksLikeSvg,
   rasterizeSvgToSize,
   TARGET_SIZE,
   MIN_SOURCE_SIZE,

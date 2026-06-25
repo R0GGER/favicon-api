@@ -1295,6 +1295,7 @@
         <a href="?q=github.com" onclick="quickFetch('github.com'); return false;">github.com</a>
         <a class="quick-hide-mobile" href="?q=reddit.com" onclick="quickFetch('reddit.com'); return false;">reddit.com</a>
         <a href="?q=proton.me" onclick="quickFetch('proton.me'); return false;">proton.me</a>
+        <a href="?q=hosthatch.com" onclick="quickFetch('hosthatch.com'); return false;">hosthatch.com</a>
         <a class="quick-hide-mobile" href="?q=google" onclick="quickFetch('google'); return false;">google</a>
         <a href="?q=immich" onclick="quickFetch('immich'); return false;">immich</a>
         <a href="?q=bitwarden" onclick="quickFetch('bitwarden'); return false;">bitwarden</a>
@@ -1316,6 +1317,14 @@
           <span class="copied-toast">URL copied!</span>
         </div>
         <div class="www-fallback-notice" id="scraper-www-fallback" style="display:none"></div>
+        <div class="size-buttons" id="scraper-proxy-sizes" style="display:none">
+          <button class="size-btn" onclick="switchScraperProxySize(512)">512</button>
+          <button class="size-btn" onclick="switchScraperProxySize(256)">256</button>
+          <button class="size-btn active" onclick="switchScraperProxySize(128)">128</button>
+          <button class="size-btn" onclick="switchScraperProxySize(64)">64</button>
+          <button class="size-btn" onclick="switchScraperProxySize(32)">32</button>
+          <button class="size-btn" onclick="switchScraperProxySize(16)">16</button>
+        </div>
         <div class="size-buttons" id="scraper-sizes" style="display:none"></div>
         <div class="meta" id="scraper-meta"></div>
       </div>
@@ -1798,6 +1807,7 @@
       currentLobehubVariant = 'color';
       currentLobehubSize = 128;
       currentScraperSelection = 0;
+      currentScraperProxySize = 128;
 
       input.value = '';
       input.focus();
@@ -1817,6 +1827,11 @@
       if (scraperSizes) {
         scraperSizes.style.display = 'none';
         scraperSizes.innerHTML = '';
+      }
+      const scraperProxySizes = document.getElementById('scraper-proxy-sizes');
+      if (scraperProxySizes) {
+        scraperProxySizes.style.display = 'none';
+        setActiveSize('scraper-proxy-sizes', 128);
       }
 
       clearServiceCandidates();
@@ -2620,7 +2635,9 @@
 
     let scraperIcons = [];
     let scraperMaxIconSize = 0;
+    let scraperAvailableSizes = {};
     let currentScraperSelection = 0;
+    let currentScraperProxySize = 128;
     let scraperLoadToken = 0;
 
     function scraperEmbedUrl() {
@@ -2630,9 +2647,17 @@
     function setActiveScraperButton(selection) {
       document.querySelectorAll('#scraper-sizes .size-btn').forEach((btn) => {
         const isProxy = btn.dataset.scraperSource === 'proxy';
+        const isProxySize = btn.dataset.scraperProxySize !== undefined;
         const idx = Number(btn.dataset.scraperIdx);
-        const active =
-          selection === 'proxy' ? isProxy : !isProxy && idx === selection;
+        let active;
+        if (typeof selection === 'string' && selection.startsWith('proxySize-')) {
+          const selSize = selection.substring(10);
+          active = isProxySize && btn.dataset.scraperProxySize === selSize;
+        } else if (selection === 'proxy') {
+          active = isProxy;
+        } else {
+          active = !isProxy && !isProxySize && idx === selection;
+        }
         btn.classList.toggle('active', active);
       });
     }
@@ -2669,10 +2694,15 @@
     function loadScraperFavicon(domain, refresh) {
       scraperIcons = [];
       scraperMaxIconSize = 0;
+      scraperAvailableSizes = {};
       currentScraperSelection = 0;
+      currentScraperProxySize = 128;
       const sizesEl = document.getElementById('scraper-sizes');
       sizesEl.style.display = 'none';
       sizesEl.innerHTML = '';
+
+      const proxySizesEl = document.getElementById('scraper-proxy-sizes');
+      proxySizesEl.style.display = 'none';
 
       const img = document.getElementById('scraper-img');
       const spinner = document.getElementById('scraper-spinner');
@@ -2720,6 +2750,7 @@
           const body = await res.json();
           icons = body?.endpoints?.scraper?.icons || [];
           scraperMaxIconSize = Number(body?.endpoints?.scraper?.maxIconSize) || 0;
+          scraperAvailableSizes = body?.endpoints?.scraper?.sizes || {};
           wwwFallback = body?.endpoints?.scraper?.wwwFallback || null;
         }
       } catch {
@@ -2758,6 +2789,10 @@
       }
 
       if (sorted.length === 0) {
+        const proxySizesEl = document.getElementById('scraper-proxy-sizes');
+        proxySizesEl.style.display = '';
+        setActiveSize('scraper-proxy-sizes', 128);
+        loadScraperProxySize(128);
         loadScraperFallback(domain, refresh);
         return;
       }
@@ -2785,10 +2820,18 @@
       if (scraperMaxIconSize > 0) {
         entries.push({ type: 'proxy', sortSize: scraperMaxIconSize });
       }
+      const existingSizes = new Set(entries.map((e) => e.sortSize));
+      const maxSource = scraperMaxIconSize || Infinity;
+      for (const sizeStr of Object.keys(scraperAvailableSizes)) {
+        const size = Number(sizeStr);
+        if (size > 0 && size <= maxSource && !existingSizes.has(size)) {
+          entries.push({ type: 'proxySize', size, sortSize: size });
+        }
+      }
       entries.sort((a, b) => {
         if (b.sortSize !== a.sortSize) return b.sortSize - a.sortSize;
-        if (a.type === 'icon' && b.type === 'proxy') return -1;
-        if (a.type === 'proxy' && b.type === 'icon') return 1;
+        if (a.type === 'icon' && b.type !== 'icon') return -1;
+        if (a.type !== 'icon' && b.type === 'icon') return 1;
         return 0;
       });
       return entries;
@@ -2839,6 +2882,27 @@
           continue;
         }
 
+        if (entry.type === 'proxySize') {
+          const size = entry.size;
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.dataset.scraperProxySize = String(size);
+          btn.className =
+            'size-btn' +
+            (currentScraperSelection === `proxySize-${size}` ? ' active' : '');
+          btn.textContent = String(size);
+          btn.title = `${location.origin}/s/${currentDomain}?size=${size}  \u2022  ${size}\u00d7${size}`;
+          btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            currentScraperSelection = `proxySize-${size}`;
+            setActiveScraperButton(currentScraperSelection);
+            loadScraperProxySize(size);
+          });
+          frag.appendChild(btn);
+          continue;
+        }
+
         const icon = scraperIcons[entry.idx];
         const idx = entry.idx;
         const btn = document.createElement('button');
@@ -2850,7 +2914,7 @@
         const h = icon.height || w;
         btn.textContent = w === h ? String(w) : `${w}\u00d7${h}`;
         const titleParts = [
-          icon.url,
+          icon.proxy || `${location.origin}/s/${currentDomain}?size=${w || 128}`,
           w && h ? `${w}\u00d7${h}` : null,
           icon.format ? icon.format.toUpperCase() : null,
           formatBytes(icon.bytes) || null,
@@ -2934,11 +2998,9 @@
       if (!icon) return;
 
       const token = ++scraperLoadToken;
-      const embedUrl = scraperEmbedUrl();
-      const useEmbedProxy = scraperMaxIconSize <= 0 && idx === 0;
-      const proxyUrl = useEmbedProxy
-        ? `/s/${currentDomain}`
-        : `/s-asset?url=${encodeURIComponent(icon.url)}`;
+      const size = icon.width || 128;
+      const proxyUrl = `/s/${currentDomain}?size=${size}`;
+      const displayProxyUrl = icon.proxy || `${location.origin}/s/${currentDomain}?size=${size}`;
 
       const img = document.getElementById('scraper-img');
       const spinner = document.getElementById('scraper-spinner');
@@ -2953,14 +3015,12 @@
         img.src = imgEl.src;
         img.style.display = 'block';
         spinner.style.display = 'none';
-        display.dataset.proxyUrl = useEmbedProxy
-          ? embedUrl
-          : `${location.origin}${proxyUrl}`;
+        display.dataset.proxyUrl = displayProxyUrl;
         writeScraperMeta(meta, {
           w: imgEl.naturalWidth || icon.width || 0,
           h: imgEl.naturalHeight || icon.height || 0,
-          displayUrl: useEmbedProxy ? embedUrl : icon.url,
-          copyLabel: useEmbedProxy ? 'Copy proxy URL' : 'Copy source URL',
+          displayUrl: displayProxyUrl,
+          copyLabel: 'Copy proxy URL',
         });
       };
       imgEl.onerror = () => {
@@ -2969,11 +3029,58 @@
         writeScraperMeta(meta, {
           w: icon.width || 0,
           h: icon.height || 0,
-          displayUrl: useEmbedProxy ? embedUrl : icon.url,
-          copyLabel: useEmbedProxy ? 'Copy proxy URL' : 'Copy source URL',
+          displayUrl: displayProxyUrl,
+          copyLabel: 'Copy proxy URL',
         });
       };
-      imgEl.src = `${proxyUrl}${proxyUrl.includes('?') ? '&' : '?'}_=${Date.now()}`;
+      imgEl.src = `${proxyUrl}&_=${Date.now()}`;
+    }
+
+    function switchScraperProxySize(size) {
+      if (!currentDomain) return;
+      currentScraperProxySize = size;
+      setActiveSize('scraper-proxy-sizes', size);
+      loadScraperProxySize(size);
+    }
+
+    function loadScraperProxySize(size) {
+      if (!currentDomain) return;
+      const token = ++scraperLoadToken;
+      const embedUrl = `${location.origin}/s/${currentDomain}?size=${size}`;
+      const proxyUrl = `/s/${currentDomain}?size=${size}`;
+
+      const img = document.getElementById('scraper-img');
+      const spinner = document.getElementById('scraper-spinner');
+      const meta = document.getElementById('scraper-meta');
+      const display = img.closest('.favicon-display');
+      resetScraperDisplay(img, spinner, meta, display);
+
+      const imgEl = new Image();
+      imgEl.crossOrigin = 'anonymous';
+      imgEl.onload = () => {
+        if (scraperLoadToken !== token) return;
+        img.src = imgEl.src;
+        img.style.display = 'block';
+        spinner.style.display = 'none';
+        display.dataset.proxyUrl = embedUrl;
+        writeScraperMeta(meta, {
+          w: size,
+          h: size,
+          displayUrl: embedUrl,
+          copyLabel: 'Copy proxy URL',
+        });
+      };
+      imgEl.onerror = () => {
+        if (scraperLoadToken !== token) return;
+        spinner.style.display = 'none';
+        writeScraperMeta(meta, {
+          w: size,
+          h: size,
+          displayUrl: embedUrl,
+          copyLabel: 'Copy proxy URL',
+        });
+      };
+      imgEl.src = `${proxyUrl}&_=${Date.now()}`;
     }
 
     function loadFavicon(id, proxyUrl, sourceUrl) {

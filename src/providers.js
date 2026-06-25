@@ -1,9 +1,10 @@
 const cheerio = require('cheerio');
 const sharp = require('sharp');
-const { rasterizeSvgToSize, readImageDimensions, toDisplayPng } = require('./imageNormalize');
+const { rasterizeSvgToSize, readImageDimensions, toDisplayPng, looksLikeSvg } = require('./imageNormalize');
 const { LRUCache } = require('lru-cache');
 const { upstreamFetch, ipv4Dispatcher, ipv4Http1Dispatcher } = require('./upstreamFetch');
 const scraperDiskCache = require('./scraperDiskCache');
+const { serviceSlugFromDomain } = require('./serviceSlugFromDomain');
 
 const UPSTREAM_TIMEOUT = parseInt(process.env.UPSTREAM_TIMEOUT || '5000', 10);
 
@@ -243,6 +244,7 @@ async function capScraperProxyOutput(entry) {
   if (side <= SCRAPER_MAX_ICON_SIZE) return entry;
 
   try {
+    const originalBuffer = entry.originalBuffer || entry.buffer;
     const buffer = await sharp(entry.buffer)
       .resize(SCRAPER_MAX_ICON_SIZE, SCRAPER_MAX_ICON_SIZE, {
         fit: 'contain',
@@ -254,6 +256,7 @@ async function capScraperProxyOutput(entry) {
       ...entry,
       buffer,
       contentType: 'image/png',
+      originalBuffer,
     };
   } catch {
     return entry;
@@ -262,6 +265,19 @@ async function capScraperProxyOutput(entry) {
 
 function getScraperMaxIconSize() {
   return scraperMaxIconSizeEnabled() ? SCRAPER_MAX_ICON_SIZE : 0;
+}
+
+// When true, the scraper falls back to service-icon catalogs (selfhst,
+// dashboardicons) and Google faviconV2 when direct HTML scraping fails for a
+// domain.  Default = true.
+const SCRAPER_FALLBACK = (() => {
+  const raw = String(process.env.SCRAPER_FALLBACK ?? '').trim().toLowerCase();
+  if (raw === '') return true;
+  return !['false', '0', 'no', 'off'].includes(raw);
+})();
+
+function getScraperFallback() {
+  return SCRAPER_FALLBACK;
 }
 
 async function runInBatches(items, batchSize, worker) {
@@ -354,8 +370,11 @@ async function probeScraperCandidates(candidates, referer, limit = 16) {
     });
     if (!dims || dims.width <= 0) return null;
 
-    const width = Math.min(dims.width, dims.height || dims.width);
+    let width = Math.min(dims.width, dims.height || dims.width);
     const format = dims.format || '';
+    const isSvg = format === 'svg' || looksLikeSvg(result.buffer)
+      || (result.contentType || '').toLowerCase().includes('svg');
+    if (isSvg) width = Math.max(width, 512);
     return { result, width, format };
   }
 
@@ -406,6 +425,7 @@ async function probeScraperCandidates(candidates, referer, limit = 16) {
       ...best,
       buffer: displayed.buffer,
       contentType: displayed.contentType,
+      originalSvgBuffer: displayed.originalSvgBuffer || null,
       provider: 'scraper',
     });
   } catch {
@@ -1462,7 +1482,66 @@ async function fetchScraperForDomain(domain) {
   return probeScraperCandidates(rankedFallback, finalBaseUrl);
 }
 
+async function normalizeFallbackResult(entry, provider) {
+  try {
+    const displayed = await toDisplayPng(entry.buffer, {
+      contentType: entry.contentType,
+      url: entry.url,
+    });
+    return capScraperProxyOutput({
+      ...entry,
+      buffer: displayed.buffer,
+      contentType: displayed.contentType,
+      provider,
+    });
+  } catch {
+    return capScraperProxyOutput({ ...entry, provider });
+  }
+}
+
+async function fetchScraperCatalogFallback(domain) {
+  const slug = serviceSlugFromDomain(domain);
+  if (!slug) return null;
+
+  const selfhstResult = await fetchSelfhst(slug);
+  if (selfhstResult) {
+    return normalizeFallbackResult(selfhstResult, 'scraper-fallback:selfhst');
+  }
+
+  const dashResult = await fetchDashboardIcons(slug);
+  if (dashResult) {
+    return normalizeFallbackResult(dashResult, 'scraper-fallback:dashboardicons');
+  }
+
+  return null;
+}
+
+async function fetchScraperGoogleFallback(domain) {
+  const size = scraperMaxIconSizeEnabled()
+    ? Math.min(SCRAPER_MAX_ICON_SIZE, 256)
+    : 128;
+  const googleResult = await fetchGoogleV2(domain, size);
+  if (!googleResult) return null;
+
+  const dims = await readImageDimensions(googleResult.buffer, {
+    contentType: googleResult.contentType,
+    url: googleResult.url,
+  });
+  if (!dims || dims.width <= 1 || dims.height <= 1) return null;
+
+  return normalizeFallbackResult(googleResult, 'scraper-fallback:googlev2');
+}
+
 async function fetchScraper(domain) {
+  // When fallback is enabled and the domain maps to a known service slug,
+  // prefer curated catalog icons (selfhst, dashboardicons) — they are
+  // typically higher resolution and visually consistent compared to whatever
+  // the website exposes via <link rel="icon">.
+  if (SCRAPER_FALLBACK) {
+    const catalogResult = await fetchScraperCatalogFallback(domain);
+    if (catalogResult) return catalogResult;
+  }
+
   const result = await fetchScraperForDomain(domain);
   if (result) return result;
 
@@ -1472,6 +1551,11 @@ async function fetchScraper(domain) {
       wwwResult.fallbackDomain = `www.${domain}`;
       return wwwResult;
     }
+  }
+
+  // Last resort when scraping failed entirely: Google faviconV2.
+  if (SCRAPER_FALLBACK) {
+    return fetchScraperGoogleFallback(domain);
   }
 
   return null;
@@ -1570,6 +1654,7 @@ module.exports = {
   parseSizesAttr,
   expandSizedVariants,
   getScraperMaxIconSize,
+  getScraperFallback,
   PROVIDERS,
   getSelfhstVariantAvailability,
   getDashboardIconsVariantAvailability,
