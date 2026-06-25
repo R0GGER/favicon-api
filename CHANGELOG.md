@@ -9,11 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **HTML scraper www/bare domain fallback** (`src/domainAlternatives.js`)
-  - When the scraper finds no icons for a bare hostname (e.g. `nu.nl`), it automatically retries on the `www.` variant (`www.nu.nl`); conversely, `www.` lookups also try the bare hostname.
-  - Applied to `fetchScraper` (`/s/{domain}`), `fetchScraperAllIcons` (`/{domain}/json`) and v1 `fetchBySourcePriority` (`/api/v1/favicon`).
-  - **`/{domain}/json`** — `endpoints.scraper.fetchedFrom` reports which hostname supplied the icons; `endpoints.scraper.alternatives` lists suggested hostnames to try.
-  - **Web UI — HTML Scraper alternative hint** (`index.html`) — when no icon is found, shows a clickable “Try www.{domain}” suggestion; when a fallback hostname succeeds, notes that the icon came from the alternate host.
+- **HTML scraper www-fallback** — when scraping a bare domain (e.g. `nu.nl`) finds no usable icons, automatically retries on `www.{domain}` before giving up. Implemented in `fetchScraper` (`src/providers.js`) and `fetchBySourcePriority` (`src/apiScraper.js`); applies transparently to `GET /s/{domain}` and `GET /api/v1/favicon`. `/{domain}/json` exposes `endpoints.scraper.wwwFallback` (`{ domain, icons, proxy }`) when the bare domain has an empty icon list but the www variant has icons.
+- **Web UI — HTML Scraper www-fallback notice** (`index.html`) — when icons are loaded from the www variant, shows a compact amber banner (`No icons on {domain}: {www.domain}`) with a clickable link to search the www hostname directly.
 
 - **Optional scraper discovery disk cache** (`SCRAPER_DISK_CACHE`, `SCRAPER_DISK_CACHE_DIR` in `.env.example`)
   - When `SCRAPER_DISK_CACHE=true`, homepage HTML, enriched icon lists (`/{domain}/json`), besticon JSON, parsed web manifests and icon-probe metadata are persisted as JSON under `{CACHE_DIR}/scraper-discovery/` (default `/cache/scraper-discovery` in Docker). Entries survive container restarts and are shared across cluster workers.
@@ -23,10 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **In-memory scraper discovery caches** (`src/providers.js`)
   - `fetchScraperPage` now caches homepage HTML (with in-flight deduplication so parallel `/{domain}/json` + `/s/{domain}` requests share one upstream fetch), `fetchBesticonAllIcons` caches besticon JSON, `fetchManifestIcons` caches per-manifest URL results, and `probeIconMetadata` caches per-icon probe metadata. Reuses `SCRAPER_ICONS_CACHE_TTL` / `SCRAPER_ICONS_CACHE_MAX`.
 
+### Changed
+
+- **Web UI — HTML Scraper default selection when `SCRAPER_MAX_ICON_SIZE` is set** (`index.html`) — the scraper size strip now defaults to the fast-proxy button (e.g. 128) instead of the largest discovered source icon. The `/s/{domain}` proxy image starts loading immediately with the results, so users no longer have to wait when selecting the capped size. When `SCRAPER_MAX_ICON_SIZE` is `0` (disabled), behaviour is unchanged: the largest variant is selected by default.
+
 ### Fixed
 
-- **HTML scraper / `{domain}/json` felt stuck and returned fewer icons** — the www-fallback page fetch always tried both bare and `www.` hostnames even when the first page already had icon tags, and `fetchScraperAllIcons` re-ran manifest/hint probes after besticon had already returned sized icons. Page fetch now stops early once icon links are found; besticon results short-circuit the slow probe path; besticon and page HTML fetch run in parallel; besticon gets its own `BESTICON_TIMEOUT` (default 15s). The web UI aborts the JSON wait after 20s and falls back to `/s/{domain}`.
-- **HTML scraper stopped at the first homepage with HTML** — `fetchScraperPage` now tries both `https://{domain}/` and `https://www.{domain}/` (when applicable) and keeps the page with the most `<link rel="icon">`-style candidates, instead of returning the first response that merely exceeds the minimum HTML size.
 - **HTML scraper re-fetched discovery data on every request** — only the final favicon PNG (`scraper_{domain}` in `CACHE_DIR`) and the enriched icon list (`scraperIconsCache`) were cached before; HTML, manifests and probe results were fetched anew on each cache miss or after restart. Discovery layers are now cached in memory and optionally on disk.
 - **`GET /s/{domain}?refresh=1` only cleared the favicon disk cache** — now also calls `invalidateScraperDomainCaches()` to drop in-memory scraper discovery state and domain-keyed disk discovery files (`page/`, `icons/`, `besticon/` under `scraper-discovery/`).
 
@@ -62,14 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Suite subdomains** (`drive.google.com`, `teams.microsoft.com`, …) → `{parent}-{subdomain}` when the parent label is in a built-in allow-list (`google`, `microsoft`, `amazon`, `apple`, `office`, `live`, `azure`).
   - **Other subdomains** (`www.github.com`) → `null` (no service-icon lookup), avoiding ambiguous single-word slugs such as `drive` → dashboardicons `eu-drive`.
 
-- **Hidden cache purge endpoint** (`GET` / `DELETE /_internal/cache/purge`, `src/cachePurgeRoutes.js`)
-  - Purges all cached data for one or more domains: provider disk + in-memory cache (`src/cache.js` `purgeDomain`), v1 API CDN output (`${API_CACHE_DIR}/{domain}.png` + `.meta.json`) and the in-memory scraper icon list (`purgeScraperIconsCache` in `src/providers.js`).
-  - **Disabled by default** — returns `404` when `CACHE_PURGE_SECRET` is unset, so the route is invisible to scanners.
-  - Authenticated via `?secret=` query param or `X-Cache-Purge-Secret` header (timing-safe compare). Supports `?domain=example.com` or comma-separated `?domains=example.com,other.com`.
-  - New env var `CACHE_PURGE_SECRET` documented in `.env.example`.
-  - `/robots.txt` adds `Disallow: /_internal/`.
-
-- **`?refresh=1` on `/api/v1/favicon`** — skips the 7-day disk cache and regenerates the PNG (also accepts `true` / `yes`). Useful after slug-mapping or source-priority changes without calling the purge endpoint.
+- **`?refresh=1` on `/api/v1/favicon`** — skips the 7-day disk cache and regenerates the PNG (also accepts `true` / `yes`). Useful after slug-mapping or source-priority changes.
 
 - **Service slug alias resolution** (`src/serviceAliases.js`, `/services/resolve/:service`)
   - New `GET /services/resolve/:service` endpoint resolves a search term to canonical icon slugs per catalog. Response shape: `{ input, resolved, candidates, providers: { selfhst: { resolved, candidates[] }, dashboardicons: { resolved, candidates[] }, lobehub: { resolved, candidates[] } } }` where each candidate includes `slug`, `label` and a relevance `score`.
@@ -386,13 +378,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Internal
 
-- `src/cache.js` exports `purgeDomain(domain)` — removes all provider cache keys whose filename ends with `_{domain}` from memory and disk.
 - `src/domainValidation.js` — shared `extractDomainFromInput`, `extractDomainFromUrl`, `isValidHostname` and `BLOCKED_FILE_EXTENSIONS` blocklist; consumed by `src/index.js` (`extractDomain`) and `src/apiRoutes.js` (`/api/v1/favicon`, `/cdn/favicons/{domain}.png`).
-- `src/providers.js` exports `purgeScraperIconsCache(domain)` — evicts the merged scraper icon list for one domain from the in-memory LRU.
+- `src/providers.js` exports `invalidateScraperDomainCaches(domain)` — evicts the in-memory scraper page/icons/besticon LRU entries for one domain and drops the corresponding disk discovery files when `SCRAPER_DISK_CACHE` is enabled.
 - New dependencies: `better-sqlite3` (synchronous SQLite driver in WAL mode so the API key store is safe across cluster workers writing into the same `/cache/api-keys.sqlite` file) and `decode-ico` (multi-frame ICO decoder retained for legacy code paths; the v1 API no longer selects ICO sources).
 - The v1 API cache is **namespaced separately** from the existing provider-based cache (`src/cache.js`): PNGs live at `${API_CACHE_DIR}/{domain}.png` with a sibling `.meta.json` (`{ sourceType, width, height, cachedAt }`) so the two schemes can coexist in `/cache` without key collisions. The existing `CACHE_SIZE_MB` LRU rescan picks up `${API_CACHE_DIR}/...` files alongside the rest of the cache directory, so the global disk-size cap also covers the v1 API output.
-- New `fetchScraperAllIcons(domain)` exported from `src/providers.js` is the single source of truth for the merged scraper icon list (besticon + static CDN hints + sized variants, deduped + sorted by area). Backed by an in-memory `LRUCache` (`SCRAPER_ICONS_CACHE_MAX` / `SCRAPER_ICONS_CACHE_TTL`). Consumed by `/{domain}/json` (`endpoints.scraper.icons`); `fetchScraper` uses the same `deriveHintCandidates` helper to enrich its candidate pool before `probeScraperCandidates` so the chosen "best" icon matches the largest entry the UI displays. `probeScraperCandidates` is invoked with `limit=32` in the besticon path so the augmented pool is not truncated at the previous default of 16. The earlier `fetchBesticonAllIcons` export is now an internal implementation detail.
-- `discoverManifestUrls`, `loadManifestIconCandidates`, `getScraperMaxIconSize` and `capScraperProxyOutput` exported from `src/providers.js`; `fetchScraperPage` now also returns the raw HTTP `Link` header for manifest discovery.
+- New `fetchScraperAllIcons(domain)` exported from `src/providers.js` is the single source of truth for the merged scraper icon list (besticon + static CDN hints + sized variants, deduped + sorted by area). Backed by an in-memory `LRUCache` (`SCRAPER_ICONS_CACHE_MAX` / `SCRAPER_ICONS_CACHE_TTL`). Consumed by `/{domain}/json` (`endpoints.scraper.icons`); `fetchScraper` uses the same `deriveHintCandidates` helper to enrich its candidate pool before `probeScraperCandidates` so the chosen "best" icon matches the largest entry the UI displays. `probeScraperCandidates` is invoked with `limit=32` in the besticon path so the augmented pool is not truncated at the previous default of 16. `fetchBesticonAllIcons` remains a public export for external callers.
+- `discoverManifestUrls`, `loadManifestIconCandidates` and `getScraperMaxIconSize` exported from `src/providers.js`; `fetchScraperPage` now also returns the raw HTTP `Link` header for manifest discovery.
 - `fetchScraperAsset` is exported from `src/providers.js`; the asset fetcher is reused by the `/s-asset` route.
 - `resolveSelfhstSlugSync` re-exported from `src/serviceAliases.js`.
 - `readImageDimensions`, `toDisplayPng` and `looksLikeIco` exported from `src/imageNormalize.js` for ICO-aware probing and browser-safe PNG serving.
