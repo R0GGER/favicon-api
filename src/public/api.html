@@ -1523,6 +1523,14 @@ docker compose exec maflplus-favicon-api npm run keys:revoke -- --prefix fa_abcd
       if (e.key === 'Escape') closeToolsOffcanvas();
     }
 
+    (function setupToolsHash() {
+      function handleToolsHash() {
+        if (location.hash === '#tools') openToolsOffcanvas();
+      }
+      handleToolsHash();
+      window.addEventListener('hashchange', handleToolsHash);
+    })();
+
     function onSearchModalBackdropClick(e) {
       if (e.target.id === 'search-modal') closeSearchModal();
     }

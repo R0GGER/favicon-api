@@ -1,8 +1,23 @@
 # FaviconAPI
 
-Lightweight favicon proxy with a web UI and a FaviconAPIs-compatible JSON API.
+FaviconAPI is a self-hosted favicon proxy with a browser-based UI that fetches website and service icons from multiple upstream sources (10+), caches results, and exposes them through simple HTTP routes.
 
-**Favicon providers** (raced in parallel on `/{domain}`; each also has a dedicated route):
+Live demo: [faviconapi.com](https://faviconapi.com) 
+
+Browser tools: [faviconapi.com/#tools](https://faviconapi.com/#tools)
+
+- **Browser search** - add `/search?q=%s` as a custom search engine (Chrome, Edge, Firefox)
+- **Bookmarklet** - drag **FaviconAPI Copy** to your bookmarks bar to copy a site's favicon URL
+
+## What it does
+
+1. **Fetches favicons** - from third-party providers (Google, DuckDuckGo, Yandex, and others) or by scraping a site's HTML.
+2. **Races providers in parallel** - on `/{domain}` (website favicons) and `/{app-name}` (service icons when the path has no dot).
+3. **Caches responses** - in memory (LRU) and on disk to reduce upstream load and improve latency.
+4. **Normalizes icons** - for the v1 JSON API into 128×128 PNG files served from a CDN route.
+5. **Looks up service icons** - from the [selfh.st icons](https://github.com/selfhst/icons), [homarr dashboard-icons](https://github.com/homarr-labs/dashboard-icons) and [LobeHub icons](https://www.npmjs.com/package/@lobehub/icons-static-svg) catalogs by service name.
+
+### Favicon providers - all run in parallel on `/{domain}`; each has its own route:
 
 | Provider | Route | Notes |
 |---|---|---|

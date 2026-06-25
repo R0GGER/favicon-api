@@ -129,6 +129,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - The homepage reads `?q=` on load and auto-runs a lookup.
   - **Web UI — "Search from browser" modal**: step-by-step setup instructions per browser (Chrome, Edge, Firefox, Safari) with the search-engine URL shown prominently (click-to-copy and as clickable links per section). The URL is derived from `location.origin` at runtime.
   - **Web UI — "Tools" offcanvas**: the browser-search and bookmarklet actions moved out of the main page flow into a slide-in panel opened from a **Tools** button in the top navigation. Keeps the homepage uncluttered while both shortcuts remain one click away. Closes on backdrop click or Escape; opening the search modal closes the offcanvas first.
+  - **`/#tools` deep link** — visiting `/#tools` on the homepage or API docs page (`index.html`, `api.html`) opens the Tools offcanvas automatically (also on `hashchange`), enabling shareable links such as `https://faviconapi.com/#tools`.
 - **homarr-labs/dashboard-icons lookup** (`/di/{service}`)
   - New service-name lookup against the [homarr-labs/dashboard-icons](https://github.com/homarr-labs/dashboard-icons) catalog via `cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/...`.
   - Supports `?variant=color|light|dark` with the same `-light` / `-dark` suffix convention used for `/sh/`. Color variant uses the bare slug (`/di/jellyfin` → `png/jellyfin.png`); light/dark map to `png/{slug}-light.png` and `png/{slug}-dark.png`.
@@ -240,6 +241,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Favicon responses may include `X-Favicon-Url` with the upstream asset URL when known (e.g. after HTML scraper fetch).
 
 ### Changed
+
+- **`README.md` intro** — replaces the one-line tagline with a fuller project summary, a **What it does** section, links to the live demo ([faviconapi.com](https://faviconapi.com)) and browser tools ([faviconapi.com/#tools](https://faviconapi.com/#tools)), and short descriptions of the custom search engine and **FaviconAPI Copy** bookmarklet; favicon-provider table heading simplified.
 
 - **`/{domain}/json` and `/{app-name}/json` — reliable catalog entries**
   - Service-icon blocks are built only when a provider actually resolves a slug (`resolveServiceMatches` on domain JSON; no more guessing the raw search term as `selfhst` / `lobehub` slug).
