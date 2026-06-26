@@ -60,7 +60,7 @@ So I built it. FaviconAPI brings 10+ favicon providers and several service-icon 
 
 ## Quick start (Docker)
 
-Copy `[.env.example](.env.example)` to `.env`, adjust the values, then start the stack:
+Copy [.env.example](.env.example) to `.env`, adjust the values, then start the stack:
 
 ```bash
 docker compose up -d
