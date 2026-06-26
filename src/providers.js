@@ -1,6 +1,6 @@
 const cheerio = require('cheerio');
 const sharp = require('sharp');
-const { rasterizeSvgToSize, readImageDimensions, toDisplayPng, looksLikeSvg, isBlankFavicon } = require('./imageNormalize');
+const { rasterizeSvgToSize, readImageDimensions, toDisplayPng, looksLikeSvg, isBlankFavicon, MIN_SOURCE_SIZE } = require('./imageNormalize');
 const { LRUCache } = require('lru-cache');
 const { upstreamFetch, ipv4Dispatcher, ipv4Http1Dispatcher } = require('./upstreamFetch');
 const scraperDiskCache = require('./scraperDiskCache');
@@ -356,7 +356,7 @@ async function probeScraperCandidates(candidates, referer, limit = 16) {
     const score = width * 100 + formatScore(format);
     if (score > bestScore) {
       bestScore = score;
-      best = { ...result, provider: 'scraper' };
+      best = { ...result, provider: 'scraper', sourceWidth: width };
     }
   }
 
@@ -1544,15 +1544,19 @@ async function fetchScraperGoogleFallback(domain) {
 }
 
 async function fetchScraper(domain) {
-  // When SCRAPER_FALLBACK is enabled and the domain maps to a known service
-  // slug, prefer curated catalog icons (selfhst, dashboardicons) over direct
-  // HTML scraping — they are typically higher resolution and visually consistent.
-  if (SCRAPER_FALLBACK) {
+  // Direct HTML scrape first. Curated catalogs (selfhst, dashboardicons) are
+  // only preferred when the site's own best icon is too small to be useful
+  // (e.g. facebook.com only exposes a 60×60 favicon). When the site exposes a
+  // large icon of its own (e.g. github.com's 512px app-icon), keep it instead
+  // of overriding it with a catalog logo.
+  const result = await fetchScraperForDomain(domain);
+  const scrapedBigEnough = !!result && (result.sourceWidth || 0) >= MIN_SOURCE_SIZE;
+
+  if (SCRAPER_FALLBACK && !scrapedBigEnough) {
     const catalogResult = await fetchScraperCatalogFallback(domain);
     if (catalogResult) return catalogResult;
   }
 
-  const result = await fetchScraperForDomain(domain);
   if (result) return result;
 
   if (!domain.startsWith('www.')) {
