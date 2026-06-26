@@ -8,7 +8,6 @@ const {
   fetchVemetric,
   fetchFaviconDev,
   fetchFaviconkit,
-  fetchLogoDev,
   fetchFaviconRun,
   fetchSelfhst,
   fetchDashboardIcons,
@@ -98,9 +97,11 @@ function buildFallbackFetchers(domain) {
     yandex:     () => fetchWithCache('yandex', domain, null, () => fetchYandex(domain)),
   };
 
-  if (process.env.LOGODEV_TOKEN) {
-    all.logodev = () => fetchWithCache('logodev', domain, null, () => fetchLogoDev(domain));
-  }
+  // logo.dev is intentionally excluded from the best-pick race. It has a
+  // monthly token quota and always returns a generated monogram placeholder
+  // for domains it has no real logo for, which would otherwise win the race
+  // over the slower scraper that finds the site's actual favicon. It stays
+  // available on its dedicated /logodev/{size}/{domain} route.
 
   // Slug is derived from the domain label, so catalog lookups are resolved
   // strictly (exact slug / curated alias) — never a fuzzy match that would pick
@@ -121,7 +122,6 @@ function buildFallbackFetchers(domain) {
 
   const defaultOrder = [
     'scraper', 'googlev2', 'duckduckgo',
-    ...(process.env.LOGODEV_TOKEN ? ['logodev'] : []),
     'google', 'faviconkit', 'faviconrun', 'faviconso', 'vemetric', 'favicondev', 'yandex',
   ];
 
