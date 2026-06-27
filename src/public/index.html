@@ -2821,8 +2821,8 @@
       return variant === 'color' ? base : `${base}?variant=${variant}`;
     }
 
-    function svglSourceUrl(slug, variant) {
-      return `${location.origin}${svglProxyPath(slug, variant, 128)}`;
+    function svglSourceUrl(slug, variant, size = currentSvglSize) {
+      return `${location.origin}${svglProxyPath(slug, variant, size)}`;
     }
 
     function loadSvgl(slug, variant, opts) {
@@ -2830,7 +2830,7 @@
       const activeSlug = (opts && opts.activeSlug) || slug;
       const size = (opts && opts.size) || currentSvglSize;
       const proxyUrl = svglProxyPath(slug, variant, size);
-      const sourceUrl = svglSourceUrl(activeSlug, variant);
+      const sourceUrl = svglSourceUrl(activeSlug, variant, size);
 
       const img = document.getElementById('svgl-img');
       const spinner = document.getElementById('svgl-spinner');

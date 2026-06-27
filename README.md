@@ -43,7 +43,7 @@ In practice that turned out to be surprisingly painful. To get decent coverage I
 
 What I was missing was a single tool that treats favicon lookup as a **first-class problem**: one that knows about many independent sources, queries them together, and intelligently picks the best result instead of betting everything on one upstream. No tool offered that kind of complete, source-aware solution where different providers are connected and complement each other.
 
-So I built it. FaviconAPI brings 10+ favicon providers and several service-icon catalogs together behind one consistent API. It **races providers in parallel**, **normalizes and caches** the results, and returns the highest-quality icon it can find - with the others available as explicit fallbacks. It grew from a helper for my own dashboards into a self-hosted favicon proxy that anyone can run.
+So I built it. FaviconAPI brings 10+ favicon providers and four service-icon catalogs together behind one consistent API. It **races providers in parallel**, **normalizes and caches** the results, and returns the highest-quality icon it can find - with the others available as explicit fallbacks. It grew from a helper for my own dashboards into a self-hosted favicon proxy that anyone can run.
 
 ---
 
@@ -53,7 +53,7 @@ So I built it. FaviconAPI brings 10+ favicon providers and several service-icon 
 2. **Races providers in parallel** on `/{domain}` (website favicons) and `/{app-name}` (service icons when the path has no dot).
 3. **Caches responses** in memory (LRU) and on disk to reduce upstream load and improve latency.
 4. **Normalizes icons** for the v1 JSON API into 128×128 PNG files served from a CDN route.
-5. **Looks up service icons** from the [selfh.st icons](https://github.com/selfhst/icons), [homarr dashboard-icons](https://github.com/homarr-labs/dashboard-icons) and [LobeHub icons](https://www.npmjs.com/package/@lobehub/icons-static-svg) catalogs by service name.
+5. **Looks up service icons** from the [selfh.st icons](https://github.com/selfhst/icons), [homarr dashboard-icons](https://github.com/homarr-labs/dashboard-icons), [LobeHub icons](https://www.npmjs.com/package/@lobehub/icons-static-svg), and [SVGL](https://github.com/pheralb/svgl) catalogs by service name.
 
 > Interactive API docs and a live playground are available at `/api` on a running instance.
 
@@ -152,6 +152,7 @@ https://your-host/github.com
 https://your-host/scraper/github.com
 https://your-host/google/64/github.com
 https://your-host/selfhst/128/jellyfin
+https://your-host/svgl/128/reddit
 ```
 
 ### Favicon providers
@@ -204,6 +205,7 @@ Look up an icon by app/service name (e.g. `jellyfin`). All support `?variant=col
 | `/api/v1/favicon?url=`       | FaviconAPI-compatible JSON API — see [API v1](#api-v1) |
 | `/cdn/favicons/{domain}.png` | Public CDN route for cached API v1 PNGs                |
 | `/providers`                 | JSON: which optional providers are enabled             |
+| `/services/resolve/{service}` | JSON: per-catalog slug matches for a service name     |
 | `/search?q=`                 | Custom search engine redirect to the homepage          |
 
 
@@ -326,7 +328,7 @@ All settings are documented in `[.env.example](.env.example)`. Copy it to `.env`
 
 | Variable                   | Default                         | Description                                                                                                                                                                                                                                                                          |
 | -------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `DEFAULT_PROVIDER`         | `scraper`                       | Preferred provider for `/{domain}` (gets the head-start). Values: `scraper`, `google`, `googlev2`, `duckduckgo`, `yandex`, `faviconso`, `vemetric`, `favicondev`, `faviconkit`, `faviconrun`, `logodev`, `brandfetch`, `selfhst`, `dashboardicons`, `lobehub`. `logodev` requires `LOGODEV_TOKEN`; `brandfetch` requires `BRANDFETCH_CLIENT_ID`. |
+| `DEFAULT_PROVIDER`         | `scraper`                       | Preferred provider for `/{domain}` (gets the head-start). Values: `scraper`, `google`, `googlev2`, `duckduckgo`, `yandex`, `faviconso`, `vemetric`, `favicondev`, `faviconkit`, `faviconrun`, `logodev`, `brandfetch`, `selfhst`, `dashboardicons`, `lobehub`, `svgl`. `logodev` requires `LOGODEV_TOKEN`; `brandfetch` requires `BRANDFETCH_CLIENT_ID`. |
 | `PICK_HEAD_START_MS`       | `150`                           | Head-start (ms) for `DEFAULT_PROVIDER` on `/{domain}` before other providers start.                                                                                                                                                                                                  |
 | `LOGODEV_TOKEN`            | *(unset)*                       | [logo.dev](https://www.logo.dev/) publishable key. Enables `/logodev/{size}/{domain}`; without it the route returns 503.                                                                                                                                                             |
 | `BRANDFETCH_CLIENT_ID`     | *(unset)*                       | [Brandfetch](https://docs.brandfetch.com/logo-api/overview) Logo API client ID. Enables `/brandfetch/{size}/{domain}`; without it the route returns 503.                                                                                                                             |
