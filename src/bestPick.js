@@ -12,6 +12,7 @@ const {
   fetchSelfhst,
   fetchDashboardIcons,
   fetchLobehub,
+  fetchSvgl,
   fetchScraper,
 } = require('./providers');
 const cache = require('./cache');
@@ -21,7 +22,7 @@ const { serviceSlugFromDomain } = require('./serviceSlugFromDomain');
 const VALID_DEFAULT_PROVIDERS = new Set([
   'scraper', 'google', 'googlev2', 'duckduckgo', 'yandex',
   'faviconso', 'vemetric', 'favicondev', 'faviconkit', 'faviconrun',
-  'logodev', 'selfhst', 'dashboardicons', 'lobehub',
+  'logodev', 'brandfetch', 'selfhst', 'dashboardicons', 'lobehub', 'svgl',
 ]);
 
 const DEFAULT_PROVIDER = (() => {
@@ -36,6 +37,10 @@ const DEFAULT_PROVIDER = (() => {
   }
   if (val === 'logodev' && !process.env.LOGODEV_TOKEN) {
     console.warn('DEFAULT_PROVIDER="logodev" requires LOGODEV_TOKEN to be set. Falling back to default order.');
+    return null;
+  }
+  if (val === 'brandfetch' && !process.env.BRANDFETCH_CLIENT_ID) {
+    console.warn('DEFAULT_PROVIDER="brandfetch" requires BRANDFETCH_CLIENT_ID to be set. Falling back to default order.');
     return null;
   }
   return val;
@@ -118,6 +123,10 @@ function buildFallbackFetchers(domain) {
       fetchWithCache('lobehub', slug, '128_c_v2', () =>
         fetchLobehub(slug, 'color', 128, { strict: true })
       );
+    all.svgl = () =>
+      fetchWithCache('svgl', slug, '128_c_v2', () =>
+        fetchSvgl(slug, 'color', 128, { strict: true })
+      );
   }
 
   const defaultOrder = [
@@ -140,9 +149,11 @@ function buildServiceFetchers(service) {
       fetchWithCache('dashboardicons', service, null, () => fetchDashboardIcons(service)),
     lobehub: () =>
       fetchWithCache('lobehub', service, '128_c_v2', () => fetchLobehub(service, 'color', 128)),
+    svgl: () =>
+      fetchWithCache('svgl', service, '128_c_v2', () => fetchSvgl(service, 'color', 128)),
   };
 
-  const defaultOrder = ['selfhst', 'dashboardicons', 'lobehub'];
+  const defaultOrder = ['selfhst', 'dashboardicons', 'lobehub', 'svgl'];
   if (DEFAULT_PROVIDER && all[DEFAULT_PROVIDER]) {
     const rest = defaultOrder.filter((k) => k !== DEFAULT_PROVIDER);
     return [DEFAULT_PROVIDER, ...rest].map((k) => all[k]);

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <title>FaviconAPI &ndash; Get high-resolution favicons for any domain</title>
-  <meta name="description" content="Free favicon API and web UI that fetches the highest-resolution favicon for any domain from 10+ providers (HTML scraper, Google, DuckDuckGo, Yandex, Favicon.so, Vemetric, Favicon Downloader, FaviconKit, favicon.run, logo.dev) plus selfh.st and homarr-labs/dashboard-icons service icon lookups by name.">
+  <meta name="description" content="Free favicon API and web UI that fetches the highest-resolution favicon for any domain from 10+ providers (HTML scraper, Google, DuckDuckGo, Yandex, Favicon.so, Vemetric, Favicon Downloader, FaviconKit, favicon.run, logo.dev) plus selfh.st, homarr-labs/dashboard-icons, LobeHub, and SVGL service icon lookups by name.">
   <meta name="keywords" content="favicon, favicon api, favicon fetcher, favicon proxy, favicon downloader, get favicon, high resolution favicon, selfhst icons, homarr dashboard icons, MAFL, MAFL+, dashboard icons, homepage icons, self-hosted">
   <meta name="author" content="R0GGER">
   <meta name="robots" content="index, follow">
@@ -30,7 +30,7 @@
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="FaviconAPI">
   <meta property="og:title" content="FaviconAPI &ndash; Get high-resolution favicons for any domain">
-  <meta property="og:description" content="Free favicon API and web UI that fetches the highest-resolution favicon for any domain from 10+ providers, plus selfh.st and homarr-labs/dashboard-icons service icon lookups by name.">
+  <meta property="og:description" content="Free favicon API and web UI that fetches the highest-resolution favicon for any domain from 10+ providers, plus selfh.st, homarr-labs/dashboard-icons, LobeHub, and SVGL service icon lookups by name.">
   <meta property="og:url" content="__BASE_URL__/">
   <meta property="og:image" content="__BASE_URL__/logo.png">
   <meta property="og:image:type" content="image/png">
@@ -42,7 +42,7 @@
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="FaviconAPI &ndash; Get high-resolution favicons for any domain">
-  <meta name="twitter:description" content="Free favicon API and web UI that fetches the highest-resolution favicon for any domain from 10+ providers, plus selfh.st and homarr-labs/dashboard-icons service icon lookups by name.">
+  <meta name="twitter:description" content="Free favicon API and web UI that fetches the highest-resolution favicon for any domain from 10+ providers, plus selfh.st, homarr-labs/dashboard-icons, LobeHub, and SVGL service icon lookups by name.">
   <meta name="twitter:image" content="__BASE_URL__/logo.png">
   <meta name="twitter:image:alt" content="FaviconAPI logo">
   
@@ -59,7 +59,7 @@
     "@type": "WebApplication",
     "name": "FaviconAPI",
     "alternateName": "Favicon API",
-    "description": "Free favicon API and web UI that fetches the highest-resolution favicon for any domain from 10+ providers (HTML scraper, Google, DuckDuckGo, Yandex, Favicon.so, Vemetric, Favicon Downloader, FaviconKit, favicon.run, logo.dev), plus selfh.st and homarr-labs/dashboard-icons service icon lookups by name.",
+    "description": "Free favicon API and web UI that fetches the highest-resolution favicon for any domain from 10+ providers (HTML scraper, Google, DuckDuckGo, Yandex, Favicon.so, Vemetric, Favicon Downloader, FaviconKit, favicon.run, logo.dev), plus selfh.st, homarr-labs/dashboard-icons, LobeHub, and SVGL service icon lookups by name.",
     "url": "__BASE_URL__/",
     "image": "__BASE_URL__/logo.png",
     "applicationCategory": "DeveloperApplication",
@@ -136,7 +136,16 @@
       text-align: center;
       color: #6b6560;
       font-size: 0.95rem;
-      margin-bottom: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .providers-line {
+      text-align: center;
+      color: #8a847e;
+      font-size: 0.82rem;
+      line-height: 1.45;
+      max-width: 42rem;
+      margin: 0 auto 1.5rem;
     }
 
     .tip {
@@ -1268,6 +1277,7 @@
     </a>
     <h1>FaviconAPI</h1>
     <p class="subtitle">Get the highest resolution favicon for any domain - or look up a service icon by name.</p>
+    <p class="providers-line">Favicons are resolved from an HTML scraper and ten upstream providers: Google, DuckDuckGo, Yandex, Favicon.so, Vemetric, Faviconextractor, FaviconKit, favicon.run, logo.dev, and Brandfetch. App icons are resolved from selfh.st, dashboardicons.com, LobeHub, and SVGL.</p>
 
     <div class="tip">
       <strong><span class="icon">&#9881;</span> Tip</strong>
@@ -1450,6 +1460,17 @@
         <div class="meta" id="logodev-meta"></div>
       </div>
 
+      <!-- Brandfetch -->
+      <div class="card" id="brandfetch-card" data-card-type="domain" style="display:none">
+        <h3>Brandfetch.io</h3>
+        <div class="favicon-display" id="brandfetch-display" onclick="copyImage(this)">
+          <div class="spinner" id="brandfetch-spinner" style="display:none"></div>
+          <img id="brandfetch-img" style="display:none" alt="Brandfetch favicon">
+          <span class="copied-toast">URL copied!</span>
+        </div>
+        <div class="meta" id="brandfetch-meta"></div>
+      </div>
+
       <div class="results-section-divider" id="service-icons-divider" aria-hidden="true">App Icons</div>
 
       <!-- selfhst (service-based) -->
@@ -1517,6 +1538,32 @@
         <div class="service-candidates" id="lobehub-candidates" hidden>
           <p class="service-candidates-title">Alternative matches</p>
           <div class="service-candidates-grid" id="lobehub-candidates-grid"></div>
+        </div>
+      </div>
+
+      <!-- SVGL icons (service-based) -->
+      <div class="card" id="svgl-card" data-card-type="service">
+        <h3>svgl.app</h3>
+        <div class="favicon-display" id="svgl-display" onclick="copyImage(this)">
+          <div class="spinner" id="svgl-spinner" style="display:none"></div>
+          <img id="svgl-img" style="display:none" alt="SVGL icon">
+          <span class="unavailable" id="svgl-unavailable" style="display:none">variant not available</span>
+          <span class="copied-toast">URL copied!</span>
+        </div>
+        <div class="size-buttons" id="svgl-variants">
+          <button class="size-btn active" data-variant="color" onclick="switchSvglVariant('color')">Color</button>
+          <button class="size-btn" data-variant="light" style="display:none" onclick="switchSvglVariant('light')">Light</button>
+          <button class="size-btn" data-variant="dark" style="display:none" onclick="switchSvglVariant('dark')">Dark</button>
+        </div>
+        <div class="size-buttons" id="svgl-sizes">
+          <button class="size-btn" onclick="switchSvglSize(256)">256</button>
+          <button class="size-btn active" onclick="switchSvglSize(128)">128</button>
+          <button class="size-btn" onclick="switchSvglSize(64)">64</button>
+        </div>
+        <div class="meta" id="svgl-meta"></div>
+        <div class="service-candidates" id="svgl-candidates" hidden>
+          <p class="service-candidates-title">Alternative matches</p>
+          <div class="service-candidates-grid" id="svgl-candidates-grid"></div>
         </div>
       </div>
     </div>
@@ -1755,12 +1802,16 @@
     let currentLobehubVariant = 'color';
     let lobehubProbeSeq = 0;
     let currentLobehubSize = 128;
-    const SERVICE_ICON_PROVIDERS = ['selfhst', 'dashboardicons', 'lobehub'];
+    let currentSvglSlug = '';
+    let currentSvglVariant = 'color';
+    let svglProbeSeq = 0;
+    let currentSvglSize = 128;
+    const SERVICE_ICON_PROVIDERS = ['selfhst', 'dashboardicons', 'lobehub', 'svgl'];
     const DOMAIN_FAVICON_PROVIDERS = [
-      'scraper', 'google', 'ddg', 'yandex', 'faviconso', 'vemetric', 'favicondev', 'faviconkit', 'faviconrun', 'logodev',
+      'scraper', 'google', 'ddg', 'yandex', 'faviconso', 'vemetric', 'favicondev', 'faviconkit', 'faviconrun', 'logodev', 'brandfetch',
     ];
-    const SERVICE_PROXY_PREFIX = { selfhst: '/selfhst', dashboardicons: '/dashboardicons', lobehub: '/lobehub' };
-    let providersConfig = { logoDev: false, logoDevToken: null, includeAppIcons: true };
+    const SERVICE_PROXY_PREFIX = { selfhst: '/selfhst', dashboardicons: '/dashboardicons', lobehub: '/lobehub', svgl: '/svgl' };
+    let providersConfig = { logoDev: false, logoDevToken: null, brandfetch: false, includeAppIcons: true };
 
     function escapeHtml(s) {
       return String(s)
@@ -1806,6 +1857,8 @@
       if (!card) return;
       if (id === 'logodev' && !providersConfig.logoDev) {
         card.style.display = 'none';
+      } else if (id === 'brandfetch' && !providersConfig.brandfetch) {
+        card.style.display = 'none';
       } else if (SERVICE_ICON_PROVIDERS.includes(id)) {
         card.style.display = 'none';
       } else {
@@ -1827,6 +1880,9 @@
       currentLobehubSlug = '';
       currentLobehubVariant = 'color';
       currentLobehubSize = 128;
+      currentSvglSlug = '';
+      currentSvglVariant = 'color';
+      currentSvglSize = 128;
       currentScraperSelection = 0;
       currentScraperProxySize = 128;
 
@@ -1871,9 +1927,13 @@
       .then((r) => r.json())
       .then((cfg) => {
         providersConfig = cfg || providersConfig;
-        const card = document.getElementById('logodev-card');
+        const logoDevCard = document.getElementById('logodev-card');
         if (providersConfig.logoDev) {
-          card.style.display = '';
+          logoDevCard.style.display = '';
+        }
+        const brandfetchCard = document.getElementById('brandfetch-card');
+        if (providersConfig.brandfetch) {
+          brandfetchCard.style.display = '';
         }
       })
       .catch(() => {})
@@ -1941,6 +2001,7 @@
           selfhst: { resolved: slug, candidates: [{ slug, label: slug }] },
           dashboardicons: { resolved: slug, candidates: [{ slug, label: slug }] },
           lobehub: { resolved: slug, candidates: [{ slug, label: slug }] },
+          svgl: { resolved: slug, candidates: [{ slug, label: slug }] },
         },
       };
       try {
@@ -2049,11 +2110,22 @@
         return;
       }
 
-      currentLobehubSlug = slug;
-      resetLobehubVariantButtons();
-      switchLobehubVariant('color');
-      probeAndShowLobehubVariants(slug);
-      document.querySelectorAll('#lobehub-candidates-grid .candidate-tile').forEach((tile) => {
+      if (provider === 'lobehub') {
+        currentLobehubSlug = slug;
+        resetLobehubVariantButtons();
+        switchLobehubVariant('color');
+        probeAndShowLobehubVariants(slug);
+        document.querySelectorAll('#lobehub-candidates-grid .candidate-tile').forEach((tile) => {
+          tile.classList.toggle('active', tile.dataset.slug === slug);
+        });
+        return;
+      }
+
+      currentSvglSlug = slug;
+      resetSvglVariantButtons();
+      switchSvglVariant('color');
+      probeAndShowSvglVariants(slug);
+      document.querySelectorAll('#svgl-candidates-grid .candidate-tile').forEach((tile) => {
         tile.classList.toggle('active', tile.dataset.slug === slug);
       });
     }
@@ -2084,6 +2156,7 @@
       const selfhstData = resolveData.providers?.selfhst || { resolved: null, candidates: [] };
       const dashboardData = resolveData.providers?.dashboardicons || { resolved: null, candidates: [] };
       const lobehubData = resolveData.providers?.lobehub || { resolved: null, candidates: [] };
+      const svglData = resolveData.providers?.svgl || { resolved: null, candidates: [] };
       const searchQuery = resolveData.input || resolveData.resolved;
 
       if (providerHasMatches(selfhstData)) {
@@ -2123,12 +2196,27 @@
       } else {
         hideServiceProviderCard('lobehub');
       }
+
+      if (providerHasMatches(svglData)) {
+        currentSvglSlug = svglData.resolved || searchQuery;
+        currentSvglVariant = 'color';
+        currentSvglSize = 128;
+        resetSvglVariantButtons();
+        setActiveVariant('svgl-variants', 'color');
+        setActiveSize('svgl-sizes', 128);
+        loadSvgl(searchQuery, 'color', { hideOnError, activeSlug: currentSvglSlug });
+        probeAndShowSvglVariants(currentSvglSlug);
+        renderServiceCandidates('svgl', svglData.candidates, currentSvglSlug);
+      } else {
+        hideServiceProviderCard('svgl');
+      }
       updateServiceIconsDivider();
     }
 
     function showCardsByType(type) {
       document.querySelectorAll('[data-card-type="domain"]').forEach((card) => {
         if (card.id === 'logodev-card' && !providersConfig.logoDev) return;
+        if (card.id === 'brandfetch-card' && !providersConfig.brandfetch) return;
         card.style.display = type === 'domain' ? '' : 'none';
       });
       updateServiceIconsDivider();
@@ -2231,6 +2319,10 @@
         // Show the proxy URL under the image instead of the upstream URL,
         // so the token never leaks and users get the URL they should actually use.
         loadFavicon('logodev', `/logodev/64/${domain}`, `${location.origin}/logodev/64/${domain}`);
+      }
+
+      if (providersConfig.brandfetch) {
+        loadFavicon('brandfetch', `/brandfetch/64/${domain}`, `${location.origin}/brandfetch/64/${domain}`);
       }
 
       if (selfhstToggle.checked) {
@@ -2719,6 +2811,118 @@
           const ok = await probeLobehubVariant(slug, variant);
           if (seq !== lobehubProbeSeq || currentLobehubSlug !== slug) return;
           const btn = document.querySelector(`#lobehub-variants .size-btn[data-variant="${variant}"]`);
+          if (btn) btn.style.display = ok ? '' : 'none';
+        })
+      );
+    }
+
+    function svglProxyPath(slug, variant, size = currentSvglSize) {
+      const base = `/svgl/${size}/${slug}`;
+      return variant === 'color' ? base : `${base}?variant=${variant}`;
+    }
+
+    function svglSourceUrl(slug, variant) {
+      return `${location.origin}${svglProxyPath(slug, variant, 128)}`;
+    }
+
+    function loadSvgl(slug, variant, opts) {
+      const hideOnError = !!(opts && opts.hideOnError);
+      const activeSlug = (opts && opts.activeSlug) || slug;
+      const size = (opts && opts.size) || currentSvglSize;
+      const proxyUrl = svglProxyPath(slug, variant, size);
+      const sourceUrl = svglSourceUrl(activeSlug, variant);
+
+      const img = document.getElementById('svgl-img');
+      const spinner = document.getElementById('svgl-spinner');
+      const meta = document.getElementById('svgl-meta');
+      const card = document.getElementById('svgl-card');
+      const display = document.getElementById('svgl-display');
+      const unavailable = document.getElementById('svgl-unavailable');
+
+      display.classList.remove('variant-light', 'variant-dark');
+      if (variant === 'light') display.classList.add('variant-light');
+      else if (variant === 'dark') display.classList.add('variant-dark');
+
+      card.style.display = '';
+      img.style.display = 'none';
+      unavailable.style.display = 'none';
+      spinner.style.display = 'block';
+      meta.textContent = '';
+
+      const imgEl = new Image();
+      imgEl.crossOrigin = 'anonymous';
+      imgEl.onload = () => {
+        if (currentSvglSlug !== activeSlug || currentSvglVariant !== variant || currentSvglSize !== size) return;
+        img.src = imgEl.src;
+        img.style.display = 'block';
+        spinner.style.display = 'none';
+        display.dataset.proxyUrl = `${location.origin}${proxyUrl}`;
+
+        const escapedUrl = escapeHtml(sourceUrl);
+        meta.innerHTML =
+          `<span class="dimensions">${imgEl.naturalWidth}x${imgEl.naturalHeight}</span>` +
+          `<a class="src-url" href="${escapedUrl}" target="_blank" rel="noopener" title="${escapedUrl}">${escapedUrl}</a>` +
+          `<button class="copy-btn" type="button" title="Copy source URL" aria-label="Copy source URL">${COPY_ICON_SVG}</button>`;
+        const copyBtn = meta.querySelector('.copy-btn');
+        copyBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          copySource(copyBtn, sourceUrl);
+        });
+        updateServiceIconsDivider();
+      };
+      imgEl.onerror = () => {
+        if (currentSvglSlug !== activeSlug || currentSvglVariant !== variant || currentSvglSize !== size) return;
+        spinner.style.display = 'none';
+        if (hideOnError || variant === 'color') {
+          card.style.display = 'none';
+        } else {
+          unavailable.textContent = 'variant not available';
+          unavailable.style.display = 'block';
+          delete display.dataset.proxyUrl;
+        }
+        updateServiceIconsDivider();
+      };
+      imgEl.src = proxyUrl;
+    }
+
+    function switchSvglVariant(variant) {
+      if (!currentSvglSlug) return;
+      currentSvglVariant = variant;
+      setActiveVariant('svgl-variants', variant);
+      loadSvgl(currentSvglSlug, variant, { hideOnError: variant === 'color', size: currentSvglSize });
+    }
+
+    function switchSvglSize(size) {
+      if (!currentSvglSlug) return;
+      currentSvglSize = size;
+      setActiveSize('svgl-sizes', size);
+      loadSvgl(currentSvglSlug, currentSvglVariant, { hideOnError: false, size });
+    }
+
+    function resetSvglVariantButtons() {
+      document.querySelectorAll('#svgl-variants .size-btn').forEach((btn) => {
+        btn.style.display = btn.dataset.variant === 'color' ? '' : 'none';
+      });
+    }
+
+    function probeSvglVariant(slug, variant) {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve(true);
+        img.onerror = () => resolve(false);
+        img.src = `${svglProxyPath(slug, variant, 128)}?probe=${Date.now()}`;
+      });
+    }
+
+    async function probeAndShowSvglVariants(slug) {
+      const seq = ++svglProbeSeq;
+      const variants = ['light', 'dark'];
+      await Promise.all(
+        variants.map(async (variant) => {
+          const ok = await probeSvglVariant(slug, variant);
+          if (seq !== svglProbeSeq || currentSvglSlug !== slug) return;
+          const btn = document.querySelector(`#svgl-variants .size-btn[data-variant="${variant}"]`);
           if (btn) btn.style.display = ok ? '' : 'none';
         })
       );

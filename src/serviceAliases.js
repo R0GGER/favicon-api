@@ -5,6 +5,8 @@ const DASHBOARD_METADATA_URL =
 const SELFHST_INDEX_URL =
   'https://raw.githubusercontent.com/selfhst/icons/main/index.json';
 const LOBEHUB_TOC_URL = 'https://unpkg.com/@lobehub/icons@latest/es/toc.json';
+const SVGL_INDEX_URL =
+  'https://cdn.jsdelivr.net/gh/pheralb/svgl@main/src/data/svgs.ts';
 const METADATA_TTL_MS = 24 * 60 * 60 * 1000;
 const FUZZY_SIMILARITY_THRESHOLD = 0.8;
 const FUZZY_MIN_QUERY_LEN = 4;
@@ -23,6 +25,7 @@ const STATIC_PROVIDER_ALIASES = {
 let dashboardCache = { loadedAt: 0, aliasToSlug: null, slugs: null, entries: null };
 let selfhstCache = { loadedAt: 0, entries: null };
 let lobehubCache = { loadedAt: 0, aliasToSlug: null, slugs: null, entries: null };
+let svglCache = { loadedAt: 0, aliasToSlug: null, slugs: null, entries: null };
 
 function normalizeServiceAliasKey(raw) {
   if (!raw || typeof raw !== 'string') return '';
@@ -211,6 +214,90 @@ async function ensureLobehubIndex() {
   ensureLobehubSyncIndex();
   if (!lobehubCache.loadedAt) lobehubCache.loadedAt = now;
   return lobehubCache;
+}
+
+function parseSvglCatalog(ts) {
+  const marker = 'export const svgs: iSVG[] = ';
+  const idx = ts.indexOf(marker);
+  if (idx < 0) return [];
+  let code = ts.slice(idx + marker.length);
+  const end = code.lastIndexOf('];');
+  if (end >= 0) code = code.slice(0, end + 1);
+  return new Function(`return (${code})`)();
+}
+
+function buildSvglAliasIndex(svgs) {
+  const aliasToSlug = new Map();
+  const slugs = new Set();
+  const entries = new Map();
+
+  for (const item of svgs || []) {
+    const slug = normalizeServiceAliasKey(item.title);
+    if (!slug) continue;
+
+    slugs.add(slug);
+    aliasToSlug.set(slug, slug);
+    entries.set(slug, {
+      slug,
+      label: item.title || slug,
+      route: item.route,
+      url: item.url || '',
+    });
+
+    const titleKey = normalizeServiceAliasKey(item.title);
+    if (titleKey) aliasToSlug.set(titleKey, slug);
+
+    const routePath =
+      typeof item.route === 'string'
+        ? item.route
+        : item.route?.light || item.route?.dark || '';
+    const baseMatch = routePath.match(/\/([^/]+)\.svg$/i);
+    if (baseMatch) {
+      const routeKey = normalizeServiceAliasKey(
+        baseMatch[1].replace(/-(?:icon|light|dark|logo|wordmark).*$/i, '')
+      );
+      if (routeKey && !aliasToSlug.has(routeKey)) aliasToSlug.set(routeKey, slug);
+    }
+
+    const parts = slug.split('-');
+    if (parts.length > 1) {
+      const last = parts[parts.length - 1];
+      if (last.length >= 3 && !aliasToSlug.has(last)) aliasToSlug.set(last, slug);
+    }
+  }
+
+  return { aliasToSlug, slugs, entries, slugKeys: [...slugs] };
+}
+
+function ensureSvglSyncIndex() {
+  if (!svglCache.aliasToSlug) {
+    svglCache = { loadedAt: 0, ...buildSvglAliasIndex([]) };
+  }
+  return svglCache;
+}
+
+async function ensureSvglIndex() {
+  const now = Date.now();
+  if (svglCache.aliasToSlug && now - svglCache.loadedAt < METADATA_TTL_MS) {
+    return svglCache;
+  }
+
+  try {
+    const res = await upstreamFetch(SVGL_INDEX_URL, {
+      headers: { 'User-Agent': 'FaviconProxy/1.0' },
+    });
+    if (res.ok) {
+      const svgs = parseSvglCatalog(await res.text());
+      svglCache = { loadedAt: now, ...buildSvglAliasIndex(svgs) };
+      return svglCache;
+    }
+  } catch {
+    /* use stale or empty fallback */
+  }
+
+  ensureSvglSyncIndex();
+  if (!svglCache.loadedAt) svglCache.loadedAt = now;
+  return svglCache;
 }
 
 function collectDashboardCandidates(key, aliasToSlug, slugs) {
@@ -508,6 +595,71 @@ function searchLobehubMatches(slug, index, limit = 8) {
   return matches.sort((a, b) => b.score - a.score).slice(0, limit);
 }
 
+function scoreSvglSlug(slugKey, entry, queryKey) {
+  if (!slugKey || !queryKey) return 0;
+
+  let score = 0;
+  if (slugKey === queryKey) return 100;
+  if (slugKey.endsWith(`-${queryKey}`)) score = Math.max(score, 85);
+  if (slugKey.startsWith(`${queryKey}-`)) score = Math.max(score, 85);
+
+  const parts = slugKey.split('-');
+  for (let i = 0; i < parts.length; i++) {
+    const partScore = fuzzyPartScore(parts[i], queryKey);
+    if (partScore <= 0) continue;
+    score = Math.max(score, partScore + (i === parts.length - 1 ? 8 : 0));
+  }
+
+  const labelKey = normalizeServiceAliasKey(entry?.label);
+  if (labelKey === queryKey) score = Math.max(score, 90);
+  if (labelKey.includes(queryKey)) score = Math.max(score, 35);
+
+  return score;
+}
+
+function searchSvglFuzzyMatches(queryKey, index, limit = 8) {
+  const { entries } = index;
+  if (!queryKey || !entries) return [];
+
+  return [...entries.values()]
+    .map((entry) => ({
+      slug: entry.slug,
+      label: entry.label || entry.slug,
+      score: scoreSvglSlug(normalizeServiceAliasKey(entry.slug), entry, queryKey),
+    }))
+    .filter((match) => match.score > 0)
+    .sort((a, b) => b.score - a.score || a.slug.localeCompare(b.slug))
+    .slice(0, limit);
+}
+
+function searchSvglMatches(slug, index, limit = 8) {
+  const queryKey = normalizeServiceAliasKey(slug);
+  if (!queryKey) return [];
+
+  const seen = new Set();
+  const matches = [];
+
+  function addMatch(candidate, score, label) {
+    if (!candidate || seen.has(candidate)) return;
+    seen.add(candidate);
+    const meta = index.entries?.get(candidate);
+    matches.push({
+      slug: candidate,
+      label: label || meta?.label || candidate,
+      score,
+    });
+  }
+
+  const resolved = index.aliasToSlug?.get(queryKey);
+  if (resolved) addMatch(resolved, 1000);
+
+  for (const match of searchSvglFuzzyMatches(queryKey, index, limit)) {
+    addMatch(match.slug, match.score, match.label);
+  }
+
+  return matches.sort((a, b) => b.score - a.score).slice(0, limit);
+}
+
 function sortMatchesByScore(matches) {
   return [...matches].sort((a, b) => b.score - a.score || a.slug.localeCompare(b.slug));
 }
@@ -592,13 +744,30 @@ async function getLobehubSlugCandidates(slug, { strict = false } = {}) {
   return searchLobehubMatches(slug, index).map((match) => match.slug);
 }
 
+async function getSvglSlugCandidates(slug, { strict = false } = {}) {
+  const index = await ensureSvglIndex();
+
+  if (strict) {
+    const queryKey = normalizeServiceAliasKey(slug);
+    if (!queryKey) return [];
+    if (index.aliasToSlug?.has(queryKey)) {
+      const resolved = index.aliasToSlug.get(queryKey);
+      if (index.slugs?.has(resolved)) return [resolved];
+    }
+    return index.slugs?.has(queryKey) ? [queryKey] : [];
+  }
+
+  return searchSvglMatches(slug, index).map((match) => match.slug);
+}
+
 async function getServiceSlugCandidates(slug) {
-  const [selfhst, dashboardicons, lobehub] = await Promise.all([
+  const [selfhst, dashboardicons, lobehub, svgl] = await Promise.all([
     getSelfhstSlugCandidates(slug),
     getDashboardIconsSlugCandidates(slug),
     getLobehubSlugCandidates(slug),
+    getSvglSlugCandidates(slug),
   ]);
-  return [...new Set([...selfhst, ...dashboardicons, ...lobehub])];
+  return [...new Set([...selfhst, ...dashboardicons, ...lobehub, ...svgl])];
 }
 
 async function resolveServiceSlug(slug) {
@@ -658,10 +827,11 @@ function getServiceSlugCandidatesSync(slug) {
 
 async function resolveServiceMatches(slug, { strict = false } = {}) {
   const input = normalizeServiceAliasKey(slug);
-  const [selfhstIndex, dashboardIndex, lobehubIndex] = await Promise.all([
+  const [selfhstIndex, dashboardIndex, lobehubIndex, svglIndex] = await Promise.all([
     ensureSelfhstIndex(),
     ensureDashboardIndex(),
     ensureLobehubIndex(),
+    ensureSvglIndex(),
   ]);
 
   // Strict mode (domain-derived slugs): only exact/alias matches, no fuzzy.
@@ -675,18 +845,27 @@ async function resolveServiceMatches(slug, { strict = false } = {}) {
   const lobehubCandidates = strict
     ? (await getLobehubSlugCandidates(input, { strict: true })).map((s) => ({ slug: s, label: s, score: 100 }))
     : searchLobehubMatches(input, lobehubIndex);
+  const svglCandidates = strict
+    ? (await getSvglSlugCandidates(input, { strict: true })).map((s) => ({ slug: s, label: s, score: 100 }))
+    : searchSvglMatches(input, svglIndex);
   const allCandidates = [
     ...new Set([
       input,
       ...selfhstCandidates.map((match) => match.slug),
       ...dashboardCandidates.map((match) => match.slug),
       ...lobehubCandidates.map((match) => match.slug),
+      ...svglCandidates.map((match) => match.slug),
     ]),
   ];
 
   return {
     input,
-    resolved: pickAnyResolvedSlug(dashboardCandidates, selfhstCandidates, lobehubCandidates),
+    resolved: pickAnyResolvedSlug(
+      dashboardCandidates,
+      selfhstCandidates,
+      lobehubCandidates,
+      svglCandidates
+    ),
     candidates: allCandidates,
     providers: {
       selfhst: {
@@ -701,6 +880,10 @@ async function resolveServiceMatches(slug, { strict = false } = {}) {
         resolved: pickResolvedSlug(lobehubCandidates),
         candidates: lobehubCandidates,
       },
+      svgl: {
+        resolved: pickResolvedSlug(svglCandidates),
+        candidates: svglCandidates,
+      },
     },
   };
 }
@@ -710,6 +893,29 @@ function getLobehubVariantAvailability(slug) {
   const index = lobehubCache.entries?.size ? lobehubCache : ensureLobehubSyncIndex();
   if (!index.entries?.has(slug)) return null;
   return { color: true, light: true, dark: true };
+}
+
+function getSvglEntrySync(slug) {
+  const queryKey = normalizeServiceAliasKey(slug);
+  if (!queryKey) return null;
+  const index = svglCache.entries?.size ? svglCache : ensureSvglSyncIndex();
+  const resolved = index.aliasToSlug?.get(queryKey) || (index.slugs?.has(queryKey) ? queryKey : null);
+  if (!resolved) return null;
+  return index.entries?.get(resolved) || null;
+}
+
+function getSvglVariantAvailability(slug) {
+  const entry = getSvglEntrySync(slug);
+  if (!entry) return null;
+  const route = entry.route;
+  if (typeof route === 'string') {
+    return { color: true, light: false, dark: false };
+  }
+  return {
+    color: !!(route?.light || route?.dark),
+    light: !!route?.light,
+    dark: !!route?.dark,
+  };
 }
 
 function resolveSelfhstSlugStrict(slug) {
@@ -733,6 +939,17 @@ function resolveLobehubSlugStrict(slug) {
   return index.slugs?.has(queryKey) ? queryKey : '';
 }
 
+function resolveSvglSlugStrict(slug) {
+  const queryKey = normalizeServiceAliasKey(slug);
+  if (!queryKey) return '';
+  const index = svglCache.entries?.size ? svglCache : ensureSvglSyncIndex();
+  if (index.aliasToSlug?.has(queryKey)) {
+    const resolved = index.aliasToSlug.get(queryKey);
+    if (index.slugs?.has(resolved)) return resolved;
+  }
+  return index.slugs?.has(queryKey) ? queryKey : '';
+}
+
 // Resolves a domain-derived slug to a provider catalog slug for the HTML
 // scraper's service-icon buckets. Domain labels are arbitrary brand names, so
 // resolution is strict (exact slug / curated alias only) — never a fuzzy match,
@@ -744,6 +961,7 @@ function resolveServiceSlugForProviderSync(slug, provider) {
   if (staticHit) return staticHit;
   if (provider === 'dashboardicons') return resolveServiceSlugSync(slug);
   if (provider === 'lobehub') return resolveLobehubSlugStrict(slug);
+  if (provider === 'svgl') return resolveSvglSlugStrict(slug);
   if (provider === 'selfhst') return resolveSelfhstSlugStrict(slug);
   return '';
 }
@@ -760,8 +978,12 @@ module.exports = {
   getSelfhstSlugCandidates,
   getDashboardIconsSlugCandidates,
   getLobehubSlugCandidates,
+  getSvglSlugCandidates,
   ensureDashboardIndex,
   ensureSelfhstIndex,
   ensureLobehubIndex,
+  ensureSvglIndex,
   getLobehubVariantAvailability,
+  getSvglVariantAvailability,
+  getSvglEntrySync,
 };

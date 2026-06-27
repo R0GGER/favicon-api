@@ -24,6 +24,7 @@ const SOURCE_TYPES = [
   'selfhst',
   'dashboardicons',
   'lobehub',
+  'svgl',
   'external',
 ];
 
@@ -145,6 +146,7 @@ async function gatherCandidates(domain) {
     selfhst: [],
     dashboardicons: [],
     lobehub: [],
+    svgl: [],
     external: [],
   };
 
@@ -228,6 +230,7 @@ async function gatherCandidates(domain) {
     const selfhstSlug = resolveServiceSlugForProviderSync(serviceSlug, 'selfhst');
     const dashboardSlug = resolveServiceSlugForProviderSync(serviceSlug, 'dashboardicons');
     const lobehubSlug = resolveServiceSlugForProviderSync(serviceSlug, 'lobehub');
+    const svglSlug = resolveServiceSlugForProviderSync(serviceSlug, 'svgl');
     buckets.selfhst.push({
       href: PROVIDERS.selfhst(selfhstSlug),
       sizes: '256x256',
@@ -245,6 +248,12 @@ async function gatherCandidates(domain) {
       sizes: '256x256',
       type: 'image/svg+xml',
       rel: 'lobehub',
+    });
+    buckets.svgl.push({
+      href: PROVIDERS.svgl(svglSlug),
+      sizes: '256x256',
+      type: 'image/svg+xml',
+      rel: 'svgl',
     });
   }
 

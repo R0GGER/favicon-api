@@ -5,6 +5,17 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0] — 2026-06-28
+
+### Added
+
+- **Brandfetch provider** — new domain favicon provider backed by the [Brandfetch Logo API](https://docs.brandfetch.com/logo-api/overview). Disabled until `BRANDFETCH_CLIENT_ID` (a free client ID from the [Brandfetch developer portal](https://developers.brandfetch.com/register)) is set; without it the route returns 503. Source URL: `https://cdn.brandfetch.io/{domain}?c={client-id}`, resized server-side to 16, 32, 64, 128, 256. Canonical route: `/brandfetch/{size}/{domain}`, short alias: `/bf/{size}/{domain}` (plus the sizeless legacy `/bf/{domain}`). Advertised through `/providers` (`brandfetch: true|false`), listed in `/{domain}/json` discovery, added to `DEFAULT_PROVIDER` options, and shown in the Web UI (the card and its proxy URL only appear when configured, so the client ID never leaks). Like logo.dev, Brandfetch is intentionally excluded from the best-pick race (`GET /:domain`) because its lettermark fallbacks would always return a generated placeholder and beat the slower scraper that finds the site's real favicon.
+- **SVGL provider** — new service-icon catalog backed by the [SVGL](https://github.com/pheralb/svgl) SVG logo library ([svgl.app](https://svgl.app)). The catalog (~660 entries) is loaded from jsDelivr (`pheralb/svgl` `src/data/svgs.ts`, 24 h TTL) and SVG assets are fetched from `cdn.jsdelivr.net/gh/pheralb/svgl/static/...` (the public `api.svgl.app` endpoints were not used as the primary source). Canonical route: `/svgl/{size}/{service}[?variant=color|light|dark]`, short alias: `/sv/{size}/{service}` (plus the legacy `/sv/{service}[?size=][&variant=]`). Native sizes 64, 128, 256; SVG sources are rasterized server-side to a crisp size×size PNG. Included in `/services/resolve/:service` (`providers.svgl`), `/{service}/json` and `/{domain}/json` (`endpoints.svgl`), the best-pick race for service names and domain-derived slugs, the v1 API scraper source priority (tier after `lobehub`), `DEFAULT_PROVIDER=svgl`, and the Web UI (new **svgl.app** card alongside selfh.st, dashboardicons.com, and LobeHub, with color/light/dark variant buttons, size buttons, and an "Alternative matches" panel). Theme-aware SVGL entries (separate light/dark SVG routes) expose light/dark variants when available.
+
+### Fixed
+
+- **SVGL "Alternative matches" listed unrelated icons for `github`** (e.g. dotenv, Esbuild, Home Assistant, Jasmine) — many SVGL catalog entries link to `github.com/...` repos or `*.github.io` pages; the matcher treated the extracted hostname key `github` as a strong match (score 95) for any query `github`, so unrelated projects hosted on GitHub appeared as alternatives. Hostname-based scoring was removed; alternatives now match on slug/title (exact, prefix/suffix such as `github-copilot`, and existing fuzzy slug rules) only.
+
 ## [2.4.0] — 2026-06-26
 
 ### Added

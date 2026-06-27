@@ -19,6 +19,7 @@ FaviconAPI is a self-hosted favicon proxy with a browser-based UI that fetches w
 
 - [Why FaviconAPI?](#why-faviconapi)
 - [How it works](#how-it-works)
+- [Fallback chain & source order](docs/fallback-chain.md)
 - [Quick start (Docker)](#quick-start-docker)
 - [Routes](#routes)
   - [Favicon providers](#favicon-providers)
@@ -55,6 +56,8 @@ So I built it. FaviconAPI brings 10+ favicon providers and several service-icon 
 5. **Looks up service icons** from the [selfh.st icons](https://github.com/selfhst/icons), [homarr dashboard-icons](https://github.com/homarr-labs/dashboard-icons) and [LobeHub icons](https://www.npmjs.com/package/@lobehub/icons-static-svg) catalogs by service name.
 
 > Interactive API docs and a live playground are available at `/api` on a running instance.
+
+For the exact provider order, head-start logic, and the scraper's strictly-ordered fallback steps, see [docs/fallback-chain.md](docs/fallback-chain.md).
 
 ---
 
@@ -169,11 +172,12 @@ All providers run in parallel on `/{domain}`; each also has its own route.
 | [Faviconkit](https://faviconkit.net/)                                               | `/faviconkit/{size}/{domain}` | `/k/`  | Sizes 16, 32, 64, 128, 256                                                                                                                                                                  |
 | [Favicon.run](https://favicon.run/)                                                 | `/faviconrun/{size}/{domain}` | `/fr/` | Sizes 16, 32, 64, 128, 256                                                                                                                                                                  |
 | [logo.dev](https://www.logo.dev/)                                                   | `/logodev/{size}/{domain}`    | `/l/`  | Requires `LOGODEV_TOKEN`; resized server-side                                                                                                                                               |
+| [Brandfetch](https://brandfetch.com/developers/logo-api)                            | `/brandfetch/{size}/{domain}` | `/bf/` | Requires `BRANDFETCH_CLIENT_ID`; resized server-side                                                                                                                                        |
 
 
-### Service-icon catalogs
+### App/Service-icon catalogs
 
-Look up an icon by service name (e.g. `jellyfin`). All support `?variant=color\|light\|dark` where applicable.
+Look up an icon by app/service name (e.g. `jellyfin`). All support `?variant=color\|light\|dark` where applicable.
 
 
 | Catalog                                                           | Route                              | Alias  |
@@ -181,12 +185,13 @@ Look up an icon by service name (e.g. `jellyfin`). All support `?variant=color\|
 | [selfhst icons](https://github.com/selfhst/icons)                 | `/selfhst/{size}/{service}`        | `/sh/` |
 | [Dashboard Icons](https://github.com/homarr-labs/dashboard-icons) | `/dashboardicons/{size}/{service}` | `/di/` |
 | [LobeHub icons](https://github.com/lobehub/lobe-icons)            | `/lobehub/{size}/{service}`        | `/lb/` |
+| [SVGL](https://github.com/pheralb/svgl)                           | `/svgl/{size}/{service}`           | `/sv/` |
 
 
 ### Sizes
 
 - **Resized server-side** providers and catalogs accept sizes **16, 32, 64, 128, 256**.
-- **LobeHub** uses sizes **64, 128, 256**.
+- **LobeHub** and **SVGL** use sizes **64, 128, 256**.
 - Legacy short aliases also accept the original sizeless form (e.g. `/sh/{service}`, `/d/{domain}`).
 
 ### Utility routes
@@ -321,9 +326,10 @@ All settings are documented in `[.env.example](.env.example)`. Copy it to `.env`
 
 | Variable                   | Default                         | Description                                                                                                                                                                                                                                                                          |
 | -------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `DEFAULT_PROVIDER`         | `scraper`                       | Preferred provider for `/{domain}` (gets the head-start). Values: `scraper`, `google`, `googlev2`, `duckduckgo`, `yandex`, `faviconso`, `vemetric`, `favicondev`, `faviconkit`, `faviconrun`, `logodev`, `selfhst`, `dashboardicons`, `lobehub`. `logodev` requires `LOGODEV_TOKEN`. |
+| `DEFAULT_PROVIDER`         | `scraper`                       | Preferred provider for `/{domain}` (gets the head-start). Values: `scraper`, `google`, `googlev2`, `duckduckgo`, `yandex`, `faviconso`, `vemetric`, `favicondev`, `faviconkit`, `faviconrun`, `logodev`, `brandfetch`, `selfhst`, `dashboardicons`, `lobehub`. `logodev` requires `LOGODEV_TOKEN`; `brandfetch` requires `BRANDFETCH_CLIENT_ID`. |
 | `PICK_HEAD_START_MS`       | `150`                           | Head-start (ms) for `DEFAULT_PROVIDER` on `/{domain}` before other providers start.                                                                                                                                                                                                  |
 | `LOGODEV_TOKEN`            | *(unset)*                       | [logo.dev](https://www.logo.dev/) publishable key. Enables `/logodev/{size}/{domain}`; without it the route returns 503.                                                                                                                                                             |
+| `BRANDFETCH_CLIENT_ID`     | *(unset)*                       | [Brandfetch](https://docs.brandfetch.com/logo-api/overview) Logo API client ID. Enables `/brandfetch/{size}/{domain}`; without it the route returns 503.                                                                                                                             |
 | `BESTICON_URL`             | *(unset)*                       | Base URL of a sidecar [besticon](https://github.com/mat/besticon) instance (e.g. `http://besticon:8080`). `/scraper/{domain}` asks besticon first, then falls back to the built-in scraper.                                                                                          |
 | `SCRAPER_PROBE_BATCH_SIZE` | `4`                             | HTML scraper icon candidates probed in parallel per batch (`/scraper/{domain}` and `/{domain}`).                                                                                                                                                                                     |
 | `SCRAPER_ICONS_CACHE_TTL`  | `3600`                          | TTL (seconds) for the in-memory cache of enriched scraper icon lists (`/{domain}/json`). Also used for scraper discovery disk cache entries when `SCRAPER_DISK_CACHE` is enabled.                                                                                                    |

@@ -18,9 +18,11 @@ const {
   fetchFaviconkit,
   fetchLogoDev,
   fetchFaviconRun,
+  fetchBrandfetch,
   fetchSelfhst,
   fetchDashboardIcons,
   fetchLobehub,
+  fetchSvgl,
   fetchScraper,
   fetchScraperAsset,
   fetchScraperAllIcons,
@@ -38,7 +40,9 @@ const {
   ensureDashboardIndex,
   ensureSelfhstIndex,
   ensureLobehubIndex,
+  ensureSvglIndex,
   getLobehubVariantAvailability,
+  getSvglVariantAvailability,
 } = require('./serviceAliases');
 const { serviceSlugFromDomain, listDomainIconTags } = require('./serviceSlugFromDomain');
 const {
@@ -215,10 +219,13 @@ const VALID_VEMETRIC_FORMATS = new Set(['png', 'jpg', 'webp']);
 const VALID_SELFHST_VARIANTS = new Set(['color', 'light', 'dark']);
 const VALID_DASHBOARDICONS_VARIANTS = new Set(['color', 'light', 'dark']);
 const VALID_LOBEHUB_VARIANTS = new Set(['color', 'light', 'dark']);
+const VALID_SVGL_VARIANTS = new Set(['color', 'light', 'dark']);
 const VALID_FAVICONRUN_SIZES = new Set([16, 32, 64, 128, 256]);
 const FAVICONRUN_SIZES_ARRAY = [16, 32, 64, 128, 256];
 const VALID_LOBEHUB_SIZES = new Set([64, 128, 256]);
+const VALID_SVGL_SIZES = new Set([64, 128, 256]);
 const DEFAULT_LOBEHUB_SIZE = 128;
+const DEFAULT_SVGL_SIZE = 128;
 
 // Uniform proxy-URL scheme: baseurl/{provider}/{size}/{domain}. Providers
 // without a native upstream size accept the path size segment and are resized
@@ -231,6 +238,7 @@ const GOOGLEV2_SIZES_ARRAY = [16, 32, 64, 128, 180, 256];
 const FAVICONKIT_SIZES_ARRAY = [16, 32, 64, 128, 256];
 const VEMETRIC_SIZES_ARRAY = [16, 32, 64, 128, 256];
 const LOBEHUB_SIZES_ARRAY = [64, 128, 256];
+const SVGL_SIZES_ARRAY = [64, 128, 256];
 // Default size for each provider's top-level `proxy` URL. Native providers
 // default to 128; the resize-based domain providers default to 64 to avoid
 // upscaling their typically small source icons.
@@ -321,8 +329,16 @@ function emptyCatalogProvider() {
   return { service: null, query: null, proxy: null, source: null, sizes: null, variants: null };
 }
 
-async function buildServiceCatalogEndpoints(host, query, selfhstServiceSlug, dashboardServiceSlug, lobehubServiceSlug) {
-  const [selfhstAvailability, dashboardAvailability, lobehubAvailability] = await Promise.all([
+async function buildServiceCatalogEndpoints(
+  host,
+  query,
+  selfhstServiceSlug,
+  dashboardServiceSlug,
+  lobehubServiceSlug,
+  svglServiceSlug
+) {
+  const [selfhstAvailability, dashboardAvailability, lobehubAvailability, svglAvailability] =
+    await Promise.all([
     selfhstServiceSlug
       ? getSelfhstVariantAvailability(selfhstServiceSlug)
       : Promise.resolve(null),
@@ -331,6 +347,9 @@ async function buildServiceCatalogEndpoints(host, query, selfhstServiceSlug, das
       : Promise.resolve(null),
     lobehubServiceSlug
       ? Promise.resolve(getLobehubVariantAvailability(lobehubServiceSlug))
+      : Promise.resolve(null),
+    svglServiceSlug
+      ? Promise.resolve(getSvglVariantAvailability(svglServiceSlug))
       : Promise.resolve(null),
   ]);
 
@@ -367,7 +386,18 @@ async function buildServiceCatalogEndpoints(host, query, selfhstServiceSlug, das
   );
   const lobehub = lobehubBlock ? { ...lobehubBlock, query } : emptyCatalogProvider();
 
-  return { selfhst, dashboardicons, lobehub };
+  const svglBlock = buildCatalogBlock(
+    host,
+    'svgl',
+    svglServiceSlug,
+    PROVIDERS.svgl,
+    svglAvailability,
+    SVGL_SIZES_ARRAY,
+    DEFAULT_SVGL_SIZE
+  );
+  const svgl = svglBlock ? { ...svglBlock, query } : emptyCatalogProvider();
+
+  return { selfhst, dashboardicons, lobehub, svgl };
 }
 
 // Downscale an icon to `size` only when its source is larger. Upscaling a small
@@ -667,6 +697,49 @@ app.get('/l/:domain', async (req, res) => {
     sendFavicon(res, entry);
   } catch (err) {
     console.error('logo.dev proxy error:', err.message);
+    res.status(500).json({ error: 'Internal error.' });
+  }
+});
+
+// Brandfetch proxy: /brandfetch/:size/:domain (alias: /bf/:size/:domain) - requires BRANDFETCH_CLIENT_ID
+async function brandfetchSizedHandler(req, res) {
+  if (!process.env.BRANDFETCH_CLIENT_ID) {
+    return res.status(503).json({ error: 'Brandfetch not configured. Set BRANDFETCH_CLIENT_ID.' });
+  }
+
+  const size = parseInt(req.params.size, 10);
+  if (!RESIZE_SIZES.has(size)) {
+    return res.status(400).json({ error: 'Invalid size. Use 16, 32, 64, 128, or 256.' });
+  }
+
+  const domain = extractDomain(req.params.domain);
+  if (!domain) return res.status(400).json({ error: 'Invalid domain.' });
+
+  try {
+    const entry = await fetchWithCache('brandfetch', domain, null, () => fetchBrandfetch(domain));
+    if (!entry) return res.status(502).json({ error: 'Upstream fetch failed.' });
+    sendFavicon(res, await downscaleEntryToSize(entry, size));
+  } catch (err) {
+    console.error('Brandfetch proxy error:', err.message);
+    res.status(500).json({ error: 'Internal error.' });
+  }
+}
+app.get(['/brandfetch/:size/:domain', '/bf/:size/:domain'], brandfetchSizedHandler);
+
+app.get('/bf/:domain', async (req, res) => {
+  if (!process.env.BRANDFETCH_CLIENT_ID) {
+    return res.status(503).json({ error: 'Brandfetch not configured. Set BRANDFETCH_CLIENT_ID.' });
+  }
+
+  const domain = extractDomain(req.params.domain);
+  if (!domain) return res.status(400).json({ error: 'Invalid domain.' });
+
+  try {
+    const entry = await fetchWithCache('brandfetch', domain, null, () => fetchBrandfetch(domain));
+    if (!entry) return res.status(502).json({ error: 'Upstream fetch failed.' });
+    sendFavicon(res, entry);
+  } catch (err) {
+    console.error('Brandfetch proxy error:', err.message);
     res.status(500).json({ error: 'Internal error.' });
   }
 });
@@ -1033,12 +1106,77 @@ app.get('/lb/:service', async (req, res) => {
   }
 });
 
+// SVGL icons (service-name based). Native sizes 64, 128, 256.
+//   Canonical: /svgl/:size/:service[?variant=color|light|dark]
+//   Aliases:   /sv/:size/:service, /sv/:service[?size=][&variant=] (legacy)
+async function svglSizedHandler(req, res) {
+  const service = extractService(req.params.service);
+  if (!service) return res.status(400).json({ error: 'Invalid service name.' });
+
+  const size = parseInt(req.params.size, 10);
+  if (!VALID_SVGL_SIZES.has(size)) {
+    return res.status(400).json({ error: 'Invalid size. Use 64, 128, or 256.' });
+  }
+
+  const variant = (req.query.variant || 'color').toString().toLowerCase();
+  if (!VALID_SVGL_VARIANTS.has(variant)) {
+    return res.status(400).json({ error: 'Invalid variant. Use color, light, or dark.' });
+  }
+
+  try {
+    const cacheKey = `${size}_${variant === 'color' ? 'c' : variant}_v1`;
+    const entry = await fetchWithCache(
+      'svgl',
+      service,
+      cacheKey,
+      () => fetchSvgl(service, variant, size)
+    );
+    if (!entry) return res.status(404).json({ error: 'Service icon not found.' });
+    sendFavicon(res, entry);
+  } catch (err) {
+    console.error('SVGL proxy error:', err.message);
+    res.status(500).json({ error: 'Internal error.' });
+  }
+}
+app.get(['/svgl/:size/:service', '/sv/:size/:service'], svglSizedHandler);
+
+app.get('/sv/:service', async (req, res) => {
+  const service = extractService(req.params.service);
+  if (!service) return res.status(400).json({ error: 'Invalid service name.' });
+
+  const variant = (req.query.variant || 'color').toString().toLowerCase();
+  if (!VALID_SVGL_VARIANTS.has(variant)) {
+    return res.status(400).json({ error: 'Invalid variant. Use color, light, or dark.' });
+  }
+
+  const size = parseInt(req.query.size || String(DEFAULT_SVGL_SIZE), 10);
+  if (!VALID_SVGL_SIZES.has(size)) {
+    return res.status(400).json({ error: 'Invalid size. Use 64, 128, or 256.' });
+  }
+
+  try {
+    const cacheKey = `${size}_${variant === 'color' ? 'c' : variant}_v1`;
+    const entry = await fetchWithCache(
+      'svgl',
+      service,
+      cacheKey,
+      () => fetchSvgl(service, variant, size)
+    );
+    if (!entry) return res.status(404).json({ error: 'Service icon not found.' });
+    sendFavicon(res, entry);
+  } catch (err) {
+    console.error('SVGL proxy error:', err.message);
+    res.status(500).json({ error: 'Internal error.' });
+  }
+});
+
 // Provider availability/config: /providers
 app.get('/providers', (req, res) => {
   res.set('Cache-Control', 'no-store');
   res.json({
     logoDev: !!process.env.LOGODEV_TOKEN,
     logoDevToken: process.env.LOGODEV_TOKEN || null,
+    brandfetch: !!process.env.BRANDFETCH_CLIENT_ID,
     defaultProvider: (process.env.DEFAULT_PROVIDER || '').trim().toLowerCase() || null,
     includeAppIcons: UI_INCLUDE_APP_ICONS,
     upstreamIpv4: true,
@@ -1063,12 +1201,13 @@ app.get('/:domain/json', async (req, res) => {
 
     try {
       const matches = await resolveServiceMatches(service);
-      const { selfhst, dashboardicons, lobehub } = await buildServiceCatalogEndpoints(
+      const { selfhst, dashboardicons, lobehub, svgl } = await buildServiceCatalogEndpoints(
         host,
         service,
         matches.providers.selfhst.resolved,
         matches.providers.dashboardicons.resolved,
-        matches.providers.lobehub.resolved
+        matches.providers.lobehub.resolved,
+        matches.providers.svgl.resolved
       );
 
       res.set('Cache-Control', JSON_CACHE_CONTROL);
@@ -1086,6 +1225,7 @@ app.get('/:domain/json', async (req, res) => {
           selfhst,
           dashboardicons,
           lobehub,
+          svgl,
         },
       });
     } catch (err) {
@@ -1102,6 +1242,7 @@ app.get('/:domain/json', async (req, res) => {
     ensureDashboardIndex(),
     ensureSelfhstIndex(),
     ensureLobehubIndex(),
+    ensureSvglIndex(),
   ]);
 
   // www-fallback: when scraper finds no icons for a bare domain, try www.domain.
@@ -1171,11 +1312,25 @@ app.get('/:domain/json', async (req, res) => {
     ),
   };
 
+  const brandfetchConfigured = !!process.env.BRANDFETCH_CLIENT_ID;
+  const brandfetch = {
+    proxy: `${host}/brandfetch/${DEFAULT_RESIZE_SIZE}/${encoded}`,
+    // Omit upstream URL: it embeds BRANDFETCH_CLIENT_ID in the query string.
+    source: null,
+    configured: brandfetchConfigured,
+    sizes: sizedEntries(
+      RESIZE_SIZES_ARRAY,
+      (size) => `/brandfetch/${size}/${encoded}`,
+      () => null
+    ),
+  };
+
   const serviceSlug = serviceSlugFromDomain(domain);
 
   let selfhstServiceSlug = null;
   let dashboardServiceSlug = null;
   let lobehubServiceSlug = null;
+  let svglServiceSlug = null;
   if (serviceSlug) {
     // serviceSlug comes from the domain label (not a user-typed query), so
     // resolve it strictly to avoid advertising fuzzily-matched, unrelated
@@ -1184,14 +1339,16 @@ app.get('/:domain/json', async (req, res) => {
     selfhstServiceSlug = matches.providers.selfhst.resolved;
     dashboardServiceSlug = matches.providers.dashboardicons.resolved;
     lobehubServiceSlug = matches.providers.lobehub.resolved;
+    svglServiceSlug = matches.providers.svgl.resolved;
   }
 
-  const { selfhst, dashboardicons, lobehub } = await buildServiceCatalogEndpoints(
+  const { selfhst, dashboardicons, lobehub, svgl } = await buildServiceCatalogEndpoints(
     host,
     serviceSlug,
     selfhstServiceSlug,
     dashboardServiceSlug,
-    lobehubServiceSlug
+    lobehubServiceSlug,
+    svglServiceSlug
   );
 
   res.set('Cache-Control', JSON_CACHE_CONTROL);
@@ -1252,6 +1409,7 @@ app.get('/:domain/json', async (req, res) => {
         (size) => PROVIDERS.faviconRun(domain, size)
       ),
       logodev,
+      brandfetch,
       scraper: {
         proxy: `${host}/scraper/${encoded}`,
         source: scraperCached?.url || null,
@@ -1283,6 +1441,7 @@ app.get('/:domain/json', async (req, res) => {
       selfhst,
       dashboardicons,
       lobehub,
+      svgl,
     },
   });
 });

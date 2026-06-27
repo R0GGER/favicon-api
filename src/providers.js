@@ -465,6 +465,8 @@ const PROVIDERS = {
     `https://ico.faviconkit.net/favicon/${encodeURIComponent(domain)}?sz=${size}`,
   logoDev: (domain, token) =>
     `https://img.logo.dev/${encodeURIComponent(domain)}?token=${encodeURIComponent(token || '')}`,
+  brandfetch: (domain, clientId) =>
+    `https://cdn.brandfetch.io/${encodeURIComponent(domain)}?c=${encodeURIComponent(clientId || '')}`,
   selfhst: (service, variant = 'color') => {
     const suffix = pngVariantSuffix(variant);
     return `https://cdn.jsdelivr.net/gh/selfhst/icons/png/${encodeURIComponent(service)}${suffix}.png`;
@@ -478,6 +480,12 @@ const PROVIDERS = {
     const base = `https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg@latest/icons/${slug}`;
     if (variant === 'light' || variant === 'dark') return `${base}.svg`;
     return `${base}.svg`;
+  },
+  svgl: (service, variant = 'color') => {
+    const entry = getSvglEntrySync(service);
+    if (!entry) return '';
+    const route = svglRouteForVariant(entry, variant);
+    return route ? svglAssetUrl(route) : '';
   },
   faviconRun: (domain, size = 128) =>
     `https://favicon.run/favicon?domain=${encodeURIComponent(domain)}&sz=${size}`,
@@ -577,16 +585,43 @@ async function fetchFaviconRun(domain, size = 128) {
   return result ? { ...result, provider: 'faviconrun' } : null;
 }
 
+async function fetchBrandfetch(domain) {
+  const clientId = process.env.BRANDFETCH_CLIENT_ID;
+  if (!clientId) return null;
+  const url = PROVIDERS.brandfetch(domain, clientId);
+  const result = await fetchFavicon(url);
+  return result ? { ...result, provider: 'brandfetch' } : null;
+}
+
 const {
   getSelfhstSlugCandidates,
   getDashboardIconsSlugCandidates,
   getLobehubSlugCandidates,
+  getSvglSlugCandidates,
+  getSvglEntrySync,
   ensureSelfhstIndex,
   ensureLobehubIndex,
   resolveServiceSlug,
   resolveSelfhstSlugSync,
   normalizeServiceAliasKey,
 } = require('./serviceAliases');
+
+const SVGL_ASSET_BASE = 'https://cdn.jsdelivr.net/gh/pheralb/svgl@main/static';
+
+function svglAssetUrl(routePath) {
+  if (!routePath) return '';
+  if (routePath.startsWith('http')) return routePath;
+  return `${SVGL_ASSET_BASE}${routePath.startsWith('/') ? routePath : `/${routePath}`}`;
+}
+
+function svglRouteForVariant(entry, variant) {
+  const route = entry?.route;
+  if (!route) return null;
+  if (typeof route === 'string') return route;
+  if (variant === 'light') return route.light || null;
+  if (variant === 'dark') return route.dark || null;
+  return route.light || route.dark || null;
+}
 
 async function fetchServiceIcon(buildUrl, getCandidates, service, variant, provider) {
   const candidates = await getCandidates(service);
@@ -747,6 +782,41 @@ async function fetchLobehub(service, variant = 'color', size = 128, { strict = f
 
         return { ...result, provider: 'lobehub', service: slug, variant: v, size };
       }
+    }
+  }
+  return null;
+}
+
+async function fetchSvgl(service, variant = 'color', size = 128, { strict = false } = {}) {
+  const candidates = await getSvglSlugCandidates(service, { strict });
+  const variants = [variant];
+
+  for (const slug of candidates) {
+    const entry = getSvglEntrySync(slug);
+    if (!entry) continue;
+    for (const v of variants) {
+      const route = svglRouteForVariant(entry, v);
+      if (!route) continue;
+      const url = svglAssetUrl(route);
+      const result = await fetchFavicon(url);
+      if (!result) continue;
+
+      const contentType = (result.contentType || '').toLowerCase();
+      const isSvg = contentType.includes('svg') || url.toLowerCase().endsWith('.svg');
+      if (isSvg) {
+        const buffer = await rasterizeSvgToSize(result.buffer, size);
+        return {
+          buffer,
+          contentType: 'image/png',
+          url: result.url,
+          provider: 'svgl',
+          service: slug,
+          variant: v,
+          size,
+        };
+      }
+
+      return { ...result, provider: 'svgl', service: slug, variant: v, size };
     }
   }
   return null;
@@ -1654,9 +1724,11 @@ module.exports = {
   fetchFaviconkit,
   fetchLogoDev,
   fetchFaviconRun,
+  fetchBrandfetch,
   fetchSelfhst,
   fetchDashboardIcons,
   fetchLobehub,
+  fetchSvgl,
   fetchScraper,
   fetchScraperAsset,
   fetchScraperPage,
