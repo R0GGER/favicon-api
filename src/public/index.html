@@ -981,6 +981,21 @@
       animation: spin 0.7s linear infinite;
     }
 
+    .refresh-btn.alt-url-link {
+      padding: 0.25rem 0.45rem;
+      font-size: 0.72rem;
+      font-weight: 500;
+      line-height: 1;
+      text-decoration: none;
+      border-style: dashed;
+    }
+
+    .refresh-btn.alt-url-link.copied {
+      border-color: #5b2e7e;
+      color: #5b2e7e;
+      background: rgba(91, 46, 126, 0.06);
+    }
+
     .spinner {
       width: 28px;
       height: 28px;
@@ -1362,7 +1377,12 @@
 
       <!-- Google (v1 + v2 combined) -->
       <div class="card" data-card-type="domain">
-        <h3>Google</h3>
+        <div class="card-header">
+          <h3>Google</h3>
+          <a class="refresh-btn alt-url-link" href="#" target="_blank" rel="noopener noreferrer" onclick="return copyAltCardUrl(event, this)" hidden>
+            <span class="alt-url-link-label">source</span>
+          </a>
+        </div>
         <div class="favicon-display" id="google-display" onclick="copyImage(this)">
           <div class="spinner" id="google-spinner" style="display:none"></div>
           <img id="google-img" style="display:none" alt="Google favicon">
@@ -1381,7 +1401,12 @@
 
       <!-- DuckDuckGo -->
       <div class="card" data-card-type="domain">
-        <h3>DuckDuckGo</h3>
+        <div class="card-header">
+          <h3>DuckDuckGo</h3>
+          <a class="refresh-btn alt-url-link" href="#" target="_blank" rel="noopener noreferrer" onclick="return copyAltCardUrl(event, this)" hidden>
+            <span class="alt-url-link-label">source</span>
+          </a>
+        </div>
         <div class="favicon-display" id="ddg-display" onclick="copyImage(this)">
           <div class="spinner" id="ddg-spinner" style="display:none"></div>
           <img id="ddg-img" style="display:none" alt="DuckDuckGo favicon">
@@ -1392,7 +1417,12 @@
 
       <!-- Yandex -->
       <div class="card" data-card-type="domain">
-        <h3>Yandex</h3>
+        <div class="card-header">
+          <h3>Yandex</h3>
+          <a class="refresh-btn alt-url-link" href="#" target="_blank" rel="noopener noreferrer" onclick="return copyAltCardUrl(event, this)" hidden>
+            <span class="alt-url-link-label">source</span>
+          </a>
+        </div>
         <div class="favicon-display" id="yandex-display" onclick="copyImage(this)">
           <div class="spinner" id="yandex-spinner" style="display:none"></div>
           <img id="yandex-img" style="display:none" alt="Yandex favicon">
@@ -1403,7 +1433,12 @@
 
       <!-- Favicon.so -->
       <div class="card" data-card-type="domain">
-        <h3>Favicon.so</h3>
+        <div class="card-header">
+          <h3>Favicon.so</h3>
+          <a class="refresh-btn alt-url-link" href="#" target="_blank" rel="noopener noreferrer" onclick="return copyAltCardUrl(event, this)" hidden>
+            <span class="alt-url-link-label">source</span>
+          </a>
+        </div>
         <div class="favicon-display" id="faviconso-display" onclick="copyImage(this)">
           <div class="spinner" id="faviconso-spinner" style="display:none"></div>
           <img id="faviconso-img" style="display:none" alt="Favicon.so favicon">
@@ -1414,7 +1449,12 @@
 
       <!-- Vemetric -->
       <div class="card" data-card-type="domain">
-        <h3>Vemetric.com</h3>
+        <div class="card-header">
+          <h3>Vemetric.com</h3>
+          <a class="refresh-btn alt-url-link" href="#" target="_blank" rel="noopener noreferrer" onclick="return copyAltCardUrl(event, this)" hidden>
+            <span class="alt-url-link-label">source</span>
+          </a>
+        </div>
         <div class="favicon-display" id="vemetric-display" onclick="copyImage(this)">
           <div class="spinner" id="vemetric-spinner" style="display:none"></div>
           <img id="vemetric-img" style="display:none" alt="Vemetric favicon">
@@ -1425,7 +1465,12 @@
 
       <!-- Favicon-3j1 -->
       <div class="card" data-card-type="domain">
-        <h3>Faviconextractor.com</h3>
+        <div class="card-header">
+          <h3>Faviconextractor.com</h3>
+          <a class="refresh-btn alt-url-link" href="#" target="_blank" rel="noopener noreferrer" onclick="return copyAltCardUrl(event, this)" hidden>
+            <span class="alt-url-link-label">source</span>
+          </a>
+        </div>
         <div class="favicon-display" id="favicondev-display" onclick="copyImage(this)">
           <div class="spinner" id="favicondev-spinner" style="display:none"></div>
           <img id="favicondev-img" style="display:none" alt="Favicon-3j1 favicon">
@@ -1436,7 +1481,12 @@
 
       <!-- Faviconkit -->
       <div class="card" data-card-type="domain">
-        <h3>Faviconkit.net</h3>
+        <div class="card-header">
+          <h3>Faviconkit.net</h3>
+          <a class="refresh-btn alt-url-link" href="#" target="_blank" rel="noopener noreferrer" onclick="return copyAltCardUrl(event, this)" hidden>
+            <span class="alt-url-link-label">source</span>
+          </a>
+        </div>
         <div class="favicon-display" id="faviconkit-display" onclick="copyImage(this)">
           <div class="spinner" id="faviconkit-spinner" style="display:none"></div>
           <img id="faviconkit-img" style="display:none" alt="Faviconkit favicon">
@@ -1454,7 +1504,12 @@
 
       <!-- Favicon.run -->
       <div class="card" data-card-type="domain">
-        <h3>Favicon.run</h3>
+        <div class="card-header">
+          <h3>Favicon.run</h3>
+          <a class="refresh-btn alt-url-link" href="#" target="_blank" rel="noopener noreferrer" onclick="return copyAltCardUrl(event, this)" hidden>
+            <span class="alt-url-link-label">source</span>
+          </a>
+        </div>
         <div class="favicon-display" id="faviconrun-display" onclick="copyImage(this)">
           <div class="spinner" id="faviconrun-spinner" style="display:none"></div>
           <img id="faviconrun-img" style="display:none" alt="favicon.run favicon">
@@ -1472,7 +1527,12 @@
 
       <!-- Brandfetch -->
       <div class="card" id="brandfetch-card" data-card-type="domain" style="display:none">
-        <h3>Brandfetch.io</h3>
+        <div class="card-header">
+          <h3>Brandfetch.io</h3>
+          <a class="refresh-btn alt-url-link" href="#" target="_blank" rel="noopener noreferrer" onclick="return copyAltCardUrl(event, this)" hidden>
+            <span class="alt-url-link-label">source</span>
+          </a>
+        </div>
         <div class="favicon-display" id="brandfetch-display" onclick="copyImage(this)">
           <div class="spinner" id="brandfetch-spinner" style="display:none"></div>
           <img id="brandfetch-img" style="display:none" alt="Brandfetch favicon">
@@ -1491,7 +1551,12 @@
 
       <!-- logo.dev -->
       <div class="card" id="logodev-card" data-card-type="domain" style="display:none">
-        <h3>logo.dev</h3>
+        <div class="card-header">
+          <h3>logo.dev</h3>
+          <a class="refresh-btn alt-url-link" href="#" target="_blank" rel="noopener noreferrer" onclick="return copyAltCardUrl(event, this)" hidden>
+            <span class="alt-url-link-label">source</span>
+          </a>
+        </div>
         <div class="favicon-display" id="logodev-display" onclick="copyImage(this)">
           <div class="spinner" id="logodev-spinner" style="display:none"></div>
           <img id="logodev-img" style="display:none" alt="logo.dev favicon">
@@ -1504,7 +1569,12 @@
 
       <!-- selfhst (service-based) -->
       <div class="card" id="selfhst-card" data-card-type="service">
-        <h3>selfh.st/icons</h3>
+        <div class="card-header">
+          <h3>selfh.st/icons</h3>
+          <a class="refresh-btn alt-url-link" href="#" target="_blank" rel="noopener noreferrer" onclick="return copyAltCardUrl(event, this)" hidden>
+            <span class="alt-url-link-label">source</span>
+          </a>
+        </div>
         <div class="favicon-display" id="selfhst-display" onclick="copyImage(this)">
           <div class="spinner" id="selfhst-spinner" style="display:none"></div>
           <img id="selfhst-img" style="display:none" alt="selfhst icon">
@@ -1525,7 +1595,12 @@
 
       <!-- Dashboard Icons (homarr-labs, service-based) -->
       <div class="card" id="dashboardicons-card" data-card-type="service">
-        <h3>dashboardicons.com</h3>
+        <div class="card-header">
+          <h3>dashboardicons.com</h3>
+          <a class="refresh-btn alt-url-link" href="#" target="_blank" rel="noopener noreferrer" onclick="return copyAltCardUrl(event, this)" hidden>
+            <span class="alt-url-link-label">source</span>
+          </a>
+        </div>
         <div class="favicon-display" id="dashboardicons-display" onclick="copyImage(this)">
           <div class="spinner" id="dashboardicons-spinner" style="display:none"></div>
           <img id="dashboardicons-img" style="display:none" alt="Dashboard Icons icon">
@@ -1546,7 +1621,12 @@
 
       <!-- LobeHub icons (service-based) -->
       <div class="card" id="lobehub-card" data-card-type="service">
-        <h3>lobehub.com</h3>
+        <div class="card-header">
+          <h3>lobehub.com</h3>
+          <a class="refresh-btn alt-url-link" href="#" target="_blank" rel="noopener noreferrer" onclick="return copyAltCardUrl(event, this)" hidden>
+            <span class="alt-url-link-label">source</span>
+          </a>
+        </div>
         <div class="favicon-display" id="lobehub-display" onclick="copyImage(this)">
           <div class="spinner" id="lobehub-spinner" style="display:none"></div>
           <img id="lobehub-img" style="display:none" alt="LobeHub icon">
@@ -1572,7 +1652,12 @@
 
       <!-- SVGL icons (service-based) -->
       <div class="card" id="svgl-card" data-card-type="service">
-        <h3>svgl.app</h3>
+        <div class="card-header">
+          <h3>svgl.app</h3>
+          <a class="refresh-btn alt-url-link" href="#" target="_blank" rel="noopener noreferrer" onclick="return copyAltCardUrl(event, this)" hidden>
+            <span class="alt-url-link-label">source</span>
+          </a>
+        </div>
         <div class="favicon-display" id="svgl-display" onclick="copyImage(this)">
           <div class="spinner" id="svgl-spinner" style="display:none"></div>
           <img id="svgl-img" style="display:none" alt="SVGL icon">
@@ -1843,6 +1928,14 @@
     ];
     const SERVICE_PROXY_PREFIX = { selfhst: '/selfhst', dashboardicons: '/dashboardicons', lobehub: '/lobehub', svgl: '/svgl' };
     let providersConfig = { logoDev: false, logoDevToken: null, brandfetch: false, includeAppIcons: true, urlMode: 'proxy' };
+    let providersReadyResolve;
+    const providersReady = new Promise((resolve) => {
+      providersReadyResolve = resolve;
+    });
+
+    function normalizeUrlMode(mode) {
+      return String(mode || '').trim().toLowerCase() === 'source' ? 'source' : 'proxy';
+    }
 
     function escapeHtml(s) {
       return String(s)
@@ -1864,6 +1957,49 @@
         return { url: sourceUrl, label: 'Copy source URL' };
       }
       return { url: fullProxy, label: 'Copy proxy URL' };
+    }
+
+    function alternateUrlLabel() {
+      return providersConfig.urlMode === 'source' ? 'proxy' : 'source';
+    }
+
+    function resolveAlternateCardUrl(adjustedProxy, sourceUrl, opts = {}) {
+      const fullProxy = adjustedProxy.startsWith('http') ? adjustedProxy : `${location.origin}${adjustedProxy}`;
+      if (opts.forceProxy || !sourceUrl) return null;
+      const label = alternateUrlLabel();
+      const url = providersConfig.urlMode === 'source' ? fullProxy : sourceUrl;
+      return { url, label };
+    }
+
+    function syncAltUrlButton(display, alt) {
+      const link = display?.closest('.card')?.querySelector('.alt-url-link');
+      if (!link) return;
+      if (!alt?.url) {
+        link.hidden = true;
+        link.removeAttribute('href');
+        if (display) delete display.dataset.altCopyUrl;
+        return;
+      }
+      link.hidden = false;
+      link.href = alt.url;
+      display.dataset.altCopyUrl = alt.url;
+      const label = alternateUrlLabel();
+      const labelEl = link.querySelector('.alt-url-link-label');
+      if (labelEl) labelEl.textContent = label;
+      const title = `Copy ${label} URL`;
+      link.title = title;
+      link.setAttribute('aria-label', title);
+    }
+
+    function refreshAllAltUrlButtonLabels() {
+      const label = alternateUrlLabel();
+      document.querySelectorAll('.alt-url-link').forEach((link) => {
+        const labelEl = link.querySelector('.alt-url-link-label');
+        if (labelEl) labelEl.textContent = label;
+        const title = `Copy ${label} URL`;
+        link.title = title;
+        link.setAttribute('aria-label', title);
+      });
     }
 
     // Resize routes never upscale: /yandex/64/… still serves a 16×16 upstream icon.
@@ -1907,6 +2043,7 @@
         display.dataset.proxyUrl = fullProxy;
         display.dataset.copyUrl = url;
       }
+      syncAltUrlButton(display, resolveAlternateCardUrl(adjustedProxy, sourceUrl, { forceProxy }));
       const escapedUrl = escapeHtml(url);
       meta.innerHTML =
         `<span class="dimensions">${w}x${h}</span>` +
@@ -1924,6 +2061,8 @@
       if (!display) return;
       delete display.dataset.proxyUrl;
       delete display.dataset.copyUrl;
+      delete display.dataset.altCopyUrl;
+      syncAltUrlButton(display, null);
     }
 
     const input = document.getElementById('domain-input');
@@ -2030,7 +2169,11 @@
     fetch('/providers')
       .then((r) => r.json())
       .then((cfg) => {
-        providersConfig = cfg || providersConfig;
+        providersConfig = {
+          ...providersConfig,
+          ...(cfg || {}),
+          urlMode: normalizeUrlMode(cfg?.urlMode),
+        };
         const logoDevCard = document.getElementById('logodev-card');
         if (providersConfig.logoDev) {
           logoDevCard.style.display = '';
@@ -2039,9 +2182,11 @@
         if (providersConfig.brandfetch) {
           brandfetchCard.style.display = 'none';
         }
+        refreshAllAltUrlButtonLabels();
       })
       .catch(() => {})
       .finally(() => {
+        providersReadyResolve();
         selfhstToggle.checked = providersConfig.includeAppIcons !== false;
         const q = new URLSearchParams(location.search).get('q');
         if (q && q.trim()) {
@@ -2382,7 +2527,8 @@
       updateServiceIconsDivider();
     }
 
-    function fetchFavicons() {
+    async function fetchFavicons() {
+      await providersReady;
       const raw = input.value.trim();
       if (!raw) return;
       const stripped = raw.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim();
@@ -2637,6 +2783,7 @@
       unavailable.style.display = 'none';
       spinner.style.display = 'block';
       meta.textContent = '';
+      clearDisplayUrls(display);
 
       const imgEl = new Image();
       imgEl.crossOrigin = 'anonymous';
@@ -2743,6 +2890,7 @@
       unavailable.style.display = 'none';
       spinner.style.display = 'block';
       meta.textContent = '';
+      clearDisplayUrls(display);
 
       const imgEl = new Image();
       imgEl.crossOrigin = 'anonymous';
@@ -2844,6 +2992,7 @@
       unavailable.style.display = 'none';
       spinner.style.display = 'block';
       meta.textContent = '';
+      clearDisplayUrls(display);
 
       const imgEl = new Image();
       imgEl.crossOrigin = 'anonymous';
@@ -2969,6 +3118,7 @@
       unavailable.style.display = 'none';
       spinner.style.display = 'block';
       meta.textContent = '';
+      clearDisplayUrls(display);
 
       const imgEl = new Image();
       imgEl.crossOrigin = 'anonymous';
@@ -3501,12 +3651,14 @@
       const img = document.getElementById(`${id}-img`);
       const spinner = document.getElementById(`${id}-spinner`);
       const meta = document.getElementById(`${id}-meta`);
+      const display = document.getElementById(`${id}-display`) || img?.closest('.favicon-display');
       const card = img.closest('.card');
 
       if (card && id !== 'brandfetch') card.style.display = '';
       img.style.display = 'none';
       spinner.style.display = 'block';
       meta.textContent = '';
+      clearDisplayUrls(display);
 
       const imgEl = new Image();
       imgEl.crossOrigin = 'anonymous';
@@ -3586,6 +3738,21 @@
         await navigator.clipboard.writeText(text);
         showGlobalToast(text);
       } catch {}
+    }
+
+    async function copyAltCardUrl(e, link) {
+      e.preventDefault();
+      const url = link.closest('.card')?.querySelector('.favicon-display')?.dataset.altCopyUrl;
+      if (!url) return false;
+      try {
+        await navigator.clipboard.writeText(url);
+        link.classList.add('copied');
+        setTimeout(() => link.classList.remove('copied'), 1200);
+        showGlobalToast(url);
+      } catch {
+        /* clipboard API not available */
+      }
+      return false;
     }
 
     async function copyImage(display) {

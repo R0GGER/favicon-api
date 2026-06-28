@@ -5,6 +5,12 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.7] — 2026-06-28
+
+### Added
+
+- **Web UI alternate URL link** — every favicon card except HTML Scraper now has a dashed-border link in the top-right corner that copies the *opposite* URL from `UI_CARD_URL`: when cards show proxy URLs the link is labelled **source** and copies the upstream URL; when cards show source URLs the link is labelled **proxy** and copies the local proxy URL. Hidden for logo.dev and Brandfetch (no safe upstream URL). The homepage waits for `GET /providers` before fetching so the label matches the server's `urlMode`.
+
 ## [2.5.6] — 2026-06-28
 
 ### Added
