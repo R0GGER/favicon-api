@@ -466,8 +466,20 @@ const PROVIDERS = {
     `https://ico.faviconkit.net/favicon/${encodeURIComponent(domain)}?sz=${size}`,
   logoDev: (domain, token) =>
     `https://img.logo.dev/${encodeURIComponent(domain)}?token=${encodeURIComponent(token || '')}`,
-  brandfetch: (domain, clientId, size = 128) =>
-    `https://cdn.brandfetch.io/${encodeURIComponent(domain)}/h/${size}/w/${size}/fallback/404/icon?c=${encodeURIComponent(clientId || '')}`,
+  brandfetch: (domain, clientId, size = 128, opts = {}) => {
+    const { type, theme, format } = normalizeBrandfetchOptions(opts);
+    const base = `https://cdn.brandfetch.io/${encodeURIComponent(domain)}`;
+    const parts = [base];
+
+    // SVG is vector — h/w does not change the file; only raster formats use native sizing.
+    if (size > 0 && format !== 'svg') {
+      parts.push(`/h/${size}/w/${size}`);
+    }
+    parts.push('/fallback/404');
+    if (theme) parts.push(`/theme/${theme}`);
+    parts.push(`/${type}.${format}`);
+    return `${parts.join('')}?c=${encodeURIComponent(clientId || '')}`;
+  },
   selfhst: (service, variant = 'color') => {
     const suffix = pngVariantSuffix(variant);
     return `https://cdn.jsdelivr.net/gh/selfhst/icons/png/${encodeURIComponent(service)}${suffix}.png`;
@@ -503,11 +515,92 @@ const BRANDFETCH_PLACEHOLDER_SHA256 = new Set([
   '8436afdb367436824cc3a1e960006af724a5cb7ff4087fe3c938c307389a34a6', // 128px webp
 ]);
 
-function brandfetchFetchHeaders(domain) {
-  return {
+function brandfetchFetchHeaders(domain, format = 'svg') {
+  const headers = {
     ...FAVICON_FETCH_HEADERS,
     Referer: `https://${domain}/`,
   };
+  if (format === 'svg') {
+    headers.Accept = 'image/svg+xml,image/*;q=0.8';
+  }
+  return headers;
+}
+
+function normalizeBrandfetchOptions(opts = {}) {
+  const VALID_TYPES = new Set(['icon', 'symbol', 'logo']);
+  const VALID_FORMATS = new Set(['svg', 'png', 'webp', 'jpg']);
+  const VALID_THEMES = new Set(['light', 'dark']);
+
+  let type = String(opts.type || 'symbol').toLowerCase();
+  let format = String(opts.format || 'svg').toLowerCase();
+  if (format === 'jpeg') format = 'jpg';
+  if (!VALID_TYPES.has(type)) type = 'symbol';
+  if (!VALID_FORMATS.has(format)) format = 'svg';
+
+  let theme = opts.theme ? String(opts.theme).toLowerCase() : null;
+  if (theme && !VALID_THEMES.has(theme)) theme = null;
+
+  return { type, format, theme };
+}
+
+function brandfetchCacheKey(size, opts = {}) {
+  const { type, format, theme } = normalizeBrandfetchOptions(opts);
+  const sizePart = format === 'svg' ? 'svg' : String(size);
+  return `${sizePart}_${type}_${format}_${theme || 'color'}`;
+}
+
+function brandfetchTypeThemeAttempts(opts = {}) {
+  const base = normalizeBrandfetchOptions(opts);
+  if (opts.strict) {
+    return [{ type: base.type, theme: base.theme }];
+  }
+
+  const attempts = [];
+  const seen = new Set();
+  const push = (patch) => {
+    const next = normalizeBrandfetchOptions({ ...base, ...patch });
+    const key = `${next.type}|${next.theme || ''}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    attempts.push({ type: next.type, theme: next.theme });
+  };
+
+  push({});
+  if (!opts.themeExplicit && base.theme) push({ theme: null });
+  if (base.type !== 'icon') {
+    push({ type: 'icon' });
+    if (!opts.themeExplicit && base.theme) push({ type: 'icon', theme: null });
+  }
+  if (base.type !== 'logo') {
+    push({ type: 'logo' });
+    if (!opts.themeExplicit && base.theme) push({ type: 'logo', theme: null });
+  }
+  return attempts;
+}
+
+function brandfetchFormatAttempts(opts = {}) {
+  const base = normalizeBrandfetchOptions(opts);
+  if (opts.formatExplicit) return [base.format];
+  if (base.format === 'svg') return ['svg', 'png', 'webp'];
+  return [base.format];
+}
+
+function brandfetchAttemptOrder(opts = {}) {
+  const base = normalizeBrandfetchOptions(opts);
+  const formats = brandfetchFormatAttempts(opts);
+  const attempts = [];
+  const seen = new Set();
+
+  for (const tt of brandfetchTypeThemeAttempts(opts)) {
+    for (const format of formats) {
+      const next = normalizeBrandfetchOptions({ ...base, ...tt, format });
+      const key = `${next.type}|${next.format}|${next.theme || ''}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      attempts.push(next);
+    }
+  }
+  return attempts;
 }
 
 function isBrandfetchPlaceholder(buffer, domain) {
@@ -516,6 +609,15 @@ function isBrandfetchPlaceholder(buffer, domain) {
   if (lower === 'brandfetch.io') return false;
   const hash = crypto.createHash('sha256').update(buffer).digest('hex');
   return BRANDFETCH_PLACEHOLDER_SHA256.has(hash);
+}
+
+function brandfetchActualFormat(result) {
+  const ct = (result.contentType || '').toLowerCase();
+  if (ct.includes('svg') || looksLikeSvg(result.buffer)) return 'svg';
+  if (ct.includes('webp')) return 'webp';
+  if (ct.includes('png')) return 'png';
+  if (ct.includes('jpeg') || ct.includes('jpg')) return 'jpg';
+  return null;
 }
 
 async function fetchFavicon(url, requestHeaders) {
@@ -607,19 +709,28 @@ async function fetchFaviconRun(domain, size = 128) {
   return result ? { ...result, provider: 'faviconrun' } : null;
 }
 
-async function fetchBrandfetch(domain, size = 128) {
+async function fetchBrandfetch(domain, size = 128, opts = {}) {
   const clientId = process.env.BRANDFETCH_CLIENT_ID;
   if (!clientId) return null;
-  const url = PROVIDERS.brandfetch(domain, clientId, size);
-  const result = await fetchFavicon(url, brandfetchFetchHeaders(domain));
-  if (!result) return null;
+  const requested = normalizeBrandfetchOptions(opts);
 
-  const contentType = (result.contentType || '').toLowerCase();
-  if (!contentType.startsWith('image/')) return null;
-  if (await isBlankFavicon(result.buffer, result)) return null;
-  if (isBrandfetchPlaceholder(result.buffer, domain)) return null;
+  for (const attempt of brandfetchAttemptOrder(opts)) {
+    const url = PROVIDERS.brandfetch(domain, clientId, size, attempt);
+    const result = await fetchFavicon(url, brandfetchFetchHeaders(domain, attempt.format));
+    if (!result) continue;
 
-  return { ...result, provider: 'brandfetch' };
+    const contentType = (result.contentType || '').toLowerCase();
+    if (!contentType.startsWith('image/')) continue;
+
+    const actualFormat = brandfetchActualFormat(result);
+    if (!actualFormat || actualFormat !== attempt.format) continue;
+
+    if (actualFormat !== 'svg' && (await isBlankFavicon(result.buffer, result))) continue;
+    if (actualFormat !== 'svg' && isBrandfetchPlaceholder(result.buffer, domain)) continue;
+
+    return { ...result, provider: 'brandfetch', ...requested, resolvedFormat: actualFormat };
+  }
+  return null;
 }
 
 const {
@@ -1754,6 +1865,8 @@ module.exports = {
   fetchLogoDev,
   fetchFaviconRun,
   fetchBrandfetch,
+  normalizeBrandfetchOptions,
+  brandfetchCacheKey,
   fetchSelfhst,
   fetchDashboardIcons,
   fetchLobehub,

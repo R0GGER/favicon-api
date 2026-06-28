@@ -651,6 +651,21 @@
       max-height: 128px;
     }
 
+    #brandfetch-display {
+      height: 140px;
+      min-height: 140px;
+      max-height: 140px;
+      overflow: hidden;
+    }
+
+    #brandfetch-display img {
+      max-width: 128px;
+      max-height: 128px;
+      width: auto;
+      height: auto;
+      object-fit: contain;
+    }
+
     .favicon-display .copied-toast {
       position: absolute;
       top: 50%;
@@ -1538,13 +1553,21 @@
           <img id="brandfetch-img" style="display:none" alt="Brandfetch favicon">
           <span class="copied-toast">URL copied!</span>
         </div>
-        <div class="size-buttons" id="brandfetch-sizes">
+        <div class="size-buttons" id="brandfetch-format-row">
+          <button class="size-btn active" type="button" disabled aria-label="SVG format">SVG</button>
+        </div>
+        <div class="size-buttons" id="brandfetch-sizes" style="display:none">
           <button class="size-btn" onclick="switchBrandfetchSize(512)">512</button>
           <button class="size-btn" onclick="switchBrandfetchSize(256)">256</button>
           <button class="size-btn active" onclick="switchBrandfetchSize(128)">128</button>
           <button class="size-btn" onclick="switchBrandfetchSize(64)">64</button>
           <button class="size-btn" onclick="switchBrandfetchSize(32)">32</button>
           <button class="size-btn" onclick="switchBrandfetchSize(16)">16</button>
+        </div>
+        <div class="size-buttons" id="brandfetch-variants" style="display:none">
+          <button class="size-btn active" data-variant="color" onclick="switchBrandfetchTheme('color')">Color</button>
+          <button class="size-btn" data-variant="light" style="display:none" onclick="switchBrandfetchTheme('light')">Light</button>
+          <button class="size-btn" data-variant="dark" style="display:none" onclick="switchBrandfetchTheme('dark')">Dark</button>
         </div>
         <div class="meta" id="brandfetch-meta"></div>
       </div>
@@ -1907,6 +1930,11 @@
     let currentFaviconkitSize = 128;
     let currentFaviconrunSize = 128;
     let currentBrandfetchSize = 128;
+    let currentBrandfetchTheme = 'color';
+    let currentBrandfetchResolvedFormat = null;
+    let brandfetchProbeSeq = 0;
+    const BRANDFETCH_SVG_PROXY_SIZE = 128;
+    const BRANDFETCH_RASTER_FORMATS = new Set(['png', 'webp', 'jpg']);
     let currentSelfhstSlug = '';
     let currentSelfhstVariant = 'color';
     let selfhstProbeSeq = 0;
@@ -2033,8 +2061,10 @@
       return origin ? `${origin}${newPath}` : newPath;
     }
 
-    function writeCardMeta(meta, display, { w, h, proxyUrl, sourceUrl, forceProxy }) {
-      const adjustedProxy = adjustProxyUrlToNativeSize(proxyUrl, w, h);
+    function writeCardMeta(meta, display, { w, h, proxyUrl, sourceUrl, forceProxy, hideDimensions }) {
+      const adjustedProxy = hideDimensions
+        ? proxyUrl
+        : adjustProxyUrlToNativeSize(proxyUrl, w, h);
       const { url, label } = resolveCardUrl(adjustedProxy, sourceUrl, { forceProxy });
       const fullProxy = adjustedProxy.startsWith('http')
         ? adjustedProxy
@@ -2045,8 +2075,9 @@
       }
       syncAltUrlButton(display, resolveAlternateCardUrl(adjustedProxy, sourceUrl, { forceProxy }));
       const escapedUrl = escapeHtml(url);
+      const dims = hideDimensions ? '' : `<span class="dimensions">${w}x${h}</span>`;
       meta.innerHTML =
-        `<span class="dimensions">${w}x${h}</span>` +
+        dims +
         `<a class="src-url" href="${escapedUrl}" target="_blank" rel="noopener" title="${escapedUrl}">${escapedUrl}</a>` +
         `<button class="copy-btn" type="button" title="${label}" aria-label="${label}">${COPY_ICON_SVG}</button>`;
       const copyBtn = meta.querySelector('.copy-btn');
@@ -2100,6 +2131,7 @@
         card.style.display = 'none';
       } else if (id === 'brandfetch') {
         card.style.display = 'none';
+        if (display) display.classList.remove('variant-light', 'variant-dark');
       } else if (SERVICE_ICON_PROVIDERS.includes(id)) {
         card.style.display = 'none';
       } else {
@@ -2115,6 +2147,9 @@
       currentFaviconkitSize = 128;
       currentFaviconrunSize = 128;
       currentBrandfetchSize = 128;
+      currentBrandfetchTheme = 'color';
+      currentBrandfetchResolvedFormat = null;
+      resetBrandfetchFormatControls();
       currentSelfhstSlug = '';
       currentSelfhstVariant = 'color';
       currentDashboardIconsSlug = '';
@@ -2160,6 +2195,8 @@
       setActiveSize('faviconkit-sizes', 128);
       setActiveSize('faviconrun-sizes', 128);
       setActiveSize('brandfetch-sizes', 128);
+      resetBrandfetchVariantButtons();
+      resetBrandfetchFormatControls();
       resetSelfhstVariantButtons();
       resetDashboardIconsVariantButtons();
       resetLobehubVariantButtons();
@@ -2576,7 +2613,13 @@
       }
 
       if (providersConfig.brandfetch) {
-        initSizedCard('brandfetch', domain);
+        resetBrandfetchVariantButtons();
+        resetBrandfetchFormatControls();
+        currentBrandfetchTheme = 'color';
+        currentBrandfetchResolvedFormat = null;
+        currentBrandfetchSize = 128;
+        loadBrandfetch(domain);
+        probeAndShowBrandfetchVariants(domain);
       }
 
       if (selfhstToggle.checked) {
@@ -2640,9 +2683,151 @@
       loadFavicon('faviconrun', `/faviconrun/${size}/${domain}`, `https://favicon.run/favicon?domain=${domain}&sz=${size}`);
     }
 
+    function buildBrandfetchUrl(domain, options = {}) {
+      const theme = options.theme !== undefined ? options.theme : currentBrandfetchTheme;
+      const format = options.format !== undefined ? options.format : currentBrandfetchResolvedFormat;
+      const size = options.size !== undefined ? options.size : currentBrandfetchSize;
+      const params = new URLSearchParams();
+      params.set('type', 'symbol');
+      if (format && BRANDFETCH_RASTER_FORMATS.has(format)) {
+        params.set('format', format);
+      }
+      if (theme && theme !== 'color') params.set('theme', theme);
+      if (options.strict) params.set('strict', '1');
+      const pathSize = format && BRANDFETCH_RASTER_FORMATS.has(format) ? size : BRANDFETCH_SVG_PROXY_SIZE;
+      const qs = params.toString();
+      return `/brandfetch/${pathSize}/${domain}${qs ? `?${qs}` : ''}`;
+    }
+
+    function brandfetchStrictProbePath(domain, theme) {
+      return buildBrandfetchUrl(domain, { theme, format: 'svg', strict: true });
+    }
+
+    function applyBrandfetchDisplayTheme(theme) {
+      const display = document.getElementById('brandfetch-display');
+      if (!display) return;
+      display.classList.remove('variant-light', 'variant-dark');
+      if (theme === 'light') display.classList.add('variant-light');
+      else if (theme === 'dark') display.classList.add('variant-dark');
+    }
+
+    function resetBrandfetchFormatControls() {
+      const svgRow = document.getElementById('brandfetch-format-row');
+      const sizeRow = document.getElementById('brandfetch-sizes');
+      if (svgRow) svgRow.style.display = '';
+      if (sizeRow) sizeRow.style.display = 'none';
+      setActiveSize('brandfetch-sizes', 128);
+    }
+
+    function updateBrandfetchFormatControls(format) {
+      const svgRow = document.getElementById('brandfetch-format-row');
+      const sizeRow = document.getElementById('brandfetch-sizes');
+      const isRaster = BRANDFETCH_RASTER_FORMATS.has(format);
+      if (svgRow) svgRow.style.display = isRaster ? 'none' : '';
+      if (sizeRow) sizeRow.style.display = isRaster ? '' : 'none';
+      if (isRaster) setActiveSize('brandfetch-sizes', currentBrandfetchSize);
+    }
+
+    function resetBrandfetchVariantButtons() {
+      const row = document.getElementById('brandfetch-variants');
+      if (row) row.style.display = 'none';
+      document.querySelectorAll('#brandfetch-variants .size-btn').forEach((btn) => {
+        btn.style.display = btn.dataset.variant === 'color' ? '' : 'none';
+      });
+      setActiveVariant('brandfetch-variants', 'color');
+    }
+
+    function probeBrandfetchTheme(domain, theme) {
+      return fetch(`${brandfetchStrictProbePath(domain, theme)}&_=${Date.now()}`)
+        .then((res) => res.ok)
+        .catch(() => false);
+    }
+
+    async function probeAndShowBrandfetchVariants(domain) {
+      const seq = ++brandfetchProbeSeq;
+      const variants = ['light', 'dark'];
+      const results = await Promise.all(
+        variants.map(async (variant) => ({
+          variant,
+          ok: await probeBrandfetchTheme(domain, variant),
+        }))
+      );
+      if (seq !== brandfetchProbeSeq || currentDomain !== domain) return;
+
+      const row = document.getElementById('brandfetch-variants');
+      const available = results.filter((r) => r.ok).map((r) => r.variant);
+      if (!available.length) {
+        if (row) row.style.display = 'none';
+        return;
+      }
+
+      if (row) row.style.display = '';
+      document.querySelectorAll('#brandfetch-variants .size-btn').forEach((btn) => {
+        const v = btn.dataset.variant;
+        if (v === 'color') btn.style.display = '';
+        else btn.style.display = available.includes(v) ? '' : 'none';
+      });
+    }
+
+    function refreshBrandfetchMeta(imgEl) {
+      const meta = document.getElementById('brandfetch-meta');
+      const display = document.getElementById('brandfetch-display');
+      const img = imgEl || document.getElementById('brandfetch-img');
+      if (!meta || !display || !img || img.style.display === 'none') return;
+      const proxy = buildBrandfetchUrl(currentDomain);
+      writeCardMeta(meta, display, {
+        w: img.naturalWidth || currentBrandfetchSize,
+        h: img.naturalHeight || currentBrandfetchSize,
+        proxyUrl: proxy,
+        sourceUrl: `${location.origin}${proxy}`,
+        forceProxy: true,
+        hideDimensions: !BRANDFETCH_RASTER_FORMATS.has(currentBrandfetchResolvedFormat),
+      });
+    }
+
+    function brandfetchFormatFromHeaders(res) {
+      const header = res.headers.get('X-Brandfetch-Format');
+      if (header) return header.toLowerCase();
+      const ct = (res.headers.get('Content-Type') || '').toLowerCase();
+      if (ct.includes('webp')) return 'webp';
+      if (ct.includes('png')) return 'png';
+      if (ct.includes('jpeg') || ct.includes('jpg')) return 'jpg';
+      if (ct.includes('svg')) return 'svg';
+      return null;
+    }
+
     function loadBrandfetch(domain, size) {
-      // Proxy URL only — upstream embeds BRANDFETCH_CLIENT_ID in the query string.
-      loadFavicon('brandfetch', `/brandfetch/${size}/${domain}`, `${location.origin}/brandfetch/${size}/${domain}`);
+      if (size !== undefined) currentBrandfetchSize = size;
+      applyBrandfetchDisplayTheme(currentBrandfetchTheme);
+      const proxy = buildBrandfetchUrl(domain, { size: currentBrandfetchSize });
+      const bust = `_=${Date.now()}`;
+      const url = `${proxy}${proxy.includes('?') ? '&' : '?'}${bust}`;
+      const spinner = document.getElementById('brandfetch-spinner');
+      const img = document.getElementById('brandfetch-img');
+      if (spinner) spinner.style.display = 'block';
+      if (img) img.style.display = 'none';
+
+      fetch(url)
+        .then(async (res) => {
+          if (!res.ok) throw new Error(String(res.status));
+          const fmt = brandfetchFormatFromHeaders(res) || 'svg';
+          currentBrandfetchResolvedFormat = fmt;
+          updateBrandfetchFormatControls(fmt);
+          const blob = await res.blob();
+          return { blob, fmt };
+        })
+        .then(({ blob }) => {
+          loadFavicon('brandfetch', buildBrandfetchUrl(domain), `${location.origin}${buildBrandfetchUrl(domain)}`, {
+            forceProxy: true,
+            objectUrl: URL.createObjectURL(blob),
+            onMeta: (imgEl) => refreshBrandfetchMeta(imgEl),
+          });
+        })
+        .catch(() => {
+          const card = document.getElementById('brandfetch-card');
+          if (spinner) spinner.style.display = 'none';
+          if (card) card.style.display = 'none';
+        });
     }
 
     // Cards whose upstreams (Google, FaviconKit) don't actually have an icon at
@@ -2674,14 +2859,6 @@
         probePath: (d) => `/faviconrun/256/${d}`,
         setCurrent: (s) => { currentFaviconrunSize = s; },
         load: (d, s) => loadFaviconrun(d, s),
-      },
-      brandfetch: {
-        group: 'brandfetch-sizes',
-        sizes: [512, 256, 128, 64, 32, 16],
-        preferred: 128,
-        probePath: (d) => `/brandfetch/512/${d}`,
-        setCurrent: (s) => { currentBrandfetchSize = s; },
-        load: (d, s) => loadBrandfetch(d, s),
       },
     };
 
@@ -2715,7 +2892,7 @@
 
     function detectNativeMax(id, domain) {
       const cfg = NATIVE_SIZE_CARDS[id];
-      if (!cfg) return;
+      if (!cfg || cfg.skipNativeDetect) return;
       const probe = new Image();
       probe.onload = () => {
         if (currentMode !== 'domain' || currentDomain !== domain) return;
@@ -3201,9 +3378,11 @@
       const display = document.getElementById(`${id}-display`) ||
         document.getElementById(`${id}-img`)?.closest('.favicon-display');
       const forceProxy = opts.forceProxy || id === 'logodev' || id === 'brandfetch';
+      const w = opts.displaySize || imgEl.naturalWidth;
+      const h = opts.displaySize || imgEl.naturalHeight;
       writeCardMeta(meta, display, {
-        w: imgEl.naturalWidth,
-        h: imgEl.naturalHeight,
+        w,
+        h,
         proxyUrl,
         sourceUrl,
         forceProxy,
@@ -3672,12 +3851,32 @@
         img.style.display = 'block';
         spinner.style.display = 'none';
         if (card) card.style.display = '';
-        showFaviconMeta(id, imgEl, proxyUrl, sourceUrl, opts);
+        if (opts?.onMeta) opts.onMeta(imgEl);
+        else showFaviconMeta(id, imgEl, proxyUrl, sourceUrl, opts);
       };
       imgEl.onerror = () => {
         spinner.style.display = 'none';
         if (card) card.style.display = 'none';
       };
+      if (opts?.objectUrl) {
+        imgEl.onload = () => {
+          if (id === 'yandex' && imgEl.naturalWidth <= 1 && imgEl.naturalHeight <= 1) {
+            spinner.style.display = 'none';
+            if (card) card.style.display = 'none';
+            URL.revokeObjectURL(opts.objectUrl);
+            return;
+          }
+          img.src = imgEl.src;
+          img.style.display = 'block';
+          spinner.style.display = 'none';
+          if (card) card.style.display = '';
+          if (opts?.onMeta) opts.onMeta(imgEl);
+          else showFaviconMeta(id, imgEl, proxyUrl, sourceUrl, opts);
+          URL.revokeObjectURL(opts.objectUrl);
+        };
+        imgEl.src = opts.objectUrl;
+        return;
+      }
       imgEl.src = `${proxyUrl}${proxyUrl.includes('?') ? '&' : '?'}_=${Date.now()}`;
     }
 
@@ -3707,10 +3906,19 @@
     }
 
     function switchBrandfetchSize(size) {
-      if (!currentDomain) return;
+      if (!currentDomain || !BRANDFETCH_RASTER_FORMATS.has(currentBrandfetchResolvedFormat)) return;
       currentBrandfetchSize = size;
       setActiveSize('brandfetch-sizes', size);
       loadBrandfetch(currentDomain, size);
+    }
+
+    function switchBrandfetchTheme(theme) {
+      if (!currentDomain) return;
+      const btn = document.querySelector(`#brandfetch-variants .size-btn[data-variant="${theme}"]`);
+      if (btn && btn.style.display === 'none') return;
+      currentBrandfetchTheme = theme;
+      setActiveVariant('brandfetch-variants', theme);
+      loadBrandfetch(currentDomain);
     }
 
     function setActiveSize(groupId, size) {

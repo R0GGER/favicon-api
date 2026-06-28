@@ -5,6 +5,48 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.14] — 2026-06-28
+
+### Fixed
+
+- **Brandfetch — detect actual response format** — when Brandfetch serves WebP/PNG at a `.svg` URL (e.g. `ah.nl`), the proxy now rejects the mismatched attempt and falls through to the correct raster format. `X-Brandfetch-Format` and the Web UI reflect the real type, so size buttons appear for WebP/PNG.
+
+## [2.5.13] — 2026-06-28
+
+### Changed
+
+- **Brandfetch Web UI — hide dimensions for SVG** — metadata no longer shows `WxH` when the resolved format is SVG (only for PNG/WebP/JPG raster fallbacks).
+
+## [2.5.12] — 2026-06-28
+
+### Changed
+
+- **Brandfetch — SVG vs raster UI** — SVG responses show a single **SVG** badge (no size buttons); the proxy URL uses a fixed path size and omits meaningless `h/w` upstream. PNG/WebP/JPG fallbacks show size buttons (16–512) with real pixel dimensions in metadata. Upstream SVG URLs no longer include `h/w` segments.
+
+## [2.5.11] — 2026-06-28
+
+### Fixed
+
+- **Brandfetch Web UI — fixed preview frame and theme buttons** — preview area stays 140×128px regardless of selected API size (size buttons only change the proxy URL/metadata). Color/Light/Dark row is hidden unless Light or Dark variants exist (probed with `?strict=1`); explicit theme requests no longer fall back to the color variant, so theme switches actually change the logo.
+
+## [2.5.10] — 2026-06-28
+
+### Changed
+
+- **Brandfetch — format fallback** — when `format` is omitted or `svg`, the proxy tries **svg → png → webp** for each type/theme variant before returning 502. An explicit `?format=png` (or `webp`, `jpg`) skips format fallback. Response header `X-Brandfetch-Format` indicates which format was served.
+
+## [2.5.9] — 2026-06-28
+
+### Fixed
+
+- **Brandfetch — coverage and size buttons** — upstream URLs always include `h/{size}/w/{size}` (including SVG). When `symbol` or a theme variant is missing, the proxy falls back through `icon` and `logo` (and color variants) before returning 502. Size buttons now scale the displayed icon via CSS and update the proxy URL without reloading the same SVG.
+
+## [2.5.8] — 2026-06-28
+
+### Changed
+
+- **Brandfetch — transparent SVG symbols** — default upstream is now `symbol.svg` with a transparent background instead of a raster `icon`. Optional query params on `/brandfetch/{size}/{domain}`: `type=icon|symbol|logo`, `format=svg|png|webp|jpg`, `theme=light|dark`. Web UI defaults to **Dark** theme with Color/Light/Dark toggles; size buttons control display only for SVG.
+
 ## [2.5.7] — 2026-06-28
 
 ### Added

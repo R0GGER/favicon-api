@@ -19,6 +19,8 @@ const {
   fetchLogoDev,
   fetchFaviconRun,
   fetchBrandfetch,
+  normalizeBrandfetchOptions,
+  brandfetchCacheKey,
   fetchSelfhst,
   fetchDashboardIcons,
   fetchLobehub,
@@ -261,6 +263,7 @@ function sendFavicon(res, entry) {
   res.set('Cache-Control', CACHE_CONTROL);
   res.set('X-Favicon-Source', entry.provider);
   if (entry.url) res.set('X-Favicon-Url', entry.url);
+  if (entry.resolvedFormat) res.set('X-Brandfetch-Format', entry.resolvedFormat);
   res.send(entry.buffer);
 }
 
@@ -708,7 +711,28 @@ app.get('/l/:domain', async (req, res) => {
   }
 });
 
+function brandfetchQuerySuffix(opts = {}) {
+  const o = normalizeBrandfetchOptions(opts);
+  const params = new URLSearchParams();
+  if (o.type !== 'symbol') params.set('type', o.type);
+  if (o.format !== 'svg') params.set('format', o.format);
+  if (o.theme) params.set('theme', o.theme);
+  const qs = params.toString();
+  return qs ? `?${qs}` : '';
+}
+
+function brandfetchFetchOpts(query = {}) {
+  return {
+    ...query,
+    formatExplicit: query.format != null && String(query.format).trim() !== '',
+    themeExplicit: query.theme != null && String(query.theme).trim() !== '',
+    strict: query.strict === '1' || query.strict === 'true',
+  };
+}
+
 // Brandfetch proxy: /brandfetch/:size/:domain (alias: /bf/:size/:domain) - requires BRANDFETCH_CLIENT_ID
+// Query: ?type=icon|symbol|logo&format=svg|png|webp|jpg&theme=light|dark (defaults: symbol, svg)
+// Without explicit format, tries svg then png then webp per type/theme variant.
 async function brandfetchSizedHandler(req, res) {
   if (!process.env.BRANDFETCH_CLIENT_ID) {
     return res.status(503).json({ error: 'Brandfetch not configured. Set BRANDFETCH_CLIENT_ID.' });
@@ -722,8 +746,13 @@ async function brandfetchSizedHandler(req, res) {
   const domain = extractDomain(req.params.domain);
   if (!domain) return res.status(400).json({ error: 'Invalid domain.' });
 
+  const bfOpts = normalizeBrandfetchOptions(req.query);
+
   try {
-    const entry = await fetchWithCache('brandfetch', domain, size, () => fetchBrandfetch(domain, size));
+    const cacheKey = brandfetchCacheKey(size, bfOpts);
+    const entry = await fetchWithCache('brandfetch', domain, cacheKey, () =>
+      fetchBrandfetch(domain, size, brandfetchFetchOpts(req.query))
+    );
     if (!entry) return res.status(502).json({ error: 'Upstream fetch failed.' });
     sendFavicon(res, entry);
   } catch (err) {
@@ -741,9 +770,12 @@ app.get('/bf/:domain', async (req, res) => {
   const domain = extractDomain(req.params.domain);
   if (!domain) return res.status(400).json({ error: 'Invalid domain.' });
 
+  const bfOpts = normalizeBrandfetchOptions(req.query);
+
   try {
-    const entry = await fetchWithCache('brandfetch', domain, DEFAULT_NATIVE_SIZE, () =>
-      fetchBrandfetch(domain, DEFAULT_NATIVE_SIZE)
+    const cacheKey = brandfetchCacheKey(DEFAULT_NATIVE_SIZE, bfOpts);
+    const entry = await fetchWithCache('brandfetch', domain, cacheKey, () =>
+      fetchBrandfetch(domain, DEFAULT_NATIVE_SIZE, brandfetchFetchOpts(req.query))
     );
     if (!entry) return res.status(502).json({ error: 'Upstream fetch failed.' });
     sendFavicon(res, entry);
@@ -1323,14 +1355,19 @@ app.get('/:domain/json', async (req, res) => {
   };
 
   const brandfetchConfigured = !!process.env.BRANDFETCH_CLIENT_ID;
+  const brandfetchSymbolQs = brandfetchQuerySuffix({ type: 'symbol' });
+  const brandfetchRasterQs = brandfetchQuerySuffix({ type: 'symbol', format: 'png' });
   const brandfetch = {
-    proxy: `${host}/brandfetch/${DEFAULT_NATIVE_SIZE}/${encoded}`,
+    proxy: `${host}/brandfetch/${DEFAULT_NATIVE_SIZE}/${encoded}${brandfetchSymbolQs}`,
     // Omit upstream URL: it embeds BRANDFETCH_CLIENT_ID in the query string.
     source: null,
     configured: brandfetchConfigured,
+    type: 'symbol',
+    format: 'svg',
+    theme: null,
     sizes: sizedEntries(
       BRANDFETCH_SIZES_ARRAY,
-      (size) => `/brandfetch/${size}/${encoded}`,
+      (size) => `/brandfetch/${size}/${encoded}${brandfetchRasterQs}`,
       () => null
     ),
   };
