@@ -1836,6 +1836,7 @@
     let currentSvglVariant = 'color';
     let svglProbeSeq = 0;
     let currentSvglSize = 128;
+    const svglCatalogCache = new Map();
     const SERVICE_ICON_PROVIDERS = ['selfhst', 'dashboardicons', 'lobehub', 'svgl'];
     const DOMAIN_FAVICON_PROVIDERS = [
       'scraper', 'google', 'ddg', 'yandex', 'faviconso', 'vemetric', 'favicondev', 'faviconkit', 'faviconrun', 'logodev', 'brandfetch',
@@ -2871,16 +2872,36 @@
       return variant === 'color' ? base : `${base}?variant=${variant}`;
     }
 
-    function svglSourceUrl(slug, variant, size = currentSvglSize) {
-      return `${location.origin}${svglProxyPath(slug, variant, size)}`;
+    async function fetchSvglCatalog(slug) {
+      const key = String(slug || '').toLowerCase();
+      if (!key) return null;
+      if (svglCatalogCache.has(key)) return svglCatalogCache.get(key);
+
+      try {
+        const res = await fetch(`${location.origin}/${encodeURIComponent(slug)}/json`, {
+          headers: { Accept: 'application/json' },
+        });
+        if (!res.ok) return null;
+        const data = await res.json();
+        const catalog = data.endpoints?.svgl || null;
+        if (catalog) svglCatalogCache.set(key, catalog);
+        return catalog;
+      } catch {
+        return null;
+      }
     }
 
-    function loadSvgl(slug, variant, opts) {
+    function svglSourceFromCatalog(catalog, variant) {
+      if (!catalog) return '';
+      return catalog.variants?.[variant]?.source || catalog.source || '';
+    }
+
+    async function loadSvgl(slug, variant, opts) {
       const hideOnError = !!(opts && opts.hideOnError);
       const activeSlug = (opts && opts.activeSlug) || slug;
       const size = (opts && opts.size) || currentSvglSize;
       const proxyUrl = svglProxyPath(slug, variant, size);
-      const sourceUrl = svglSourceUrl(activeSlug, variant, size);
+      const catalogPromise = fetchSvglCatalog(activeSlug);
 
       const img = document.getElementById('svgl-img');
       const spinner = document.getElementById('svgl-spinner');
@@ -2901,24 +2922,33 @@
 
       const imgEl = new Image();
       imgEl.crossOrigin = 'anonymous';
-      imgEl.onload = () => {
+      imgEl.onload = async () => {
         if (currentSvglSlug !== activeSlug || currentSvglVariant !== variant || currentSvglSize !== size) return;
         img.src = imgEl.src;
         img.style.display = 'block';
         spinner.style.display = 'none';
         display.dataset.proxyUrl = `${location.origin}${proxyUrl}`;
 
-        const escapedUrl = escapeHtml(sourceUrl);
-        meta.innerHTML =
-          `<span class="dimensions">${imgEl.naturalWidth}x${imgEl.naturalHeight}</span>` +
-          `<a class="src-url" href="${escapedUrl}" target="_blank" rel="noopener" title="${escapedUrl}">${escapedUrl}</a>` +
-          `<button class="copy-btn" type="button" title="Copy source URL" aria-label="Copy source URL">${COPY_ICON_SVG}</button>`;
+        const catalog = await catalogPromise;
+        if (currentSvglSlug !== activeSlug || currentSvglVariant !== variant || currentSvglSize !== size) return;
+        const sourceUrl = svglSourceFromCatalog(catalog, variant);
+
+        let metaHtml = `<span class="dimensions">${imgEl.naturalWidth}x${imgEl.naturalHeight}</span>`;
+        if (sourceUrl) {
+          const escapedUrl = escapeHtml(sourceUrl);
+          metaHtml +=
+            `<a class="src-url" href="${escapedUrl}" target="_blank" rel="noopener" title="${escapedUrl}">${escapedUrl}</a>` +
+            `<button class="copy-btn" type="button" title="Copy source URL" aria-label="Copy source URL">${COPY_ICON_SVG}</button>`;
+        }
+        meta.innerHTML = metaHtml;
         const copyBtn = meta.querySelector('.copy-btn');
-        copyBtn.addEventListener('click', (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          copySource(copyBtn, sourceUrl);
-        });
+        if (copyBtn) {
+          copyBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            copySource(copyBtn, sourceUrl);
+          });
+        }
         updateServiceIconsDivider();
       };
       imgEl.onerror = () => {

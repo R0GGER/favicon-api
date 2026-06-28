@@ -5,6 +5,12 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.5] — 2026-06-28
+
+### Fixed
+
+- **SVGL Web UI showed proxy URL instead of source URL** — the **svgl.app** card metadata link and copy button pointed at the local proxy (`/svgl/{size}/{service}`) rather than the upstream SVGL asset on jsDelivr. The displayed URL is now resolved from `/{service}/json` (`endpoints.svgl.source` / per-variant `source`), consistent with selfh.st, dashboardicons.com, and LobeHub.
+
 ## [2.5.4] — 2026-06-28
 
 ### Changed
