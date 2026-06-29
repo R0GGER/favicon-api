@@ -5,11 +5,33 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.3] — 2026-06-29
+
+### Fixed
+
+- **Web UI — light/dark preview contrast** — light icon variants now preview on a dark background and dark variants on a light background (Brandfetch, selfh.st, dashboardicons.com, LobeHub, SVGL).
+
+## [2.6.2] — 2026-06-29
+
+### Fixed
+
+- **Catalog SVG proxy URLs — size 0 in path** — SVG routes for selfh.st, dashboardicons.com, LobeHub, and SVGL now use `/0/svg/` in generated proxy URLs (e.g. `/selfhst/0/svg/github` instead of `/selfhst/256/svg/github`). Route handlers accept `0` as the canonical SVG path size; legacy URLs with a pixel size remain valid. JSON discovery and the Web UI emit the `0` segment.
+
+## [2.6.1] — 2026-06-29
+
+### Added
+
+- **Web UI — icon downloads** — each favicon card has a download button in the header row (aligned with source/refresh). **Download all** above the results grid fetches every loaded icon and delivers a ZIP (`{query}-favicons.zip`); when only one icon is available, a single file is downloaded instead. JSZip is loaded on demand for multi-file archives. Filenames use `{domain-or-app}-{provider}.{ext}`.
+
+### Changed
+
+- **Web UI — provider card titles link to upstream sites** — each provider/app-icon card title (Google, DuckDuckGo, Yandex, Favicon.so, Vemetric, Faviconextractor, Faviconkit, Favicon.run, Brandfetch, logo.dev, selfh.st, dashboardicons.com, LobeHub, SVGL) opens the provider's website in a new tab.
+
 ## [2.6.0] — 2026-06-29
 
 ### Changed
 
-- **Proxy URL scheme — format in path** — domain providers now use `/{provider}/{size}/{ext}/{domain}` (e.g. `/google/128/png/github.com`, `/duckduckgo/32/png/github.com`). Catalog providers (selfh.st, dashboardicons, LobeHub, SVGL) use `/{provider}/{size}/{format}/{service}` with `png` or `svg` instead of `?format=`. Vemetric accepts `png`, `jpg`, or `webp` in the path (`?format=` still works). Legacy three-segment routes (`/{provider}/{size}/{domain}`) remain aliases defaulting to `png`. logo.dev and Brandfetch are unchanged.
+- **Proxy URL scheme — format in path** — domain providers now use `/{provider}/{size}/{ext}/{domain}` (e.g. `/google/128/png/github.com`, `/duckduckgo/32/png/github.com`). Catalog providers (selfh.st, dashboardicons, LobeHub, SVGL) use `/{provider}/{size}/{format}/{service}` with `png` or `svg` instead of `?format=`. SVG routes use size **0** in the path (e.g. `/selfhst/0/svg/github`, `/brandfetch/0/svg/github.com`); PNG routes keep pixel sizes (e.g. `/svgl/256/png/github`, `/brandfetch/128/png/github.com`). Vemetric accepts `png`, `jpg`, or `webp` in the path (`?format=` still works). Brandfetch accepts `svg`, `png`, `webp`, or `jpg` in the path; `?type=` and `?theme=` stay as query params. Legacy three-segment routes (`/{provider}/{size}/{domain}`) remain aliases; logo.dev is unchanged.
 - **`/{domain}/json` discovery** — `proxy` and per-size entries now include the `/png/` path segment for all providers that use the new scheme.
 - **Web UI — PNG | SVG on catalog cards** — selfh.st, dashboardicons.com, and LobeHub cards gain a **PNG | SVG** toggle; size buttons hide when SVG is selected.
 - **LobeHub light/dark variants** — availability is probed against `@lobehub/icons-static-png` theme assets (`/light/{slug}.png`, `/dark/{slug}.png`) instead of the color SVG URL, so Light/Dark buttons only appear when those PNGs exist. Light/dark requests serve the upstream theme PNGs; SVG format remains color-only.

@@ -631,10 +631,10 @@
 
     .favicon-display:hover { background: #ece6de; }
 
-    .favicon-display.variant-light { background: #ffffff; }
-    .favicon-display.variant-light:hover { background: #f0eee9; }
-    .favicon-display.variant-dark { background: #2d2a26; }
-    .favicon-display.variant-dark:hover { background: #1f1c19; }
+    .favicon-display.variant-light { background: #2d2a26; }
+    .favicon-display.variant-light:hover { background: #1f1c19; }
+    .favicon-display.variant-dark { background: #ffffff; }
+    .favicon-display.variant-dark:hover { background: #f0eee9; }
 
     .favicon-display .unavailable {
       color: #8a8480;
@@ -643,7 +643,7 @@
       text-align: center;
       padding: 0 0.5rem;
     }
-    .favicon-display.variant-dark .unavailable { color: #b8b1aa; }
+    .favicon-display.variant-light .unavailable { color: #b8b1aa; }
 
     .favicon-display img {
       image-rendering: pixelated;
@@ -1004,10 +1004,80 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 0.5rem;
       margin-bottom: 0.8rem;
     }
 
-    .card-header h3 { margin-bottom: 0; }
+    .card-header h3 {
+      margin-bottom: 0;
+      min-width: 0;
+    }
+
+    .card-header h3 a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .card-header h3 a:hover {
+      color: #5b2e7e;
+      text-decoration: underline;
+    }
+
+    .card-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      flex-shrink: 0;
+      margin-left: auto;
+    }
+
+    .download-toolbar {
+      grid-column: 1 / -1;
+      display: none;
+      justify-content: flex-end;
+      margin-bottom: -0.2rem;
+    }
+
+    .download-toolbar.visible {
+      display: flex;
+    }
+
+    .download-all-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.45rem 0.85rem;
+      background: #fff;
+      border: 1px solid #d4cfc9;
+      border-radius: 6px;
+      color: #5b2e7e;
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s;
+    }
+
+    .download-all-btn:hover:not(:disabled) {
+      border-color: #5b2e7e;
+      background: rgba(91, 46, 126, 0.06);
+    }
+
+    .download-all-btn:disabled {
+      opacity: 0.6;
+      cursor: wait;
+    }
+
+    .download-all-btn svg {
+      width: 14px;
+      height: 14px;
+      fill: currentColor;
+    }
+
+    .download-all-btn.spinning svg,
+    .card-download-btn.spinning svg {
+      animation: spin 0.7s linear infinite;
+    }
 
     .refresh-btn {
       background: transparent;
@@ -1406,6 +1476,12 @@
     </div>
 
     <div class="results" id="results">
+      <div class="download-toolbar" id="download-toolbar">
+        <button type="button" class="download-all-btn" id="download-all-btn" onclick="downloadAllFavicons()" title="Download all loaded icons as ZIP" aria-label="Download all loaded icons as ZIP">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>
+          Download all
+        </button>
+      </div>
       <!-- Scraper -->
       <div class="card" data-card-type="domain">
         <div class="card-header">
@@ -1435,7 +1511,7 @@
       <!-- Google (v1 + v2 combined) -->
       <div class="card" data-card-type="domain">
         <div class="card-header">
-          <h3>Google</h3>
+          <h3><a href="https://google.com" target="_blank" rel="noopener noreferrer">Google</a></h3>
           <a class="refresh-btn alt-url-link" href="#" target="_blank" rel="noopener noreferrer" onclick="return copyAltCardUrl(event, this)" hidden>
             <span class="alt-url-link-label">source</span>
           </a>
@@ -1459,7 +1535,7 @@
       <!-- DuckDuckGo -->
       <div class="card" data-card-type="domain">
         <div class="card-header">
-          <h3>DuckDuckGo</h3>
+          <h3><a href="https://duckduckgo.com" target="_blank" rel="noopener noreferrer">DuckDuckGo</a></h3>
           <a class="refresh-btn alt-url-link" href="#" target="_blank" rel="noopener noreferrer" onclick="return copyAltCardUrl(event, this)" hidden>
             <span class="alt-url-link-label">source</span>
           </a>
@@ -1475,7 +1551,7 @@
       <!-- Yandex -->
       <div class="card" data-card-type="domain">
         <div class="card-header">
-          <h3>Yandex</h3>
+          <h3><a href="https://yandex.com" target="_blank" rel="noopener noreferrer">Yandex</a></h3>
           <a class="refresh-btn alt-url-link" href="#" target="_blank" rel="noopener noreferrer" onclick="return copyAltCardUrl(event, this)" hidden>
             <span class="alt-url-link-label">source</span>
           </a>
@@ -1491,7 +1567,7 @@
       <!-- Favicon.so -->
       <div class="card" data-card-type="domain">
         <div class="card-header">
-          <h3>Favicon.so</h3>
+          <h3><a href="https://favicon.so" target="_blank" rel="noopener noreferrer">Favicon.so</a></h3>
           <a class="refresh-btn alt-url-link" href="#" target="_blank" rel="noopener noreferrer" onclick="return copyAltCardUrl(event, this)" hidden>
             <span class="alt-url-link-label">source</span>
           </a>
@@ -1507,7 +1583,7 @@
       <!-- Vemetric -->
       <div class="card" data-card-type="domain">
         <div class="card-header">
-          <h3>Vemetric.com</h3>
+          <h3><a href="https://vemetric.com/favicon-api" target="_blank" rel="noopener noreferrer">Vemetric.com</a></h3>
           <a class="refresh-btn alt-url-link" href="#" target="_blank" rel="noopener noreferrer" onclick="return copyAltCardUrl(event, this)" hidden>
             <span class="alt-url-link-label">source</span>
           </a>
@@ -1523,7 +1599,7 @@
       <!-- Favicon-3j1 -->
       <div class="card" data-card-type="domain">
         <div class="card-header">
-          <h3>Faviconextractor.com</h3>
+          <h3><a href="https://favicon-extractor.com" target="_blank" rel="noopener noreferrer">Faviconextractor.com</a></h3>
           <a class="refresh-btn alt-url-link" href="#" target="_blank" rel="noopener noreferrer" onclick="return copyAltCardUrl(event, this)" hidden>
             <span class="alt-url-link-label">source</span>
           </a>
@@ -1539,7 +1615,7 @@
       <!-- Faviconkit -->
       <div class="card" data-card-type="domain">
         <div class="card-header">
-          <h3>Faviconkit.net</h3>
+          <h3><a href="https://faviconkit.net" target="_blank" rel="noopener noreferrer">Faviconkit.net</a></h3>
           <a class="refresh-btn alt-url-link" href="#" target="_blank" rel="noopener noreferrer" onclick="return copyAltCardUrl(event, this)" hidden>
             <span class="alt-url-link-label">source</span>
           </a>
@@ -1562,7 +1638,7 @@
       <!-- Favicon.run -->
       <div class="card" data-card-type="domain">
         <div class="card-header">
-          <h3>Favicon.run</h3>
+          <h3><a href="https://favicon.run" target="_blank" rel="noopener noreferrer">Favicon.run</a></h3>
           <a class="refresh-btn alt-url-link" href="#" target="_blank" rel="noopener noreferrer" onclick="return copyAltCardUrl(event, this)" hidden>
             <span class="alt-url-link-label">source</span>
           </a>
@@ -1585,7 +1661,7 @@
       <!-- Brandfetch -->
       <div class="card" id="brandfetch-card" data-card-type="domain" style="display:none">
         <div class="card-header">
-          <h3>Brandfetch.io</h3>
+          <h3><a href="https://brandfetch.com" target="_blank" rel="noopener noreferrer">Brandfetch.io</a></h3>
         </div>
         <div class="favicon-display" id="brandfetch-display" onclick="copyImage(this)">
           <div class="spinner" id="brandfetch-spinner" style="display:none"></div>
@@ -1616,7 +1692,7 @@
       <!-- logo.dev -->
       <div class="card" id="logodev-card" data-card-type="domain" style="display:none">
         <div class="card-header">
-          <h3>logo.dev</h3>
+          <h3><a href="https://logo.dev" target="_blank" rel="noopener noreferrer">logo.dev</a></h3>
         </div>
         <div class="favicon-display" id="logodev-display" onclick="copyImage(this)">
           <div class="spinner" id="logodev-spinner" style="display:none"></div>
@@ -1631,7 +1707,7 @@
       <!-- selfhst (service-based) -->
       <div class="card" id="selfhst-card" data-card-type="service">
         <div class="card-header">
-          <h3>selfh.st/icons</h3>
+          <h3><a href="https://selfh.st/icons" target="_blank" rel="noopener noreferrer">selfh.st/icons</a></h3>
           <a class="refresh-btn alt-url-link" href="#" target="_blank" rel="noopener noreferrer" onclick="return copyAltCardUrl(event, this)" hidden>
             <span class="alt-url-link-label">source</span>
           </a>
@@ -1670,7 +1746,7 @@
       <!-- Dashboard Icons (homarr-labs, service-based) -->
       <div class="card" id="dashboardicons-card" data-card-type="service">
         <div class="card-header">
-          <h3>dashboardicons.com</h3>
+          <h3><a href="https://dashboardicons.com" target="_blank" rel="noopener noreferrer">dashboardicons.com</a></h3>
           <a class="refresh-btn alt-url-link" href="#" target="_blank" rel="noopener noreferrer" onclick="return copyAltCardUrl(event, this)" hidden>
             <span class="alt-url-link-label">source</span>
           </a>
@@ -1709,7 +1785,7 @@
       <!-- LobeHub icons (service-based) -->
       <div class="card" id="lobehub-card" data-card-type="service">
         <div class="card-header">
-          <h3>lobehub.com</h3>
+          <h3><a href="https://lobehub.com/icons" target="_blank" rel="noopener noreferrer">lobehub.com</a></h3>
           <a class="refresh-btn alt-url-link" href="#" target="_blank" rel="noopener noreferrer" onclick="return copyAltCardUrl(event, this)" hidden>
             <span class="alt-url-link-label">source</span>
           </a>
@@ -1746,7 +1822,7 @@
       <!-- SVGL icons (service-based) -->
       <div class="card" id="svgl-card" data-card-type="service">
         <div class="card-header">
-          <h3>svgl.app</h3>
+          <h3><a href="https://svgl.app" target="_blank" rel="noopener noreferrer">svgl.app</a></h3>
           <a class="refresh-btn alt-url-link" href="#" target="_blank" rel="noopener noreferrer" onclick="return copyAltCardUrl(event, this)" hidden>
             <span class="alt-url-link-label">source</span>
           </a>
@@ -2003,7 +2079,7 @@
     let currentBrandfetchTheme = 'color';
     let currentBrandfetchResolvedFormat = null;
     let brandfetchProbeSeq = 0;
-    const BRANDFETCH_SVG_PROXY_SIZE = 128;
+    const BRANDFETCH_SVG_PROXY_SIZE = 0;
     const BRANDFETCH_RASTER_FORMATS = new Set(['png', 'webp', 'jpg']);
     let currentSelfhstSlug = '';
     let currentSelfhstVariant = 'color';
@@ -2050,6 +2126,8 @@
     }
 
     const COPY_ICON_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/><path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/></svg>';
+    const DOWNLOAD_ICON_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>';
+    let jsZipLoadPromise = null;
 
     function resolveCardUrl(proxyUrl, sourceUrl, opts = {}) {
       const fullProxy = proxyUrl.startsWith('http') ? proxyUrl : `${location.origin}${proxyUrl}`;
@@ -2198,6 +2276,203 @@
       btn.disabled = !hasQuery && !hasResults;
     }
 
+    function setDownloadToolbarVisible(visible) {
+      const toolbar = document.getElementById('download-toolbar');
+      if (toolbar) toolbar.classList.toggle('visible', visible);
+    }
+
+    function getProviderCard(providerId) {
+      return document.getElementById(`${providerId}-card`)
+        || document.getElementById(`${providerId}-img`)?.closest('.card');
+    }
+
+    function getDownloadBaseName() {
+      return currentDomain || currentService || 'favicon';
+    }
+
+    function sanitizeFilename(name) {
+      return String(name)
+        .replace(/[^a-zA-Z0-9._-]+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '') || 'favicon';
+    }
+
+    function extensionFromUrl(url) {
+      try {
+        const path = new URL(url, location.origin).pathname;
+        const extMatch = path.match(/\.([a-z0-9]+)$/i);
+        if (extMatch) {
+          const ext = extMatch[1].toLowerCase();
+          if (['png', 'svg', 'jpg', 'jpeg', 'webp', 'ico', 'gif'].includes(ext)) return ext;
+        }
+        const routeMatch = path.match(/\/(png|svg|jpe?g|webp)\//i);
+        if (routeMatch) return routeMatch[1].toLowerCase();
+      } catch {
+        /* ignore */
+      }
+      return null;
+    }
+
+    function extensionFromContent(blob, contentType, url) {
+      const fromUrl = extensionFromUrl(url);
+      if (fromUrl) return fromUrl === 'jpeg' ? 'jpg' : fromUrl;
+      const ct = (contentType || blob.type || '').toLowerCase();
+      if (ct.includes('svg')) return 'svg';
+      if (ct.includes('webp')) return 'webp';
+      if (ct.includes('png')) return 'png';
+      if (ct.includes('jpeg') || ct.includes('jpg')) return 'jpg';
+      if (ct.includes('gif')) return 'gif';
+      if (ct.includes('ico') || ct.includes('x-icon')) return 'ico';
+      return null;
+    }
+
+    function downloadBlob(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.rel = 'noopener';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    }
+
+    function setDownloadBusy(btn, busy) {
+      if (!btn) return;
+      btn.disabled = busy;
+      btn.classList.toggle('spinning', busy);
+    }
+
+    async function fetchImageBlob(url) {
+      const res = await fetch(url, { credentials: 'same-origin' });
+      if (!res.ok) throw new Error(String(res.status));
+      const blob = await res.blob();
+      return { blob, contentType: res.headers.get('Content-Type') };
+    }
+
+    function loadJSZip() {
+      if (window.JSZip) return Promise.resolve(window.JSZip);
+      if (!jsZipLoadPromise) {
+        jsZipLoadPromise = new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+          script.onload = () => resolve(window.JSZip);
+          script.onerror = () => reject(new Error('Failed to load JSZip'));
+          document.head.appendChild(script);
+        });
+      }
+      return jsZipLoadPromise;
+    }
+
+    function getCardDownloadInfo(card, providerId) {
+      if (!card || card.style.display === 'none') return null;
+      const img = document.getElementById(`${providerId}-img`);
+      const spinner = document.getElementById(`${providerId}-spinner`);
+      if (!img || img.style.display === 'none' || spinner?.style.display !== 'none') return null;
+      const display = card.querySelector('.favicon-display');
+      const url = display?.dataset.proxyUrl;
+      if (!url) return null;
+      const baseName = sanitizeFilename(getDownloadBaseName());
+      const providerName = sanitizeFilename(providerId);
+      return { url, filename: `${baseName}-${providerName}` };
+    }
+
+    function collectDownloadableCards() {
+      const items = [];
+      [...DOMAIN_FAVICON_PROVIDERS, ...SERVICE_ICON_PROVIDERS].forEach((providerId) => {
+        const card = getProviderCard(providerId);
+        const info = card ? getCardDownloadInfo(card, providerId) : null;
+        if (info) items.push(info);
+      });
+      return items;
+    }
+
+    function initCardDownloadButtons() {
+      document.querySelectorAll('#results .card').forEach((card) => {
+        const header = card.querySelector('.card-header');
+        if (!header) return;
+
+        card.querySelector(':scope > .card-download-btn')?.remove();
+
+        if (header.querySelector('.card-download-btn')) return;
+        const img = card.querySelector('.favicon-display img[id$="-img"]');
+        const providerId = img?.id?.replace(/-img$/, '');
+        if (!providerId) return;
+
+        let actions = header.querySelector('.card-header-actions');
+        if (!actions) {
+          actions = document.createElement('div');
+          actions.className = 'card-header-actions';
+          [...header.children].filter((el) => el.tagName !== 'H3').forEach((el) => actions.appendChild(el));
+          header.appendChild(actions);
+        }
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'refresh-btn card-download-btn';
+        btn.title = 'Download icon';
+        btn.setAttribute('aria-label', 'Download icon');
+        btn.innerHTML = DOWNLOAD_ICON_SVG;
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          downloadCard(providerId, btn);
+        });
+        actions.appendChild(btn);
+      });
+    }
+
+    async function downloadCard(providerId, btn) {
+      const card = getProviderCard(providerId);
+      const info = card ? getCardDownloadInfo(card, providerId) : null;
+      if (!info) {
+        showGlobalToast('No icon available to download');
+        return;
+      }
+      try {
+        setDownloadBusy(btn, true);
+        const { blob, contentType } = await fetchImageBlob(info.url);
+        const ext = extensionFromContent(blob, contentType, info.url) || 'png';
+        downloadBlob(blob, `${info.filename}.${ext}`);
+      } catch {
+        showGlobalToast('Download failed');
+      } finally {
+        setDownloadBusy(btn, false);
+      }
+    }
+
+    async function downloadAllFavicons() {
+      const btn = document.getElementById('download-all-btn');
+      const items = collectDownloadableCards();
+      if (!items.length) {
+        showGlobalToast('No icons available to download');
+        return;
+      }
+      try {
+        setDownloadBusy(btn, true);
+        if (items.length === 1) {
+          const { blob, contentType } = await fetchImageBlob(items[0].url);
+          const ext = extensionFromContent(blob, contentType, items[0].url) || 'png';
+          downloadBlob(blob, `${items[0].filename}.${ext}`);
+          return;
+        }
+        const JSZip = await loadJSZip();
+        const zip = new JSZip();
+        await Promise.all(items.map(async (item) => {
+          const { blob, contentType } = await fetchImageBlob(item.url);
+          const ext = extensionFromContent(blob, contentType, item.url) || 'png';
+          zip.file(`${item.filename}.${ext}`, blob);
+        }));
+        const zipBlob = await zip.generateAsync({ type: 'blob' });
+        downloadBlob(zipBlob, `${sanitizeFilename(getDownloadBaseName())}-favicons.zip`);
+      } catch {
+        showGlobalToast('Download failed');
+      } finally {
+        setDownloadBusy(btn, false);
+      }
+    }
+
     function resetFaviconCard(id) {
       const img = document.getElementById(`${id}-img`);
       const spinner = document.getElementById(`${id}-spinner`);
@@ -2265,6 +2540,7 @@
       document.getElementById('api-example').textContent = `${location.origin}/{domain-or-appname}`;
       document.getElementById('json-button-wrap').classList.remove('visible');
       document.getElementById('results').classList.remove('visible');
+      setDownloadToolbarVisible(false);
 
       DOMAIN_FAVICON_PROVIDERS.forEach(resetFaviconCard);
       SERVICE_ICON_PROVIDERS.forEach(resetFaviconCard);
@@ -2405,7 +2681,8 @@
     }
 
     function buildCatalogProxyPath(provider, slug, { variant = 'color', format = 'png', size = 128 } = {}) {
-      const base = `${SERVICE_PROXY_PREFIX[provider]}/${size}/${format}/${encodeURIComponent(slug)}`;
+      const pathSize = format === 'svg' ? 0 : size;
+      const base = `${SERVICE_PROXY_PREFIX[provider]}/${pathSize}/${format}/${encodeURIComponent(slug)}`;
       if (variant === 'color') return base;
       return `${base}?variant=${variant}`;
     }
@@ -2724,6 +3001,7 @@
       document.getElementById('json-link-url').textContent = jsonUrl;
       document.getElementById('json-button-wrap').classList.add('visible');
       document.getElementById('results').classList.add('visible');
+      setDownloadToolbarVisible(true);
       updateResetButton();
 
       showCardsByType('domain');
@@ -2787,6 +3065,7 @@
       document.getElementById('json-link-url').textContent = jsonUrl;
       document.getElementById('json-button-wrap').classList.add('visible');
       document.getElementById('results').classList.add('visible');
+      setDownloadToolbarVisible(true);
       updateResetButton();
 
       showCardsByType('service');
@@ -2817,18 +3096,15 @@
 
     function buildBrandfetchUrl(domain, options = {}) {
       const theme = options.theme !== undefined ? options.theme : currentBrandfetchTheme;
-      const format = options.format !== undefined ? options.format : currentBrandfetchResolvedFormat;
+      const format = options.format !== undefined ? options.format : (currentBrandfetchResolvedFormat || 'svg');
       const size = options.size !== undefined ? options.size : currentBrandfetchSize;
       const params = new URLSearchParams();
       params.set('type', 'symbol');
-      if (format && BRANDFETCH_RASTER_FORMATS.has(format)) {
-        params.set('format', format);
-      }
       if (theme && theme !== 'color') params.set('theme', theme);
       if (options.strict) params.set('strict', '1');
-      const pathSize = format && BRANDFETCH_RASTER_FORMATS.has(format) ? size : BRANDFETCH_SVG_PROXY_SIZE;
+      const pathSize = BRANDFETCH_RASTER_FORMATS.has(format) ? size : BRANDFETCH_SVG_PROXY_SIZE;
       const qs = params.toString();
-      return `/brandfetch/${pathSize}/${domain}${qs ? `?${qs}` : ''}`;
+      return `/brandfetch/${pathSize}/${format}/${domain}${qs ? `?${qs}` : ''}`;
     }
 
     function brandfetchStrictProbePath(domain, theme) {
@@ -4248,6 +4524,8 @@
         /* clipboard API not available */
       }
     }
+
+    initCardDownloadButtons();
   </script>
 </body>
 </html>

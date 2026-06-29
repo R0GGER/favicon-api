@@ -246,6 +246,21 @@ const DEFAULT_SVGL_SIZE = 128;
 const RESIZE_SIZES = new Set([16, 32, 64, 128, 256]);
 const RESIZE_SIZES_ARRAY = [16, 32, 64, 128, 256];
 const CATALOG_SIZES_ARRAY = [16, 32, 64, 128, 256];
+// SVG catalog routes are vector — the path size segment is always 0.
+const CATALOG_SVG_SIZE = 0;
+
+function catalogProxyPathSize(size, format) {
+  return format === 'svg' ? CATALOG_SVG_SIZE : size;
+}
+
+function catalogRouteSizeError(size, format, pngSizes, pngLabel) {
+  if (format === 'svg') {
+    if (size === CATALOG_SVG_SIZE || pngSizes.has(size)) return null;
+    return `Invalid size. Use ${CATALOG_SVG_SIZE} for SVG.`;
+  }
+  if (!pngSizes.has(size)) return `Invalid size. Use ${pngLabel}.`;
+  return null;
+}
 const GOOGLE_SIZES_ARRAY = [16, 32, 64, 128];
 const GOOGLEV2_SIZES_ARRAY = [16, 32, 64, 128, 180, 256];
 const FAVICONKIT_SIZES_ARRAY = [16, 32, 64, 128, 256];
@@ -309,7 +324,8 @@ function buildCatalogBlock(host, routeName, slug, sourceFn, availability, sizes,
 
   const encoded = encodeURIComponent(slug);
   const proxyFor = (size, variant, format = 'png') => {
-    const base = `${host}/${routeName}/${size}/${format}/${encoded}`;
+    const pathSize = catalogProxyPathSize(size, format);
+    const base = `${host}/${routeName}/${pathSize}/${format}/${encoded}`;
     return variant && variant !== 'color' ? `${base}?variant=${variant}` : base;
   };
 
@@ -407,6 +423,36 @@ function resolveVemetricFormat(req) {
     return { error: 'Invalid format. Use png, jpg, or webp.' };
   }
   return { format };
+}
+
+const VALID_BRANDFETCH_FORMATS = new Set(['svg', 'png', 'webp', 'jpg']);
+
+function resolveBrandfetchFormat(req) {
+  if (req.params.ext != null && String(req.params.ext).trim() !== '') {
+    let ext = String(req.params.ext).toLowerCase();
+    if (ext === 'jpeg') ext = 'jpg';
+    if (!VALID_BRANDFETCH_FORMATS.has(ext)) {
+      return { error: 'Invalid extension. Use svg, png, webp, or jpg.' };
+    }
+    return { format: ext };
+  }
+  let format = req.query.format ? String(req.query.format).toLowerCase() : null;
+  if (format === 'jpeg') format = 'jpg';
+  if (format && !VALID_BRANDFETCH_FORMATS.has(format)) {
+    return { error: 'Invalid format. Use svg, png, webp, or jpg.' };
+  }
+  return { format: format || 'svg' };
+}
+
+function brandfetchRouteSizeError(size, format) {
+  if (format === 'svg') {
+    if (size === CATALOG_SVG_SIZE || VALID_BRANDFETCH_SIZES.has(size)) return null;
+    return `Invalid size. Use ${CATALOG_SVG_SIZE} for SVG.`;
+  }
+  if (!VALID_BRANDFETCH_SIZES.has(size)) {
+    return 'Invalid size. Use 16, 32, 64, 128, 256, or 512.';
+  }
+  return null;
 }
 
 function emptyCatalogProvider() {
@@ -815,43 +861,50 @@ function brandfetchQuerySuffix(opts = {}) {
   const o = normalizeBrandfetchOptions(opts);
   const params = new URLSearchParams();
   if (o.type !== 'symbol') params.set('type', o.type);
-  if (o.format !== 'svg') params.set('format', o.format);
   if (o.theme) params.set('theme', o.theme);
   const qs = params.toString();
   return qs ? `?${qs}` : '';
 }
 
-function brandfetchFetchOpts(query = {}) {
+function brandfetchFetchOpts(query = {}, { pathFormat = false } = {}) {
   return {
     ...query,
-    formatExplicit: query.format != null && String(query.format).trim() !== '',
+    formatExplicit:
+      pathFormat || (query.format != null && String(query.format).trim() !== ''),
     themeExplicit: query.theme != null && String(query.theme).trim() !== '',
     strict: query.strict === '1' || query.strict === 'true',
   };
 }
 
-// Brandfetch proxy: /brandfetch/:size/:domain (alias: /bf/:size/:domain) - requires BRANDFETCH_CLIENT_ID
-// Query: ?type=icon|symbol|logo&format=svg|png|webp|jpg&theme=light|dark (defaults: symbol, svg)
-// Without explicit format, tries svg then png then webp per type/theme variant.
+// Brandfetch proxy: /brandfetch/:size/:ext/:domain (alias: /bf/:size/:ext/:domain)
+// SVG routes use size 0 in the path; raster routes use native sizes 16–512.
+// Query: ?type=icon|symbol|logo&theme=light|dark (defaults: symbol, svg)
+// Legacy: /brandfetch/:size/:domain still accepts ?format= for backward compatibility.
 async function brandfetchSizedHandler(req, res) {
   if (!process.env.BRANDFETCH_CLIENT_ID) {
     return res.status(503).json({ error: 'Brandfetch not configured. Set BRANDFETCH_CLIENT_ID.' });
   }
 
+  const formatResult = resolveBrandfetchFormat(req);
+  if (formatResult.error) return res.status(400).json({ error: formatResult.error });
+  const { format } = formatResult;
+
   const size = parseInt(req.params.size, 10);
-  if (!VALID_BRANDFETCH_SIZES.has(size)) {
-    return res.status(400).json({ error: 'Invalid size. Use 16, 32, 64, 128, 256, or 512.' });
-  }
+  const sizeError = brandfetchRouteSizeError(size, format);
+  if (sizeError) return res.status(400).json({ error: sizeError });
 
   const domain = extractDomain(req.params.domain);
   if (!domain) return res.status(400).json({ error: 'Invalid domain.' });
 
-  const bfOpts = normalizeBrandfetchOptions(req.query);
+  const pathHasExt = req.params.ext != null && String(req.params.ext).trim() !== '';
+  const bfQuery = { ...req.query, format };
+  const bfOpts = normalizeBrandfetchOptions(bfQuery);
+  const fetchSize = format === 'svg' ? DEFAULT_NATIVE_SIZE : size;
 
   try {
-    const cacheKey = brandfetchCacheKey(size, bfOpts);
+    const cacheKey = brandfetchCacheKey(fetchSize, bfOpts);
     const entry = await fetchWithCache('brandfetch', domain, cacheKey, () =>
-      fetchBrandfetch(domain, size, brandfetchFetchOpts(req.query))
+      fetchBrandfetch(domain, fetchSize, brandfetchFetchOpts(bfQuery, { pathFormat: pathHasExt }))
     );
     if (!entry) return res.status(502).json({ error: 'Upstream fetch failed.' });
     sendFavicon(res, entry);
@@ -860,6 +913,7 @@ async function brandfetchSizedHandler(req, res) {
     res.status(500).json({ error: 'Internal error.' });
   }
 }
+app.get(['/brandfetch/:size/:ext/:domain', '/bf/:size/:ext/:domain'], brandfetchSizedHandler);
 app.get(['/brandfetch/:size/:domain', '/bf/:size/:domain'], brandfetchSizedHandler);
 
 app.get('/bf/:domain', async (req, res) => {
@@ -1082,25 +1136,24 @@ app.get('/services/resolve/:service', async (req, res) => {
 });
 
 // selfhst icons (service-name based).
-//   Canonical: /selfhst/:size/:ext/:service[?variant=color|light|dark]
+//   Canonical: /selfhst/:size/:ext/:service[?variant=color|light|dark]  (size 0 for svg)
 //   Legacy:    /selfhst/:size/:service[?format=png|svg], /sh/:size/:service, /sh/:service
 async function selfhstSizedHandler(req, res) {
   const service = extractService(req.params.service);
   if (!service) return res.status(400).json({ error: 'Invalid service name.' });
 
+  const formatResult = resolveCatalogFormat(req);
+  if (formatResult.error) return res.status(400).json({ error: formatResult.error });
+  const { format } = formatResult;
+
   const size = parseInt(req.params.size, 10);
-  if (!RESIZE_SIZES.has(size)) {
-    return res.status(400).json({ error: 'Invalid size. Use 16, 32, 64, 128, or 256.' });
-  }
+  const sizeError = catalogRouteSizeError(size, format, RESIZE_SIZES, '16, 32, 64, 128, or 256');
+  if (sizeError) return res.status(400).json({ error: sizeError });
 
   const variant = (req.query.variant || 'color').toString().toLowerCase();
   if (!VALID_SELFHST_VARIANTS.has(variant)) {
     return res.status(400).json({ error: 'Invalid variant. Use color, light, or dark.' });
   }
-
-  const formatResult = resolveCatalogFormat(req);
-  if (formatResult.error) return res.status(400).json({ error: formatResult.error });
-  const { format } = formatResult;
 
   try {
     const cacheKey = catalogCacheKey(variant, format);
@@ -1154,19 +1207,18 @@ async function dashboardIconsSizedHandler(req, res) {
   const service = extractService(req.params.service);
   if (!service) return res.status(400).json({ error: 'Invalid service name.' });
 
+  const formatResult = resolveCatalogFormat(req);
+  if (formatResult.error) return res.status(400).json({ error: formatResult.error });
+  const { format } = formatResult;
+
   const size = parseInt(req.params.size, 10);
-  if (!RESIZE_SIZES.has(size)) {
-    return res.status(400).json({ error: 'Invalid size. Use 16, 32, 64, 128, or 256.' });
-  }
+  const sizeError = catalogRouteSizeError(size, format, RESIZE_SIZES, '16, 32, 64, 128, or 256');
+  if (sizeError) return res.status(400).json({ error: sizeError });
 
   const variant = (req.query.variant || 'color').toString().toLowerCase();
   if (!VALID_DASHBOARDICONS_VARIANTS.has(variant)) {
     return res.status(400).json({ error: 'Invalid variant. Use color, light, or dark.' });
   }
-
-  const formatResult = resolveCatalogFormat(req);
-  if (formatResult.error) return res.status(400).json({ error: formatResult.error });
-  const { format } = formatResult;
 
   try {
     const cacheKey = catalogCacheKey(variant, format);
@@ -1226,27 +1278,28 @@ async function lobehubSizedHandler(req, res) {
   const service = extractService(req.params.service);
   if (!service) return res.status(400).json({ error: 'Invalid service name.' });
 
+  const formatResult = resolveCatalogFormat(req);
+  if (formatResult.error) return res.status(400).json({ error: formatResult.error });
+  const { format } = formatResult;
+
   const size = parseInt(req.params.size, 10);
-  if (!VALID_LOBEHUB_SIZES.has(size)) {
-    return res.status(400).json({ error: 'Invalid size. Use 64, 128, or 256.' });
-  }
+  const sizeError = catalogRouteSizeError(size, format, VALID_LOBEHUB_SIZES, '64, 128, or 256');
+  if (sizeError) return res.status(400).json({ error: sizeError });
 
   const variant = (req.query.variant || 'color').toString().toLowerCase();
   if (!VALID_LOBEHUB_VARIANTS.has(variant)) {
     return res.status(400).json({ error: 'Invalid variant. Use color, light, or dark.' });
   }
 
-  const formatResult = resolveCatalogFormat(req);
-  if (formatResult.error) return res.status(400).json({ error: formatResult.error });
-  const { format } = formatResult;
+  const rasterSize = format === 'svg' ? DEFAULT_LOBEHUB_SIZE : size;
 
   try {
-    const cacheKey = catalogCacheKey(variant, format, { size, lobehub: true });
+    const cacheKey = catalogCacheKey(variant, format, { size: rasterSize, lobehub: true });
     const entry = await fetchWithCache(
       'lobehub',
       service,
       cacheKey,
-      () => fetchLobehub(service, variant, size, { format })
+      () => fetchLobehub(service, variant, rasterSize, { format })
     );
     if (!entry) return res.status(404).json({ error: 'Service icon not found.' });
     sendFavicon(res, entry);
@@ -1299,27 +1352,28 @@ async function svglSizedHandler(req, res) {
   const service = extractService(req.params.service);
   if (!service) return res.status(400).json({ error: 'Invalid service name.' });
 
+  const formatResult = resolveCatalogFormat(req);
+  if (formatResult.error) return res.status(400).json({ error: formatResult.error });
+  const { format } = formatResult;
+
   const size = parseInt(req.params.size, 10);
-  if (!VALID_SVGL_SIZES.has(size)) {
-    return res.status(400).json({ error: 'Invalid size. Use 64, 128, or 256.' });
-  }
+  const sizeError = catalogRouteSizeError(size, format, VALID_SVGL_SIZES, '64, 128, or 256');
+  if (sizeError) return res.status(400).json({ error: sizeError });
 
   const variant = (req.query.variant || 'color').toString().toLowerCase();
   if (!VALID_SVGL_VARIANTS.has(variant)) {
     return res.status(400).json({ error: 'Invalid variant. Use color, light, or dark.' });
   }
 
-  const formatResult = resolveCatalogFormat(req);
-  if (formatResult.error) return res.status(400).json({ error: formatResult.error });
-  const { format } = formatResult;
+  const rasterSize = format === 'svg' ? DEFAULT_SVGL_SIZE : size;
 
   try {
-    const cacheKey = svglCacheKey(variant, format, size);
+    const cacheKey = svglCacheKey(variant, format, rasterSize);
     const entry = await fetchWithCache(
       'svgl',
       service,
       cacheKey,
-      () => fetchSvgl(service, variant, size, { format })
+      () => fetchSvgl(service, variant, rasterSize, { format })
     );
     if (!entry) return res.status(404).json({ error: 'Service icon not found.' });
     sendFavicon(res, entry);
@@ -1510,9 +1564,8 @@ app.get('/:domain/json', async (req, res) => {
 
   const brandfetchConfigured = !!process.env.BRANDFETCH_CLIENT_ID;
   const brandfetchSymbolQs = brandfetchQuerySuffix({ type: 'symbol' });
-  const brandfetchRasterQs = brandfetchQuerySuffix({ type: 'symbol', format: 'png' });
   const brandfetch = {
-    proxy: `${host}/brandfetch/${DEFAULT_NATIVE_SIZE}/${encoded}${brandfetchSymbolQs}`,
+    proxy: `${host}/brandfetch/${CATALOG_SVG_SIZE}/svg/${encoded}${brandfetchSymbolQs}`,
     // Omit upstream URL: it embeds BRANDFETCH_CLIENT_ID in the query string.
     source: null,
     configured: brandfetchConfigured,
@@ -1521,7 +1574,7 @@ app.get('/:domain/json', async (req, res) => {
     theme: null,
     sizes: sizedEntries(
       BRANDFETCH_SIZES_ARRAY,
-      (size) => `/brandfetch/${size}/${encoded}${brandfetchRasterQs}`,
+      (size) => `/brandfetch/${size}/png/${encoded}${brandfetchSymbolQs}`,
       () => null
     ),
   };
