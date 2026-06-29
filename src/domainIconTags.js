@@ -9,14 +9,14 @@
  */
 const DOMAIN_ICON_TAGS = [
   // Google Workspace
-  { domain: 'drive.google.com', iconTag: 'google-drive' },
-  { domain: 'docs.google.com', iconTag: 'google-docs' },
-  { domain: 'sheets.google.com', iconTag: 'google-sheets' },
-  { domain: 'slides.google.com', iconTag: 'google-slides' },
-  { domain: 'mail.google.com', iconTag: 'gmail' },
-  { domain: 'calendar.google.com', iconTag: 'google-calendar' },
-  { domain: 'meet.google.com', iconTag: 'google-meet' },
-  { domain: 'photos.google.com', iconTag: 'google-photos' },
+  //{ domain: 'drive.google.com', iconTag: 'google-drive' },
+  //{ domain: 'docs.google.com', iconTag: 'google-docs' },
+  //{ domain: 'sheets.google.com', iconTag: 'google-sheets' },
+  //{ domain: 'slides.google.com', iconTag: 'google-slides' },
+  //{ domain: 'mail.google.com', iconTag: 'gmail' },
+  //{ domain: 'calendar.google.com', iconTag: 'google-calendar' },
+  //{ domain: 'meet.google.com', iconTag: 'google-meet' },
+  //{ domain: 'photos.google.com', iconTag: 'google-photos' },
 
   // Microsoft 365 (examples — extend as needed)
   { domain: 'outlook.office.com', iconTag: 'microsoft-outlook' },
