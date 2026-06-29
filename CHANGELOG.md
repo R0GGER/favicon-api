@@ -5,11 +5,17 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.5] — 2026-06-29
+
+### Fixed
+
+- **Wrong icon on `/{domain}` for product subdomains** (e.g. `drive.google.com` still served the generic Google “G” favicon) — `pickBest()` now delegates to the same scraper fallback chain as `/scraper/{domain}` for hosts listed in `domainIconTags.js`, instead of racing generic providers. Added `?refresh=1` / `?nocache=1` on `GET /{domain}` to bypass the `best` and scraper caches after deploy.
+
 ## [2.6.4] — 2026-06-29
 
 ### Fixed
 
-- **Wrong icon on `/{domain}` for product subdomains** (e.g. `drive.google.com` returned the generic Google “G” favicon from DuckDuckGo/Google while `/scraper/drive.google.com` correctly served the Google Drive icon from selfh.st) — the best-pick race let fast generic providers beat the slower scraper catalog fallback. Domains with an explicit mapping in `domainIconTags.js` now race only the scraper plus catalog providers (`selfhst`, `dashboardicons`, `lobehub`, `svgl`), skipping site-wide providers that resolve to the parent brand icon.
+- **Best-pick race for product subdomains** — domains with an explicit `domainIconTags.js` mapping now race only the scraper plus catalog providers, skipping site-wide providers that resolve to the parent brand icon. Superseded by the direct scraper delegation in 2.6.5.
 
 ## [2.6.3] — 2026-06-29
 

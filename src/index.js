@@ -1705,9 +1705,17 @@ app.get('/:domain', async (req, res) => {
   const parsed = parseDomainOrService(req.params.domain);
   if (!parsed) return res.status(400).json({ error: 'Invalid domain or service name.' });
 
+  const refresh = req.query.refresh === '1' || req.query.nocache === '1';
+
   try {
+    if (refresh && parsed.type === 'domain') {
+      await cache.del('best', parsed.value, 32);
+      await cache.del('scraper', parsed.value, null);
+      invalidateScraperDomainCaches(parsed.value);
+    }
+
     const entry = parsed.type === 'domain'
-      ? await pickBest(parsed.value)
+      ? await pickBest(parsed.value, { refresh })
       : await pickBestService(parsed.value);
     if (entry.notFound) {
       res.status(404);

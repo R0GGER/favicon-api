@@ -229,9 +229,29 @@ async function raceFetchers(fallbacks, cacheProvider, cacheKey, cacheSize) {
   }
 }
 
-async function pickBest(domain) {
-  const cached = await cache.get('best', domain, 32);
-  if (cached) return cached;
+async function pickBest(domain, { refresh = false } = {}) {
+  if (!refresh) {
+    const cached = await cache.get('best', domain, 32);
+    if (cached) return cached;
+  } else {
+    await cache.del('best', domain, 32);
+  }
+
+  // Same chain as GET /scraper/{domain} — avoids the best-pick race returning a
+  // fast parent-brand favicon (e.g. Google "G" for drive.google.com).
+  if (iconTagForDomain(domain)) {
+    const scraperEntry = await fetchWithCache('scraper', domain, null, () => fetchScraper(domain));
+    if (scraperEntry) {
+      const entry = {
+        buffer: scraperEntry.buffer,
+        contentType: scraperEntry.contentType,
+        provider: scraperEntry.provider,
+        url: scraperEntry.url,
+      };
+      await cache.set('best', domain, 32, entry);
+      return entry;
+    }
+  }
 
   const fallbacks = buildFallbackFetchers(domain);
   return raceFetchers(fallbacks, 'best', domain, 32);
