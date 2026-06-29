@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`/{domain}/json` discovery** — `proxy` and per-size entries now include the `/png/` path segment for all providers that use the new scheme.
 - **Web UI — PNG | SVG on catalog cards** — selfh.st, dashboardicons.com, and LobeHub cards gain a **PNG | SVG** toggle; size buttons hide when SVG is selected.
 - **LobeHub light/dark variants** — availability is probed against `@lobehub/icons-static-png` theme assets (`/light/{slug}.png`, `/dark/{slug}.png`) instead of the color SVG URL, so Light/Dark buttons only appear when those PNGs exist. Light/dark requests serve the upstream theme PNGs; SVG format remains color-only.
-- **Web UI — service icon controls** — extension (PNG/SVG) and color (Color/Light/Dark) toggles on selfh.st, dashboardicons.com, LobeHub, and SVGL cards are now compact Bootstrap-style button groups on one row; size buttons use the same grouped style on a separate row.
+- **Web UI — service icon controls** — extension (PNG/SVG or SVG badge) and color (Color/Light/Dark) toggles on selfh.st, dashboardicons.com, LobeHub, SVGL, and Brandfetch cards are compact Bootstrap-style button groups on one row. Size buttons (256, 128, 64, …) remain separate rounded buttons with spacing.
 
 ### Fixed
 

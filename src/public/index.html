@@ -710,25 +710,25 @@
       gap: 0;
     }
 
-    .btn-group .size-btn {
+    .size-buttons.btn-group .size-btn {
       border-radius: 0;
       margin-left: -1px;
     }
 
-    .btn-group .size-btn:first-child {
+    .size-buttons.btn-group .size-btn:first-child {
       margin-left: 0;
       border-top-left-radius: 4px;
       border-bottom-left-radius: 4px;
     }
 
-    .btn-group .size-btn:last-child {
+    .size-buttons.btn-group .size-btn:last-child {
       border-top-right-radius: 4px;
       border-bottom-right-radius: 4px;
     }
 
-    .btn-group .size-btn:hover,
-    .btn-group .size-btn.active,
-    .btn-group .size-btn:focus-visible {
+    .size-buttons.btn-group .size-btn:hover,
+    .size-buttons.btn-group .size-btn.active,
+    .size-buttons.btn-group .size-btn:focus-visible {
       position: relative;
       z-index: 1;
     }
@@ -1592,8 +1592,15 @@
           <img id="brandfetch-img" style="display:none" alt="Brandfetch favicon">
           <span class="copied-toast">URL copied!</span>
         </div>
-        <div class="size-buttons" id="brandfetch-format-row">
-          <button class="size-btn active" type="button" disabled aria-label="SVG format">SVG</button>
+        <div class="size-buttons-toolbar" id="brandfetch-controls-toolbar">
+          <div class="size-buttons btn-group" id="brandfetch-format-row" role="group" aria-label="Extension">
+            <button class="size-btn active" type="button" disabled aria-label="SVG format">SVG</button>
+          </div>
+          <div class="size-buttons btn-group" id="brandfetch-variants" role="group" aria-label="Color" style="display:none">
+            <button class="size-btn active" data-variant="color" onclick="switchBrandfetchTheme('color')">Color</button>
+            <button class="size-btn" data-variant="light" style="display:none" onclick="switchBrandfetchTheme('light')">Light</button>
+            <button class="size-btn" data-variant="dark" style="display:none" onclick="switchBrandfetchTheme('dark')">Dark</button>
+          </div>
         </div>
         <div class="size-buttons" id="brandfetch-sizes" style="display:none">
           <button class="size-btn" onclick="switchBrandfetchSize(512)">512</button>
@@ -1602,11 +1609,6 @@
           <button class="size-btn" onclick="switchBrandfetchSize(64)">64</button>
           <button class="size-btn" onclick="switchBrandfetchSize(32)">32</button>
           <button class="size-btn" onclick="switchBrandfetchSize(16)">16</button>
-        </div>
-        <div class="size-buttons" id="brandfetch-variants" style="display:none">
-          <button class="size-btn active" data-variant="color" onclick="switchBrandfetchTheme('color')">Color</button>
-          <button class="size-btn" data-variant="light" style="display:none" onclick="switchBrandfetchTheme('light')">Light</button>
-          <button class="size-btn" data-variant="dark" style="display:none" onclick="switchBrandfetchTheme('dark')">Dark</button>
         </div>
         <div class="meta" id="brandfetch-meta"></div>
       </div>
@@ -1651,7 +1653,7 @@
             <button class="size-btn" data-variant="dark" style="display:none" onclick="switchSelfhstVariant('dark')">Dark</button>
           </div>
         </div>
-        <div class="size-buttons btn-group" id="selfhst-sizes">
+        <div class="size-buttons" id="selfhst-sizes">
           <button class="size-btn" onclick="switchSelfhstSize(256)">256</button>
           <button class="size-btn active" onclick="switchSelfhstSize(128)">128</button>
           <button class="size-btn" onclick="switchSelfhstSize(64)">64</button>
@@ -1690,7 +1692,7 @@
             <button class="size-btn" data-variant="dark" style="display:none" onclick="switchDashboardIconsVariant('dark')">Dark</button>
           </div>
         </div>
-        <div class="size-buttons btn-group" id="dashboardicons-sizes">
+        <div class="size-buttons" id="dashboardicons-sizes">
           <button class="size-btn" onclick="switchDashboardIconsSize(256)">256</button>
           <button class="size-btn active" onclick="switchDashboardIconsSize(128)">128</button>
           <button class="size-btn" onclick="switchDashboardIconsSize(64)">64</button>
@@ -1729,7 +1731,7 @@
             <button class="size-btn" data-variant="dark" style="display:none" onclick="switchLobehubVariant('dark')">Dark</button>
           </div>
         </div>
-        <div class="size-buttons btn-group" id="lobehub-sizes">
+        <div class="size-buttons" id="lobehub-sizes">
           <button class="size-btn" onclick="switchLobehubSize(256)">256</button>
           <button class="size-btn active" onclick="switchLobehubSize(128)">128</button>
           <button class="size-btn" onclick="switchLobehubSize(64)">64</button>
@@ -1760,7 +1762,7 @@
           <button class="size-btn" data-variant="light" style="display:none" onclick="switchSvglVariant('light')">Light</button>
           <button class="size-btn" data-variant="dark" style="display:none" onclick="switchSvglVariant('dark')">Dark</button>
         </div>
-        <div class="size-buttons btn-group" id="svgl-sizes">
+        <div class="size-buttons" id="svgl-sizes">
           <button class="size-btn" onclick="switchSvglSize(256)">256</button>
           <button class="size-btn active" onclick="switchSvglSize(128)">128</button>
           <button class="size-btn" onclick="switchSvglSize(64)">64</button>
