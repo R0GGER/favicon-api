@@ -364,6 +364,16 @@
       margin-bottom: 1.1rem;
     }
 
+    .profile-url-box {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.6rem;
+    }
+
+    .profile-url-box code { font-size: 0.78rem; }
+
+    .profile-url-box .modal-copy-btn { align-self: flex-end; }
+
     .profile-field {
       display: flex;
       flex-direction: column;
@@ -2118,7 +2128,7 @@
           </div>
         </div>
 
-        <div class="search-url-box">
+        <div class="search-url-box profile-url-box">
           <code id="profile-url"></code>
           <button type="button" class="modal-copy-btn" onclick="copyProfileUrl()">Copy URL</button>
         </div>
