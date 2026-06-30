@@ -400,6 +400,30 @@
       gap: 0.6rem;
     }
 
+    .profile-fallback-cell {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      min-width: 0;
+    }
+
+    .profile-fallback-cell select { flex: 1; min-width: 0; }
+
+    .profile-fallback-num {
+      flex: 0 0 auto;
+      width: 1.4rem;
+      height: 1.4rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #5b2e7e;
+      background: #f0e9f5;
+      border: 1px solid #e0d3ec;
+      border-radius: 50%;
+    }
+
     .profile-hint {
       font-size: 0.78rem;
       color: #8a8480;
@@ -2075,10 +2099,10 @@
           <div class="profile-field">
             <label>Fallbacks (optional, in order)</label>
             <div class="profile-fallbacks">
-              <select id="profile-fallback-1" aria-label="Fallback 1"></select>
-              <select id="profile-fallback-2" aria-label="Fallback 2"></select>
-              <select id="profile-fallback-3" aria-label="Fallback 3"></select>
-              <select id="profile-fallback-4" aria-label="Fallback 4"></select>
+              <div class="profile-fallback-cell"><span class="profile-fallback-num">1</span><select id="profile-fallback-1" aria-label="Fallback 1"></select></div>
+              <div class="profile-fallback-cell"><span class="profile-fallback-num">2</span><select id="profile-fallback-2" aria-label="Fallback 2"></select></div>
+              <div class="profile-fallback-cell"><span class="profile-fallback-num">3</span><select id="profile-fallback-3" aria-label="Fallback 3"></select></div>
+              <div class="profile-fallback-cell"><span class="profile-fallback-num">4</span><select id="profile-fallback-4" aria-label="Fallback 4"></select></div>
             </div>
           </div>
 

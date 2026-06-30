@@ -5,6 +5,16 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.1] — 2026-06-30
+
+### Changed
+
+- **Custom URL builder — clearer fallback order** — the four fallback selectors now show numbered badges (1-4) so the apply order is unambiguous (preferred → 1 → 2 → 3 → 4; empty slots are skipped).
+
+### Fixed
+
+- **Custom URL builder — crisp preview** — the icon preview no longer forces every image to 48×48 (which upscaled and blurred small icons). It now renders at the icon's natural size inside a fixed thumbnail box, so small sizes (e.g. 16px) stay sharp.
+
 ## [2.7.0] — 2026-06-30
 
 ### Added
