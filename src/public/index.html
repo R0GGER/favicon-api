@@ -3521,6 +3521,14 @@
       return null;
     }
 
+    function brandfetchBlobMime(format) {
+      if (format === 'svg') return 'image/svg+xml';
+      if (format === 'png') return 'image/png';
+      if (format === 'webp') return 'image/webp';
+      if (format === 'jpg' || format === 'jpeg') return 'image/jpeg';
+      return 'application/octet-stream';
+    }
+
     function loadBrandfetch(domain, size) {
       if (size !== undefined) currentBrandfetchSize = size;
       applyBrandfetchDisplayTheme(currentBrandfetchTheme);
@@ -3539,12 +3547,14 @@
           currentBrandfetchResolvedFormat = fmt;
           updateBrandfetchFormatControls(fmt);
           const blob = await res.blob();
-          return { blob, fmt };
+          const mime = brandfetchBlobMime(fmt);
+          const typedBlob = blob.type ? blob : new Blob([await blob.arrayBuffer()], { type: mime });
+          return { typedBlob, fmt };
         })
-        .then(({ blob }) => {
+        .then(({ typedBlob }) => {
           loadFavicon('brandfetch', buildBrandfetchUrl(domain), `${location.origin}${buildBrandfetchUrl(domain)}`, {
             forceProxy: true,
-            objectUrl: URL.createObjectURL(blob),
+            objectUrl: URL.createObjectURL(typedBlob),
             onMeta: (imgEl) => refreshBrandfetchMeta(imgEl),
           });
         })
@@ -4700,22 +4710,29 @@
         if (card) card.style.display = 'none';
       };
       if (opts?.objectUrl) {
-        imgEl.onload = () => {
-          if (id === 'yandex' && imgEl.naturalWidth <= 1 && imgEl.naturalHeight <= 1) {
+        const objectUrl = opts.objectUrl;
+        const revokeObjectUrl = () => URL.revokeObjectURL(objectUrl);
+        const showLoaded = (loadedImg) => {
+          if (id === 'yandex' && loadedImg.naturalWidth <= 1 && loadedImg.naturalHeight <= 1) {
             spinner.style.display = 'none';
             if (card) card.style.display = 'none';
-            URL.revokeObjectURL(opts.objectUrl);
+            revokeObjectUrl();
             return;
           }
-          img.src = imgEl.src;
           img.style.display = 'block';
           spinner.style.display = 'none';
           if (card) card.style.display = '';
-          if (opts?.onMeta) opts.onMeta(imgEl);
-          else showFaviconMeta(id, imgEl, proxyUrl, sourceUrl, opts);
-          URL.revokeObjectURL(opts.objectUrl);
+          if (opts?.onMeta) opts.onMeta(loadedImg);
+          else showFaviconMeta(id, loadedImg, proxyUrl, sourceUrl, opts);
+          revokeObjectUrl();
         };
-        imgEl.src = opts.objectUrl;
+        img.onload = () => showLoaded(img);
+        img.onerror = () => {
+          spinner.style.display = 'none';
+          if (card) card.style.display = 'none';
+          revokeObjectUrl();
+        };
+        img.src = objectUrl;
         return;
       }
       imgEl.src = `${proxyUrl}${proxyUrl.includes('?') ? '&' : '?'}_=${Date.now()}`;
