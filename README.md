@@ -11,6 +11,7 @@ FaviconAPI is a self-hosted favicon proxy with a browser-based UI that fetches w
 **Browser tools: [faviconapi.com/#tools](https://faviconapi.com/#tools)**
 
 - **Browser search** - add `/search?q=%s` as a custom search engine (Chrome, Edge, Firefox)
+- **Custom URL** - Build a shareable URL with your own preferred provider, fallbacks and minimum icon size. 
 - **Bookmarklet** - drag **FaviconAPI Copy** to your bookmarks bar to copy a site's favicon URL
 
 ---
@@ -19,7 +20,6 @@ FaviconAPI is a self-hosted favicon proxy with a browser-based UI that fetches w
 
 - [Why FaviconAPI?](#why-faviconapi)
 - [How it works](#how-it-works)
-- [Fallback chain & source order](docs/fallback-chain.md)
 - [Quick start (Docker)](#quick-start-docker)
 - [Routes](#routes)
   - [Favicon providers](#favicon-providers)
@@ -27,18 +27,16 @@ FaviconAPI is a self-hosted favicon proxy with a browser-based UI that fetches w
   - [Sizes](#sizes)
 - [Custom profile URLs](#custom-profile-urls)
 - [API v1](#api-v1)
-  - [Authentication](#authentication)
-  - [Response](#response)
-  - [Errors](#errors)
 - [Managing API keys (CLI)](#managing-api-keys-cli)
 - [Configuration](#configuration)
 - [Performance tuning](#performance-tuning)
+- [Detailed guides](#detailed-guides)
 
 ---
 
 ## Why FaviconAPI?
 
-FaviconAPI started out of a very practical need. While building my own dashboards with [Mafl+ (](https://github.com/R0GGER/maflplus)`R0GGER/maflplus`[)](https://github.com/R0GGER/maflplus), I wanted a simple, low-friction way to fetch favicons and logos and link them to the services on my dashboard - without manually downloading and hosting an image for every single tile.
+FaviconAPI started out of a very practical need. While building my own dashboards with [Mafl+ (`R0GGER/maflplus`)](https://github.com/R0GGER/maflplus), I wanted a simple, low-friction way to fetch favicons and logos and link them to the services on my dashboard — without manually downloading and hosting an image for every single tile.
 
 In practice that turned out to be surprisingly painful. To get decent coverage I always ended up combining **multiple sources**, and time and again I noticed that the "different" tools I was using were really just reaching for the **same underlying providers** behind the scenes - mostly Google and DuckDuckGo. When one of those came back with a blank, low-resolution, or generic placeholder icon, I had no fallback and was stuck.
 
@@ -59,7 +57,7 @@ So I built it. FaviconAPI brings 10+ favicon providers and four service-icon cat
 
 > Interactive API docs and a live playground are available at `/api` on a running instance.
 
-For the exact provider order, head-start logic, and the scraper's strictly-ordered fallback steps, see [docs/fallback-chain.md](docs/fallback-chain.md).
+For the exact provider order, head-start logic, and the scraper's strictly-ordered fallback steps, see [Fallback chain](docs/fallback-chain.md) (detailed guide).
 
 ---
 
@@ -133,29 +131,32 @@ volumes:
 
 - **besticon** has no `ports:` mapping — only `maflplus-favicon-api` can reach it on `http://besticon:8080`. Set `BESTICON_URL=http://besticon:8080` in `.env`.
 - **Without besticon:** remove the `besticon` service, `depends_on`, `networks`, and `BESTICON_URL`. The built-in HTML scraper is used instead.
-- **Host cache path:** use `- /path/to/cache:/cache` instead of the named volume; run `chown 100:101 /path/to/cache` and `chmod 755 /path/to/cache` so the container user can write.
+- **Host cache path:** use `- /path/to/cache:/cache` instead of the named volume; run `chown 100:101 /path/to/cache` and `chmod 755 /path/to/cache` so the container user can write. See [Getting started — cache volume](docs/getting-started.md#host-path-for-the-cache-volume).
 
 ---
 
 ## Routes
 
-Every provider route follows one uniform scheme:
+Domain providers use `/{provider}/{size}/{ext}/{domain}` (e.g. `/google/128/png/github.com`). Catalog providers use `/{provider}/{size}/{format}/{service}` — SVG with size **`0`** (e.g. `/svgl/0/svg/github`). Legacy three-segment routes and short aliases (`/g/`, `/d/`, `/sh/`, …) remain valid.
 
 ```
-/{provider}/{size}/{domain}
+/{provider}/{size}/{domain}          # legacy; PNG assumed
+/{provider}/{size}/{ext}/{domain}    # canonical for domain providers
 ```
 
-The short single-letter routes from earlier versions are kept as aliases. Providers without a native upstream size accept the size segment and are resized server-side.
+Providers without a native upstream size accept the size segment and are resized server-side.
 
 **Quick examples**
 
 ```
 https://your-host/github.com
 https://your-host/scraper/github.com
-https://your-host/google/64/github.com
-https://your-host/selfhst/128/jellyfin
-https://your-host/svgl/128/reddit
+https://your-host/google/64/png/github.com
+https://your-host/selfhst/128/png/jellyfin
+https://your-host/svgl/0/svg/github
 ```
+
+Full endpoint list, JSON discovery, and caching headers: [API reference](docs/api-reference.md).
 
 ### Favicon providers
 
@@ -170,7 +171,7 @@ All providers run in parallel on `/{domain}`; each also has its own route.
 | [DuckDuckGo](https://icons.duckduckgo.com/)                                         | `/duckduckgo/{size}/{domain}` | `/d/`  | Resized server-side                                                                                                                                                                         |
 | [Yandex](https://favicon.yandex.net/)                                               | `/yandex/{size}/{domain}`     | `/y/`  | Resized server-side                                                                                                                                                                         |
 | [Favicon.so](https://favicon.so/)                                                   | `/faviconso/{size}/{domain}`  | `/f/`  | Resized server-side                                                                                                                                                                         |
-| [Vemetric](https://favicon.vemetric.com/)                                           | `/vemetric/{size}/{domain}`   | `/v/`  | `?format=png                                                                                                                                                                                |
+| [Vemetric](https://favicon.vemetric.com/)                                           | `/vemetric/{size}/{domain}`   | `/v/`  | `?format=webp`, `png`, or `jpg`; or `/{size}/{ext}/` in path |
 | [Favicon Extractor](https://www.faviconextractor.com/)                              | `/favicondev/{size}/{domain}` | `/p/`  | Resized server-side                                                                                                                                                                         |
 | [Faviconkit](https://faviconkit.net/)                                               | `/faviconkit/{size}/{domain}` | `/k/`  | Sizes 16, 32, 64, 128, 256                                                                                                                                                                  |
 | [Favicon.run](https://favicon.run/)                                                 | `/faviconrun/{size}/{domain}` | `/fr/` | Sizes 16, 32, 64, 128, 256                                                                                                                                                                  |
@@ -252,11 +253,13 @@ The id is the base64url of a compact JSON array — keep this contract identical
 
 Providers are any from the [favicon providers](#favicon-providers) / [catalogs](#appservice-icon-catalogs) tables; minimum sizes are `16, 32, 64, 128`. `logodev`/`brandfetch` only resolve when their credentials are configured (otherwise that step is skipped). Domain-only providers (scraper, raster providers, brandfetch) are skipped for app-name targets.
 
+More detail: [Custom profile URLs](docs/custom-profiles.md).
+
 ---
 
 ## API v1
 
-`GET /api/v1/favicon?url=<website>` returns JSON (not image bytes) with a CDN URL to a normalized 256×256 PNG, a `sourceType` (`svg` > `manifest` > `apple-touch-icon` > `png` > `ico`), and cache metadata. Clients fetch the image from the returned `url` via `/cdn/favicons/{domain}.png`.
+`GET /api/v1/favicon?url=<website>` returns JSON (not image bytes) with a CDN URL to a normalized **128×128** PNG, a `sourceType`, and cache metadata. Clients fetch the image from the returned `url` via `/cdn/favicons/{domain}.png`.
 
 ### Authentication
 
@@ -286,8 +289,8 @@ Set `API_REQUIRE_KEY=false` for a fully public endpoint (no key, no quotas).
 {
   "url":        "https://your-host/cdn/favicons/github.com.png",
   "domain":     "github.com",
-  "width":      256,
-  "height":     256,
+  "width":      128,
+  "height":     128,
   "format":     "png",
   "sourceType": "svg",
   "cached":     true,
@@ -308,6 +311,8 @@ Set `API_REQUIRE_KEY=false` for a fully public endpoint (no key, no quotas).
 
 
 Only `200` responses count toward the monthly quota. Quotas reset each calendar month (UTC).
+
+Full reference — source priority, CDN route, plans, PowerShell notes: [API v1](docs/api-v1.md).
 
 ---
 
@@ -336,11 +341,15 @@ docker compose exec maflplus-favicon-api npm run keys:delete -- --prefix fa_abcd
 
 Plans: `free`, `pro`, `enterprise`. Monthly limits are set via `PLAN_*_LIMIT` env vars. Outside Docker, the same commands work via `npm run keys:create`, `keys:list`, `keys:revoke`, and `keys:delete`.
 
+See also [API v1 — Managing API keys](docs/api-v1.md#managing-api-keys).
+
 ---
 
 ## Configuration
 
-All settings are documented in `[.env.example](.env.example)`. Copy it to `.env` and pass it via `env_file: .env` in Compose (or set `environment:` entries manually).
+All settings are documented in [`.env.example`](.env.example). Copy it to `.env` and pass it via `env_file: .env` in Compose (or set `environment:` entries manually).
+
+The tables below cover the most-used variables. For the complete list — including `UI_CARD_URL`, `UI_INCLUDE_APP_ICONS`, `SCRAPER_FALLBACK`, and tuning notes — see [Configuration](docs/configuration.md).
 
 ### Server & cache
 
@@ -383,7 +392,7 @@ All settings are documented in `[.env.example](.env.example)`. Copy it to `.env`
 | Variable                | Default                  | Description                                                                                                         |
 | ----------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------- |
 | `API_KEYS_DB`           | `/cache/api-keys.sqlite` | SQLite file for hashed API keys and monthly usage counters. Keep on the same volume as `CACHE_DIR`.                 |
-| `API_CACHE_DIR`         | `/cache/api`             | Directory for normalized 256×256 PNGs from `/api/v1/favicon`. Served via `/cdn/favicons/{domain}.png`.              |
+| `API_CACHE_DIR`         | `/cache/api`             | Directory for normalized 128×128 PNGs from `/api/v1/favicon`. Served via `/cdn/favicons/{domain}.png`.              |
 | `API_CACHE_TTL`         | `604800`                 | How long a generated PNG counts as cached (seconds, 7 days). Also used as `Cache-Control` max-age on the CDN route. |
 | `API_REQUIRE_KEY`       | `true`                   | `false` makes `/api/v1/favicon` public: no key required, quotas not enforced. A provided key is silently ignored.   |
 | `PLAN_FREE_LIMIT`       | `25`                     | Monthly call quota for `free` plan keys. `0` = unlimited.                                                           |
@@ -395,4 +404,26 @@ All settings are documented in `[.env.example](.env.example)`. Copy it to `.env`
 
 ## Performance tuning
 
-Wiki — soon
+See [Performance tuning](docs/performance.md) for cache TTL recommendations, scraper latency, and worker sizing.
+
+---
+
+## Detailed guides
+
+This page is the wiki **homepage**. Deeper documentation lives under `docs/`:
+
+| Topic | Guide |
+|-------|-------|
+| Verify install, local dev, cache volume | [Getting started](docs/getting-started.md) |
+| All routes, JSON discovery, caching | [API reference](docs/api-reference.md) |
+| Custom profile encoding & edge cases | [Custom profile URLs](docs/custom-profiles.md) |
+| API v1 auth, quotas, CDN, errors | [API v1](docs/api-v1.md) |
+| Homepage, downloads, tools panel | [Web UI](docs/web-ui.md) |
+| Provider race & scraper chain | [Fallback chain](docs/fallback-chain.md) |
+| Catalog slugs, aliases, CSV exports | [Icon catalogs](docs/icon-catalogs.md) |
+| Complete environment reference | [Configuration](docs/configuration.md) |
+| Production & reverse proxy | [Deployment](docs/deployment.md) |
+| Internal modules & caching | [Architecture](docs/architecture.md) |
+| robots.txt, sitemap | [SEO](docs/seo.md) |
+
+**Docker image:** `ghcr.io/r0gger/maflplus-favicon-api:latest`
