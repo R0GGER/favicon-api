@@ -360,11 +360,12 @@ const DEFAULT_RESIZE_SIZE = 64;
 const DEFAULT_CATALOG_SIZE = 128;
 const SERVICE_SLUG_RE = /^[a-z0-9][a-z0-9._-]*$/;
 const CACHE_CONTROL = 'public, max-age=86400';
+const NOT_FOUND_CACHE_CONTROL = 'no-store';
 const JSON_CACHE_CONTROL = 'no-cache';
 
 function sendFavicon(res, entry) {
   res.set('Content-Type', entry.contentType);
-  res.set('Cache-Control', CACHE_CONTROL);
+  res.set('Cache-Control', entry.notFound ? NOT_FOUND_CACHE_CONTROL : CACHE_CONTROL);
   res.set('X-Favicon-Source', entry.provider);
   if (entry.url) res.set('X-Favicon-Url', entry.url);
   if (entry.resolvedFormat) res.set('X-Brandfetch-Format', entry.resolvedFormat);

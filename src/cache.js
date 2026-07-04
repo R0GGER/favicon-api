@@ -142,6 +142,8 @@ async function get(provider, domain, size) {
 }
 
 async function set(provider, domain, size, entry) {
+  if (entry?.notFound) return;
+
   const key = cacheKey(provider, domain, size);
 
   memoryCache.set(key, entry);

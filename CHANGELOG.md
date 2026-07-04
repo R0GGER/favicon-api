@@ -5,6 +5,27 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.2] — 2026-07-05
+
+### Added
+
+- **Web UI — "No icon found" notice** — when every provider (and app-icon catalog, if enabled) fails to load an icon, a banner appears above the results grid stating that no favicon was found, with a preview of the black placeholder and the direct `/{domain}` URL.
+
+### Fixed
+
+- **Web UI — stale icons after a new search** — provider cards are reset at the start of each domain lookup, and a failed load no longer keeps the previous domain's image (e.g. GitHub icons after searching `hibbit.net`). The "size not available" fallback still applies only when switching sizes within the same domain.
+
+## [2.8.1] — 2026-07-05
+
+### Added
+
+- **Not-found placeholder icon** — when all providers fail (`GET /{domain}`, custom profile URLs, service lookups), a solid black PNG placeholder is returned (HTTP 404) instead of a transparent 1×1 pixel. Sized to the profile minimum or 32px for best-pick. Asset: `src/assets/not-found.png`; helper: `src/notFoundPlaceholder.js`.
+
+### Fixed
+
+- **Favicon.so / Vemetric generic placeholders rejected** — Favicon.so's SVG code-bracket icon and Vemetric's "world-question" fallback are no longer treated as real favicons in best-pick, profile resolve, or dedicated provider routes; the chain continues to the next source or the not-found placeholder.
+- **Not-found responses are not cached** — placeholder results (`notFound: true`) are never written to the disk/memory cache; stale `provider: none` entries are evicted on read. HTTP responses use `Cache-Control: no-store` so browsers and CDNs do not cache 404 placeholders (found icons still use `max-age=86400`).
+
 ## [2.8.0] — 2026-07-04
 
 ### Added

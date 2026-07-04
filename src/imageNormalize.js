@@ -1,5 +1,6 @@
 const sharp = require('sharp');
 const decodeIco = require('decode-ico');
+const crypto = require('crypto');
 
 const TARGET_SIZE = 128;
 // Minimum acceptable source image size (applies to ICO frames and raster images).
@@ -319,6 +320,57 @@ async function isBlankFavicon(buffer, { contentType = '', url = '' } = {}) {
   }
 }
 
+function providerHint(meta = {}) {
+  return `${meta.provider || ''} ${meta.url || ''}`.toLowerCase();
+}
+
+function isFaviconSoResult(meta = {}) {
+  const hint = providerHint(meta);
+  return hint.includes('favicon.so') || hint.includes('faviconso');
+}
+
+function isVemetricResult(meta = {}) {
+  const hint = providerHint(meta);
+  return hint.includes('vemetric.com') || hint.includes('vemetric');
+}
+
+// Favicon.so returns a generic SVG code-bracket icon when the site has no favicon;
+// real hits are always raster (png/ico).
+function isFaviconSoPlaceholder(buffer, meta = {}) {
+  if (!isFaviconSoResult(meta)) return false;
+  const hint = (meta.contentType || '').toLowerCase();
+  return looksLikeSvg(buffer) || hint.includes('svg');
+}
+
+// Vemetric serves a tabler "world-question" icon when no favicon exists.
+const VEMETRIC_PLACEHOLDER_SHA256 = new Set([
+  '716386384223ef83da6c1e214399ed18b2e22c31b69fa5bb5df0ca32f7989360', // 16px png
+  'd6b82a2f8afb4ad5d1564f98bd9ba179de23ac82062bf4258b64b02161718eaf', // 32px png
+  '508c896cc7f491e1ebeef24686f3a0673e5cd9f1f71e1af002120ecfa45ed512', // 64px png
+  '1910648a0ea674b3e059ed2d83a211c02caae9d4530111cd35a269d23b573382', // 128px png
+  'd6b5ed227d47ebc0a5aaeaf1dc634730b3bb13e1b0e20d906f00d5687f6c5357', // 256px png
+]);
+
+function isVemetricPlaceholder(buffer, meta = {}) {
+  if (!isVemetricResult(meta)) return false;
+  if (!buffer || buffer.length === 0) return false;
+
+  const hint = (meta.contentType || '').toLowerCase();
+  if (looksLikeSvg(buffer) || hint.includes('svg')) {
+    return buffer.toString('utf8').toLowerCase().includes('world-question');
+  }
+
+  const hash = crypto.createHash('sha256').update(buffer).digest('hex');
+  return VEMETRIC_PLACEHOLDER_SHA256.has(hash);
+}
+
+async function isUnusableIcon(buffer, meta = {}) {
+  if (await isBlankFavicon(buffer, meta)) return true;
+  if (isFaviconSoPlaceholder(buffer, meta)) return true;
+  if (isVemetricPlaceholder(buffer, meta)) return true;
+  return false;
+}
+
 // Keep legacy export name for compatibility
 const toPng256 = toPng;
 
@@ -331,6 +383,7 @@ module.exports = {
   readImageDimensions,
   resizeIcon,
   isBlankFavicon,
+  isUnusableIcon,
   looksLikeIco,
   looksLikeSvg,
   rasterizeSvgToSize,

@@ -11,7 +11,7 @@
  *     side is >= the minimum size; it is then resized to exactly that size and
  *     served as PNG.
  *   - Otherwise fall through to the next entry. If the whole chain fails, a
- *     transparent placeholder is returned with notFound: true.
+ *     not-found placeholder is returned with notFound: true.
  */
 const {
   fetchGoogle,
@@ -41,12 +41,7 @@ const {
 } = require('./imageNormalize');
 const { serviceSlugFromDomain } = require('./serviceSlugFromDomain');
 const cache = require('./cache');
-
-const TRANSPARENT_1X1_PNG = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVQI12NgAAIABQAB' +
-    'Nl7BcQAAAABJRU5ErkJggg==',
-  'base64'
-);
+const { notFoundEntry } = require('./notFoundPlaceholder');
 
 // Raster domain providers with no SVG output. `max` is the largest native size
 // the upstream offers (null = the upstream has no size parameter). We always
@@ -204,21 +199,18 @@ async function finalizeCandidate(candidate, size) {
   }
 }
 
-function notFoundEntry() {
-  return {
-    buffer: TRANSPARENT_1X1_PNG,
-    contentType: 'image/png',
-    provider: 'none',
-    notFound: true,
-  };
-}
-
 async function resolveProfileIcon(target, profile, id) {
   const { preferred, fallbacks, size } = profile;
   const cacheDomain = `${id}_${target.value}`;
 
   const cached = await cache.get('profile', cacheDomain, size);
-  if (cached) return cached;
+  if (cached) {
+    if (cached.notFound || cached.provider === 'none') {
+      await cache.del('profile', cacheDomain, size);
+    } else {
+      return cached;
+    }
+  }
 
   const chain = [preferred, ...fallbacks];
   for (const provider of chain) {
@@ -243,7 +235,7 @@ async function resolveProfileIcon(target, profile, id) {
     return entry;
   }
 
-  return notFoundEntry();
+  return notFoundEntry(size);
 }
 
 module.exports = { resolveProfileIcon };

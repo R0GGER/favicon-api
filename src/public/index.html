@@ -758,6 +758,50 @@
       margin-right: 0;
     }
 
+    .no-icon-notice {
+      grid-column: 1 / -1;
+      display: none;
+      padding: 1rem 1.15rem;
+      background: #fef8f5;
+      border: 1px solid #e8dcd4;
+      border-radius: 8px;
+      color: #4a4540;
+      font-size: 0.92rem;
+      line-height: 1.55;
+    }
+
+    .no-icon-notice.visible {
+      display: block;
+    }
+
+    .no-icon-notice strong {
+      color: #3d1a5e;
+    }
+
+    .no-icon-notice code {
+      font-family: monospace;
+      font-size: 0.88em;
+      background: #f0ebe4;
+      padding: 0.12em 0.35em;
+      border-radius: 4px;
+      word-break: break-all;
+    }
+
+    .no-icon-notice-placeholder {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-top: 0.65rem;
+      flex-wrap: wrap;
+    }
+
+    .no-icon-notice-placeholder img {
+      width: 32px;
+      height: 32px;
+      border-radius: 4px;
+      flex: 0 0 auto;
+    }
+
     .results.placeholder .card {
       pointer-events: none;
       user-select: none;
@@ -1939,6 +1983,14 @@
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>
           Download all
         </button>
+      </div>
+      <div class="no-icon-notice" id="no-icon-notice" role="status" aria-live="polite">
+        <strong>No icon found.</strong>
+        <span id="no-icon-notice-text">No favicon could be found for this domain.</span>
+        <div class="no-icon-notice-placeholder" id="no-icon-notice-placeholder" hidden>
+          <img id="no-icon-notice-img" width="32" height="32" alt="">
+          <span>The direct URL <code id="no-icon-notice-url"></code> returns a placeholder icon.</span>
+        </div>
       </div>
       <!-- Scraper -->
       <div class="card" data-card-type="domain">
@@ -3300,6 +3352,7 @@
 
       document.getElementById('api-example').textContent = `${location.origin}/{domain-or-appname}`;
       document.getElementById('json-button-wrap').classList.remove('visible');
+      hideNoIconNotice();
 
       DOMAIN_FAVICON_PROVIDERS.forEach(resetFaviconCard);
       SERVICE_ICON_PROVIDERS.forEach(resetFaviconCard);
@@ -3587,6 +3640,7 @@
       const grid = document.getElementById(`${provider}-candidates-grid`);
       if (panel) panel.hidden = true;
       if (grid) grid.innerHTML = '';
+      scheduleNoIconNoticeCheck();
     }
 
     function startServiceIconLoads(resolveData, hideOnError) {
@@ -3660,6 +3714,7 @@
         hideServiceProviderCard('svgl');
       }
       updateServiceIconsDivider();
+      scheduleNoIconNoticeCheck();
     }
 
     function showCardsByType(type) {
@@ -3700,6 +3755,92 @@
       divider.setAttribute('aria-hidden', show ? 'false' : 'true');
     }
 
+    let noIconNoticeTimer = null;
+
+    function activeFaviconProviders() {
+      if (currentMode === 'service') return SERVICE_ICON_PROVIDERS;
+      const providers = [...DOMAIN_FAVICON_PROVIDERS];
+      if (selfhstToggle.checked) providers.push(...SERVICE_ICON_PROVIDERS);
+      return providers;
+    }
+
+    function faviconLoadsPending() {
+      return activeFaviconProviders().some((provider) => {
+        const card = getProviderCard(provider);
+        if (!card || card.style.display === 'none') return false;
+        const spinner = document.getElementById(`${provider}-spinner`);
+        return spinner?.style.display !== 'none';
+      });
+    }
+
+    function faviconCategoryHasResults(providers) {
+      return providers.some((provider) => {
+        const card = getProviderCard(provider);
+        if (!card || card.style.display === 'none') return false;
+        const img = document.getElementById(`${provider}-img`);
+        const spinner = document.getElementById(`${provider}-spinner`);
+        if (spinner?.style.display !== 'none') return false;
+        return img?.style.display !== 'none';
+      });
+    }
+
+    function hasAnyFaviconResults() {
+      if (currentMode === 'service') {
+        return faviconCategoryHasResults(SERVICE_ICON_PROVIDERS);
+      }
+      if (faviconCategoryHasResults(DOMAIN_FAVICON_PROVIDERS)) return true;
+      if (selfhstToggle.checked && faviconCategoryHasResults(SERVICE_ICON_PROVIDERS)) return true;
+      return false;
+    }
+
+    function scheduleNoIconNoticeCheck() {
+      if (noIconNoticeTimer) clearTimeout(noIconNoticeTimer);
+      noIconNoticeTimer = setTimeout(updateNoIconNotice, 450);
+    }
+
+    function hideNoIconNotice() {
+      const notice = document.getElementById('no-icon-notice');
+      if (notice) notice.classList.remove('visible');
+    }
+
+    function updateNoIconNotice() {
+      const notice = document.getElementById('no-icon-notice');
+      if (!notice) return;
+      const results = document.getElementById('results');
+      if (!results.classList.contains('visible') || results.classList.contains('placeholder')) {
+        notice.classList.remove('visible');
+        return;
+      }
+      if (faviconLoadsPending()) {
+        scheduleNoIconNoticeCheck();
+        return;
+      }
+
+      const show = !hasAnyFaviconResults();
+      notice.classList.toggle('visible', show);
+      if (!show) return;
+
+      const target = currentDomain || currentService || '';
+      const textEl = document.getElementById('no-icon-notice-text');
+      const urlEl = document.getElementById('no-icon-notice-url');
+      const imgEl = document.getElementById('no-icon-notice-img');
+      const placeholderWrap = document.getElementById('no-icon-notice-placeholder');
+
+      if (currentMode === 'domain' && target) {
+        if (textEl) textEl.textContent = `No favicon could be found for ${target}.`;
+        const directUrl = `${location.origin}/${encodeURIComponent(target)}`;
+        if (urlEl) urlEl.textContent = directUrl;
+        if (imgEl) imgEl.src = `${directUrl}?_=${Date.now()}`;
+        if (placeholderWrap) placeholderWrap.hidden = false;
+      } else if (currentMode === 'service' && target) {
+        if (textEl) textEl.textContent = `No app icon could be found for "${target}".`;
+        if (placeholderWrap) placeholderWrap.hidden = true;
+      } else if (textEl) {
+        textEl.textContent = 'No icon could be found.';
+        if (placeholderWrap) placeholderWrap.hidden = true;
+      }
+    }
+
     function setServiceCardsVisible(visible) {
       SERVICE_ICON_PROVIDERS.forEach((provider) => {
         const card = document.getElementById(`${provider}-card`);
@@ -3729,6 +3870,7 @@
         setServiceCardsVisible(false);
       }
       updateServiceIconsDivider();
+      scheduleNoIconNoticeCheck();
     }
 
     async function fetchFavicons() {
@@ -3755,6 +3897,10 @@
       clearServiceCandidates();
       currentGoogleSize = 128;
       currentFaviconkitSize = 128;
+      currentFaviconrunSize = 128;
+
+      DOMAIN_FAVICON_PROVIDERS.forEach(resetFaviconCard);
+      hideNoIconNotice();
 
       document.getElementById('api-example').textContent = `${location.origin}/${domain}`;
       const jsonUrl = `${location.origin}/${domain}/json`;
@@ -3805,6 +3951,7 @@
       } else {
         setServiceCardsVisible(false);
       }
+      scheduleNoIconNoticeCheck();
     }
 
     async function runServiceSearch(rawSlug) {
@@ -3818,6 +3965,7 @@
       currentMode = 'service';
       currentService = resolveData.resolved || resolveData.input;
       currentDomain = '';
+      hideNoIconNotice();
 
       const serviceQuery = resolveData.input || slug;
       document.getElementById('api-example').textContent =
@@ -3835,6 +3983,7 @@
       resetFaviconCard('brandfetch');
       setServiceCardsVisible(true);
       startServiceIconLoads(resolveData, true);
+      scheduleNoIconNoticeCheck();
     }
 
     function loadGoogle(domain, size, opts) {
@@ -5221,6 +5370,7 @@
           proxyUrl: embedUrl,
           sourceUrl: sizeSource,
         });
+        scheduleNoIconNoticeCheck();
       };
       imgEl.onerror = () => {
         if (scraperLoadToken !== token) return;
@@ -5231,6 +5381,7 @@
           proxyUrl: embedUrl,
           sourceUrl: sizeSource,
         });
+        scheduleNoIconNoticeCheck();
       };
       imgEl.src = `${proxyUrl}?_=${Date.now()}`;
     }
@@ -5256,6 +5407,7 @@
         if (id === 'yandex' && imgEl.naturalWidth <= 1 && imgEl.naturalHeight <= 1) {
           spinner.style.display = 'none';
           if (card) card.style.display = 'none';
+          scheduleNoIconNoticeCheck();
           return;
         }
         img.src = imgEl.src;
@@ -5265,16 +5417,20 @@
         if (card) card.style.display = '';
         if (opts?.onMeta) opts.onMeta(imgEl);
         else showFaviconMeta(id, imgEl, proxyUrl, sourceUrl, opts);
+        scheduleNoIconNoticeCheck();
       };
       imgEl.onerror = () => {
         spinner.style.display = 'none';
-        if (opts?.hideCardOnError === false || hadImage) {
+        if (opts?.hideCardOnError === false) {
           if (hadImage) img.style.display = 'block';
           setSizeUnavailable(display, true);
           if (card) card.style.display = '';
+          scheduleNoIconNoticeCheck();
           return;
         }
+        img.removeAttribute('src');
         if (card) card.style.display = 'none';
+        scheduleNoIconNoticeCheck();
       };
       if (opts?.objectUrl) {
         const objectUrl = opts.objectUrl;

@@ -16,8 +16,9 @@ const {
   fetchScraper,
 } = require('./providers');
 const cache = require('./cache');
-const { isBlankFavicon } = require('./imageNormalize');
+const { isUnusableIcon } = require('./imageNormalize');
 const { serviceSlugFromDomain } = require('./serviceSlugFromDomain');
+const { notFoundEntry } = require('./notFoundPlaceholder');
 
 const VALID_DEFAULT_PROVIDERS = new Set([
   'scraper', 'google', 'googlev2', 'duckduckgo', 'yandex',
@@ -45,12 +46,6 @@ const DEFAULT_PROVIDER = (() => {
   }
   return val;
 })();
-
-const TRANSPARENT_1X1_PNG = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVQI12NgAAIABQAB' +
-  'Nl7BcQAAAABJRU5ErkJggg==',
-  'base64'
-);
 
 const HEAD_START_MS = parseInt(process.env.PICK_HEAD_START_MS || '150', 10);
 
@@ -164,12 +159,7 @@ function buildServiceFetchers(service) {
 
 async function raceFetchers(fallbacks, cacheProvider, cacheKey, cacheSize) {
   if (fallbacks.length === 0) {
-    return {
-      buffer: TRANSPARENT_1X1_PNG,
-      contentType: 'image/png',
-      provider: 'none',
-      notFound: true,
-    };
+    return notFoundEntry(cacheSize || 32);
   }
 
   const wrap = (fetcher) =>
@@ -208,18 +198,21 @@ async function raceFetchers(fallbacks, cacheProvider, cacheKey, cacheSize) {
     await cache.set(cacheProvider, cacheKey, cacheSize, entry);
     return entry;
   } catch {
-    return {
-      buffer: TRANSPARENT_1X1_PNG,
-      contentType: 'image/png',
-      provider: 'none',
-      notFound: true,
-    };
+    return notFoundEntry(cacheSize || 32);
   }
 }
 
 async function pickBest(domain) {
   const cached = await cache.get('best', domain, 32);
-  if (cached) return cached;
+  if (cached) {
+    if (cached.notFound || cached.provider === 'none') {
+      await cache.del('best', domain, 32);
+    } else if (!(await isUnusableIcon(cached.buffer, cached))) {
+      return cached;
+    } else {
+      await cache.del('best', domain, 32);
+    }
+  }
 
   const fallbacks = buildFallbackFetchers(domain);
   return raceFetchers(fallbacks, 'best', domain, 32);
@@ -227,7 +220,15 @@ async function pickBest(domain) {
 
 async function pickBestService(service) {
   const cached = await cache.get('best-service', service, null);
-  if (cached) return cached;
+  if (cached) {
+    if (cached.notFound || cached.provider === 'none') {
+      await cache.del('best-service', service, null);
+    } else if (!(await isUnusableIcon(cached.buffer, cached))) {
+      return cached;
+    } else {
+      await cache.del('best-service', service, null);
+    }
+  }
 
   const fallbacks = buildServiceFetchers(service);
   return raceFetchers(fallbacks, 'best-service', service, null);
@@ -236,12 +237,12 @@ async function pickBestService(service) {
 async function fetchWithCache(provider, domain, size, fetcher) {
   const cached = await cache.get(provider, domain, size);
   if (cached) {
-    if (!(await isBlankFavicon(cached.buffer, cached))) return cached;
+    if (!(await isUnusableIcon(cached.buffer, cached))) return cached;
     await cache.del(provider, domain, size);
   }
 
   const result = await fetcher();
-  if (result && (await isBlankFavicon(result.buffer, result))) return null;
+  if (result && (await isUnusableIcon(result.buffer, result))) return null;
   if (result) {
     await cache.set(provider, domain, size, result);
   }

@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const cheerio = require('cheerio');
 const sharp = require('sharp');
-const { rasterizeSvgToSize, readImageDimensions, toDisplayPng, looksLikeSvg, isBlankFavicon, MIN_SOURCE_SIZE, resizeIcon } = require('./imageNormalize');
+const { rasterizeSvgToSize, readImageDimensions, toDisplayPng, looksLikeSvg, isBlankFavicon, isUnusableIcon, MIN_SOURCE_SIZE, resizeIcon } = require('./imageNormalize');
 const { LRUCache } = require('lru-cache');
 const { upstreamFetch, ipv4Dispatcher, ipv4Http1Dispatcher } = require('./upstreamFetch');
 const scraperDiskCache = require('./scraperDiskCache');
@@ -678,13 +678,17 @@ async function fetchYandex(domain) {
 async function fetchFaviconSo(domain) {
   const url = PROVIDERS.faviconSo(domain);
   const result = await fetchFavicon(url);
-  return result ? { ...result, provider: 'faviconso' } : null;
+  if (!result) return null;
+  if (await isUnusableIcon(result.buffer, { ...result, provider: 'faviconso' })) return null;
+  return { ...result, provider: 'faviconso' };
 }
 
 async function fetchVemetric(domain, size, format) {
   const url = PROVIDERS.vemetric(domain, size, format);
   const result = await fetchFavicon(url);
-  return result ? { ...result, provider: 'vemetric' } : null;
+  if (!result) return null;
+  if (await isUnusableIcon(result.buffer, { ...result, provider: 'vemetric' })) return null;
+  return { ...result, provider: 'vemetric' };
 }
 
 async function fetchFaviconDev(domain) {
