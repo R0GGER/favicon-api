@@ -707,6 +707,108 @@
       margin-right: 0;
     }
 
+    .results.placeholder .card {
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .results.placeholder .download-toolbar {
+      pointer-events: auto;
+    }
+
+    .results.placeholder .card-header h3 a {
+      pointer-events: auto;
+    }
+
+    .results.placeholder .favicon-display {
+      cursor: default;
+    }
+
+    .results.placeholder .favicon-display:hover {
+      background: #f5f0ea;
+    }
+
+    .results.placeholder .favicon-display::before {
+      content: '';
+      width: 68px;
+      height: 68px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #d4c4e4 0%, #a888c0 45%, #8b6aaa 100%);
+      filter: blur(11px);
+      opacity: 0.72;
+      flex-shrink: 0;
+      animation: placeholder-pulse 2.8s ease-in-out infinite;
+    }
+
+    .results.placeholder .card[data-card-type="domain"]:nth-child(4n+3) .favicon-display::before {
+      border-radius: 14%;
+      width: 62px;
+      height: 62px;
+      background: linear-gradient(135deg, #c8ddd4 0%, #8fbaa8 45%, #6a9a88 100%);
+    }
+
+    .results.placeholder .card[data-card-type="domain"]:nth-child(4n+4) .favicon-display::before {
+      width: 74px;
+      height: 74px;
+      background: linear-gradient(135deg, #ddd0c4 0%, #b8a090 45%, #9a8878 100%);
+    }
+
+    .results.placeholder .favicon-display .copied-toast {
+      display: none;
+    }
+
+    .results.placeholder .size-buttons,
+    .results.placeholder .size-buttons-toolbar {
+      opacity: 0.32;
+      filter: blur(1.5px);
+    }
+
+    .results.placeholder .meta:empty {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      min-height: 0.85rem;
+    }
+
+    .results.placeholder .meta:empty::before {
+      content: '';
+      height: 0.58rem;
+      width: 2.4rem;
+      background: #e5e0d9;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+
+    .results.placeholder .meta:empty::after {
+      content: '';
+      height: 0.58rem;
+      flex: 1;
+      max-width: 72%;
+      background: #ece8e2;
+      border-radius: 3px;
+    }
+
+    .results.placeholder .card-header-actions,
+    .results.placeholder .card-header > .refresh-btn:not(.alt-url-link) {
+      opacity: 0.45;
+    }
+
+    .results.placeholder .download-all-btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    @keyframes placeholder-pulse {
+      0%, 100% { opacity: 0.62; transform: scale(0.96); }
+      50% { opacity: 0.78; transform: scale(1); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .results.placeholder .favicon-display::before {
+        animation: none;
+      }
+    }
+
     .results-section-divider {
       grid-column: 1 / -1;
       display: none;
@@ -1169,6 +1271,7 @@
       justify-content: flex-end;
       gap: 0.5rem;
       margin-bottom: -0.2rem;
+      overflow: visible;
     }
 
     .download-toolbar.visible {
@@ -1198,6 +1301,10 @@
 
     .download-all-btn:disabled {
       opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .download-all-btn.spinning:disabled {
       cursor: wait;
     }
 
@@ -1390,6 +1497,77 @@
       color: #7b3fa8;
       background: #f3eaf7;
       border-color: #c4a8d8;
+    }
+
+    @keyframes cta-attention-wiggle {
+      0%, 70%, 100% { transform: translateX(0) rotate(0); }
+      8% { transform: translateX(-2px) rotate(-1.5deg); }
+      16% { transform: translateX(2px) rotate(1.5deg); }
+      24% { transform: translateX(-1px) rotate(-0.5deg); }
+      32% { transform: translateX(0) rotate(0); }
+    }
+
+    @keyframes cta-attention-glow {
+      0%, 70%, 100% { box-shadow: 0 0 0 0 rgba(91, 46, 126, 0); }
+      35% { box-shadow: 0 0 0 4px rgba(91, 46, 126, 0.16); }
+    }
+
+    @keyframes cta-pointer-bob-y {
+      0%, 100% { transform: translate(-50%, 0); opacity: 0.75; }
+      50% { transform: translate(-50%, -4px); opacity: 1; }
+    }
+
+    @keyframes cta-pointer-bob-x {
+      0%, 100% { transform: translate(0, -50%); opacity: 0.75; }
+      50% { transform: translate(4px, -50%); opacity: 1; }
+    }
+
+    .btn-cta-attention {
+      position: relative;
+      z-index: 1;
+      animation: cta-attention-wiggle 4.5s ease-in-out infinite, cta-attention-glow 4.5s ease-in-out infinite;
+    }
+
+    .btn-cta-attention:hover {
+      animation: none;
+      box-shadow: 0 0 0 3px rgba(91, 46, 126, 0.12);
+    }
+
+    #tools-offcanvas-btn.btn-cta-attention::after {
+      content: '👆';
+      position: absolute;
+      bottom: -1.2rem;
+      left: 50%;
+      font-size: 1rem;
+      line-height: 1;
+      pointer-events: none;
+      animation: cta-pointer-bob-y 1.35s ease-in-out infinite;
+    }
+
+    .cta-pointer {
+      position: absolute;
+      pointer-events: none;
+      font-size: 1rem;
+      line-height: 1;
+      user-select: none;
+    }
+
+    .cta-pointer--left {
+      left: -1.3rem;
+      top: 50%;
+      animation: cta-pointer-bob-x 1.35s ease-in-out infinite;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .btn-cta-attention {
+        animation: none;
+        box-shadow: 0 0 0 2px rgba(91, 46, 126, 0.18);
+      }
+
+      .btn-cta-attention::after,
+      .cta-pointer {
+        animation: none;
+      }
     }
 
     .offcanvas-overlay {
@@ -1622,7 +1800,7 @@
 </head>
 <body>
   <nav class="top-nav">
-    <button type="button" class="top-nav-btn" id="tools-offcanvas-btn" onclick="openToolsOffcanvas()" aria-expanded="false" aria-controls="tools-offcanvas">
+    <button type="button" class="top-nav-btn btn-cta-attention" id="tools-offcanvas-btn" onclick="openToolsOffcanvas()" aria-expanded="false" aria-controls="tools-offcanvas">
       <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 2.5A1.5 1.5 0 012.5 1h3A1.5 1.5 0 017 2.5v3A1.5 1.5 0 015.5 7h-3A1.5 1.5 0 011 5.5v-3zM2.5 2a.5.5 0 00-.5.5v3a.5.5 0 00.5.5h3a.5.5 0 00.5-.5v-3a.5.5 0 00-.5-.5h-3zm6.5.5A1.5 1.5 0 0110.5 1h3A1.5 1.5 0 0115 2.5v3A1.5 1.5 0 0113.5 7h-3A1.5 1.5 0 019 5.5v-3zm1.5-.5a.5.5 0 00-.5.5v3a.5.5 0 00.5.5h3a.5.5 0 00.5-.5v-3a.5.5 0 00-.5-.5h-3zM1 10.5A1.5 1.5 0 012.5 9h3A1.5 1.5 0 017 10.5v3A1.5 1.5 0 015.5 15h-3A1.5 1.5 0 011 13.5v-3zm1.5-.5a.5.5 0 00-.5.5v3a.5.5 0 00.5.5h3a.5.5 0 00.5-.5v-3a.5.5 0 00-.5-.5h-3zm6.5.5A1.5 1.5 0 0110.5 9h3a1.5 1.5 0 011.5 1.5v3a1.5 1.5 0 01-1.5 1.5h-3A1.5 1.5 0 019 13.5v-3zm1.5-.5a.5.5 0 00-.5.5v3a.5.5 0 00.5.5h3a.5.5 0 00.5-.5v-3a.5.5 0 00-.5-.5h-3z"/></svg>
       Tools
     </button>
@@ -1682,7 +1860,8 @@
 
     <div class="results" id="results">
       <div class="download-toolbar" id="download-toolbar">
-        <button type="button" class="download-all-btn" id="profile-builder-btn" onclick="openProfileModal()" data-tip="Build a shareable URL with your own preferred provider, fallbacks and minimum icon size. The settings are encoded in the URL — no account needed." aria-label="Build a custom favicon URL: a shareable URL with your own preferred provider, fallbacks and minimum icon size, encoded in the URL with no account needed">
+        <button type="button" class="download-all-btn btn-cta-attention" id="profile-builder-btn" onclick="openProfileModal()" data-tip="Build a shareable URL with your own preferred provider, fallbacks and minimum icon size. The settings are encoded in the URL — no account needed." aria-label="Build a custom favicon URL: a shareable URL with your own preferred provider, fallbacks and minimum icon size, encoded in the URL with no account needed">
+          <span class="cta-pointer cta-pointer--left" aria-hidden="true">👉</span>
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.715 6.542 3.343 7.914a3 3 0 1 0 4.243 4.243l1.828-1.829A3 3 0 0 0 8.586 5.5L8 6.086a1.002 1.002 0 0 0-.154.199 2 2 0 0 1 .861 3.337L6.88 11.45a2 2 0 1 1-2.83-2.83l.793-.792a4.018 4.018 0 0 1-.128-1.287z"/><path d="M6.586 4.672A3 3 0 0 0 7.414 9.5l.775-.776a2 2 0 0 1-.896-3.346L9.12 3.55a2 2 0 1 1 2.83 2.83l-.793.792c.112.42.155.855.128 1.287l1.372-1.372a3 3 0 1 0-4.243-4.243L6.586 4.672z"/></svg>
           Build custom URL
         </button>
@@ -1694,7 +1873,7 @@
       <!-- Scraper -->
       <div class="card" data-card-type="domain">
         <div class="card-header">
-          <h3>HTML Scraper</h3>
+          <h3><a href="/" target="_blank" rel="noopener noreferrer">HTML Scraper</a></h3>
           <button class="refresh-btn" id="scraper-refresh-btn" onclick="refreshScraper()" data-tip="Refresh icon (bypass cache)" aria-label="Refresh icon (bypass cache)">
             <svg viewBox="0 0 16 16"><path d="M11.534 7h3.932a.25.25 0 0 1 .192.41l-1.966 2.36a.25.25 0 0 1-.384 0l-1.966-2.36a.25.25 0 0 1 .192-.41zm-11 2H4.466a.25.25 0 0 0 .192-.41L2.692 6.23a.25.25 0 0 0-.384 0L.342 8.59A.25.25 0 0 0 .534 9z"/><path fill-rule="evenodd" d="M8 3c-1.552 0-2.94.707-3.857 1.818a.5.5 0 1 1-.771-.636A6.002 6.002 0 0 1 13.917 7H12.9A5.002 5.002 0 0 0 8 3zM3.1 9a5.002 5.002 0 0 0 8.757 2.182.5.5 0 1 1 .771.636A6.002 6.002 0 0 1 2.083 9H3.1z"/></svg>
           </button>
@@ -2414,7 +2593,22 @@
       } catch {}
     }
 
+    function dismissCtaAttention() {
+      sessionStorage.setItem('faviconapi-cta-dismissed', '1');
+      document.querySelectorAll('.btn-cta-attention').forEach((el) => {
+        el.classList.remove('btn-cta-attention');
+      });
+      document.querySelectorAll('.cta-pointer').forEach((el) => el.remove());
+    }
+
+    function initCtaAttention() {
+      if (sessionStorage.getItem('faviconapi-cta-dismissed')) {
+        dismissCtaAttention();
+      }
+    }
+
     function openProfileModal() {
+      dismissCtaAttention();
       closeToolsOffcanvas();
       const modal = document.getElementById('profile-modal');
       if (!modal) return;
@@ -2447,6 +2641,7 @@
     }
 
     function openToolsOffcanvas() {
+      dismissCtaAttention();
       const panel = document.getElementById('tools-offcanvas');
       const btn = document.getElementById('tools-offcanvas-btn');
       if (!panel) return;
@@ -2713,8 +2908,41 @@
       const btn = document.getElementById('reset-btn');
       if (!btn) return;
       const hasQuery = !!input.value.trim();
-      const hasResults = document.getElementById('results').classList.contains('visible');
+      const resultsEl = document.getElementById('results');
+      const hasResults = resultsEl.classList.contains('visible')
+        && !resultsEl.classList.contains('placeholder');
       btn.disabled = !hasQuery && !hasResults;
+    }
+
+    function showPlaceholderResults() {
+      const results = document.getElementById('results');
+      results.classList.add('visible', 'placeholder');
+      setDownloadToolbarVisible(true);
+      const downloadAllBtn = document.getElementById('download-all-btn');
+      if (downloadAllBtn) downloadAllBtn.disabled = true;
+
+      document.querySelectorAll('[data-card-type="domain"]').forEach((card) => {
+        if (card.id === 'logodev-card') {
+          card.style.display = providersConfig.logoDev ? '' : 'none';
+          return;
+        }
+        if (card.id === 'brandfetch-card') {
+          card.style.display = providersConfig.brandfetch ? '' : 'none';
+          return;
+        }
+        card.style.display = '';
+      });
+      setServiceCardsVisible(selfhstToggle.checked);
+      updateServiceIconsDivider();
+      updateResetButton();
+    }
+
+    function exitPlaceholderMode() {
+      document.getElementById('results').classList.remove('placeholder');
+      const downloadAllBtn = document.getElementById('download-all-btn');
+      if (downloadAllBtn && !downloadAllBtn.classList.contains('spinning')) {
+        downloadAllBtn.disabled = false;
+      }
     }
 
     function setDownloadToolbarVisible(visible) {
@@ -2981,8 +3209,6 @@
 
       document.getElementById('api-example').textContent = `${location.origin}/{domain-or-appname}`;
       document.getElementById('json-button-wrap').classList.remove('visible');
-      document.getElementById('results').classList.remove('visible');
-      setDownloadToolbarVisible(false);
 
       DOMAIN_FAVICON_PROVIDERS.forEach(resetFaviconCard);
       SERVICE_ICON_PROVIDERS.forEach(resetFaviconCard);
@@ -2999,8 +3225,6 @@
       }
 
       clearServiceCandidates();
-      setServiceCardsVisible(false);
-      updateServiceIconsDivider();
       setActiveSize('google-sizes', 128);
       setActiveSize('faviconkit-sizes', 128);
       setActiveSize('faviconrun-sizes', 128);
@@ -3017,7 +3241,7 @@
       resetLobehubFormatControls();
       resetSvglVariantButtons();
       resetSvglFormatControls();
-      updateResetButton();
+      showPlaceholderResults();
     }
 
     fetch('/providers')
@@ -3028,14 +3252,6 @@
           ...(cfg || {}),
           urlMode: normalizeUrlMode(cfg?.urlMode),
         };
-        const logoDevCard = document.getElementById('logodev-card');
-        if (providersConfig.logoDev) {
-          logoDevCard.style.display = '';
-        }
-        const brandfetchCard = document.getElementById('brandfetch-card');
-        if (providersConfig.brandfetch) {
-          brandfetchCard.style.display = 'none';
-        }
         refreshAllAltUrlButtonLabels();
       })
       .catch(() => {})
@@ -3046,8 +3262,9 @@
         if (q && q.trim()) {
           input.value = q.trim();
           fetchFavicons();
+        } else {
+          showPlaceholderResults();
         }
-        updateResetButton();
       });
 
     function quickFetch(domain) {
@@ -3381,9 +3598,13 @@
     function updateServiceIconsDivider() {
       const divider = document.getElementById('service-icons-divider');
       if (!divider) return;
-      const show = currentMode === 'domain'
-        && selfhstToggle.checked
-        && serviceCategoryHasResults();
+      const isPlaceholder = document.getElementById('results').classList.contains('placeholder');
+      const includeAppIcons = selfhstToggle.checked;
+      const show = isPlaceholder
+        ? includeAppIcons
+        : (currentMode === 'domain'
+          && includeAppIcons
+          && serviceCategoryHasResults());
       divider.classList.toggle('visible', show);
       divider.setAttribute('aria-hidden', show ? 'false' : 'true');
     }
@@ -3434,6 +3655,7 @@
     }
 
     function runDomainSearch(domain) {
+      exitPlaceholderMode();
       currentMode = 'domain';
       currentDomain = domain;
       currentService = '';
@@ -3499,6 +3721,7 @@
       const resolveData = await resolveServiceSlugClient(rawSlug);
       if (!resolveData) return;
 
+      exitPlaceholderMode();
       currentMode = 'service';
       currentService = resolveData.resolved || resolveData.input;
       currentDomain = '';
@@ -5019,6 +5242,10 @@
     }
 
     initCardDownloadButtons();
+    initCtaAttention();
+    if (!new URLSearchParams(location.search).get('q')?.trim()) {
+      showPlaceholderResults();
+    }
   </script>
 </body>
 </html>

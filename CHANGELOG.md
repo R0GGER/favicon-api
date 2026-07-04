@@ -5,6 +5,19 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.5] — 2026-07-04
+
+### Added
+
+- **Web UI — placeholder results grid** — on first load (and after reset), the homepage shows a skeleton preview of the provider cards so visitors see the layout before searching. Blurred icon shapes, muted size buttons, and skeleton metadata mimic real results; card interactions are disabled. **Download all** stays disabled until a search runs; **Build custom URL** remains available.
+- **Web UI — CTA attention on Tools and Build custom URL** — subtle wiggle, glow pulse, and pointing-hand hint on the top **Tools** button and **Build custom URL** toolbar button. Animations stop on hover or after the user opens either panel (remembered for the session via `sessionStorage`); respects `prefers-reduced-motion`.
+
+### Changed
+
+- **Web UI — placeholder app icons follow checkbox** — **Also include app icon lookups** now toggles the App Icons divider and service-icon cards in placeholder mode, matching behaviour after a domain search.
+- **Web UI — optional providers in placeholder** — Brandfetch.io and logo.dev skeleton cards appear only when `BRANDFETCH_CLIENT_ID` or `LOGODEV_TOKEN` is configured (via `GET /providers`), same as live results.
+- **Web UI — HTML Scraper title link** — the HTML Scraper card title links to the [maflplus-favicon-api](https://github.com/R0GGER/maflplus-favicon-api) repository.
+
 ## [2.7.4] — 2026-07-02
 
 ### Changed
