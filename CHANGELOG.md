@@ -5,6 +5,16 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.4] — 2026-07-05
+
+### Changed
+
+- **Web UI — placeholder results grid only on first visit** — the skeleton preview appears once per browser session on the first homepage load; after a search or reset it stays hidden, including on refresh (`sessionStorage`). Reset clears the grid instead of restoring the skeleton.
+
+### Fixed
+
+- **Web UI — app icon skeletons in placeholder mode** — when **Also include app icon lookups** is enabled (via server config), the App Icons divider and service-icon skeleton cards now appear correctly after `GET /providers` loads; fixed a race where the placeholder rendered before the checkbox state was applied.
+
 ## [2.8.3] — 2026-07-05
 
 ### Fixed
