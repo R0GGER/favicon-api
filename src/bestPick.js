@@ -98,10 +98,9 @@ function buildFallbackFetchers(domain) {
   };
 
   // logo.dev is intentionally excluded from the best-pick race. It has a
-  // monthly token quota and always returns a generated monogram placeholder
-  // for domains it has no real logo for, which would otherwise win the race
-  // over the slower scraper that finds the site's actual favicon. It stays
-  // available on its dedicated /logodev/{size}/{domain} route.
+  // monthly token quota and returns a generated monogram when fallback is not
+  // set to 404; we request fallback=404 so unknown domains return nothing useful.
+  // It stays available on its dedicated /logodev/{size}/{domain} route.
 
   // Slug is derived from the domain label, so catalog lookups are resolved
   // strictly (exact slug / curated alias) — never a fuzzy match that would pick

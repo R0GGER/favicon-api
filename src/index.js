@@ -926,7 +926,7 @@ async function logoDevSizedHandler(req, res) {
   if (!domain) return res.status(400).json({ error: 'Invalid domain.' });
 
   try {
-    const entry = await fetchWithCache('logodev', domain, null, () => fetchLogoDev(domain));
+    const entry = await fetchWithCache('logodev', domain, '404', () => fetchLogoDev(domain));
     if (!entry) return res.status(502).json({ error: 'Upstream fetch failed.' });
     sendFavicon(res, await downscaleEntryToSize(entry, size));
   } catch (err) {
@@ -945,7 +945,7 @@ app.get('/l/:domain', async (req, res) => {
   if (!domain) return res.status(400).json({ error: 'Invalid domain.' });
 
   try {
-    const entry = await fetchWithCache('logodev', domain, null, () => fetchLogoDev(domain));
+    const entry = await fetchWithCache('logodev', domain, '404', () => fetchLogoDev(domain));
     if (!entry) return res.status(502).json({ error: 'Upstream fetch failed.' });
     sendFavicon(res, entry);
   } catch (err) {

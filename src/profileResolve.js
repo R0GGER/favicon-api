@@ -57,7 +57,7 @@ const RASTER_PROVIDERS = {
   yandex: { max: null, fetch: (d) => fetchYandex(d) },
   faviconso: { max: null, fetch: (d) => fetchFaviconSo(d) },
   favicondev: { max: null, fetch: (d) => fetchFaviconDev(d) },
-  logodev: { max: null, fetch: (d) => fetchLogoDev(d) },
+  logodev: { max: '404', fetch: (d) => fetchLogoDev(d) },
 };
 
 const CATALOG_FETCHERS = {

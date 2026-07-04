@@ -465,7 +465,7 @@ const PROVIDERS = {
   faviconkit: (domain, size = 128) =>
     `https://ico.faviconkit.net/favicon/${encodeURIComponent(domain)}?sz=${size}`,
   logoDev: (domain, token) =>
-    `https://img.logo.dev/${encodeURIComponent(domain)}?token=${encodeURIComponent(token || '')}`,
+    `https://img.logo.dev/${encodeURIComponent(domain)}?token=${encodeURIComponent(token || '')}&fallback=404`,
   brandfetch: (domain, clientId, size = 128, opts = {}) => {
     const { type, theme, format } = normalizeBrandfetchOptions(opts);
     const base = `https://cdn.brandfetch.io/${encodeURIComponent(domain)}`;
