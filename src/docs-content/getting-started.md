@@ -1,4 +1,4 @@
-# FaviconAPI
+# Getting Started
 
 FaviconAPI is a self-hosted favicon proxy with a browser-based UI that fetches website and service icons from multiple upstream sources (10+), caches results, and exposes them through simple HTTP routes.
 
@@ -27,8 +27,7 @@ FaviconAPI is a self-hosted favicon proxy with a browser-based UI that fetches w
 - [API v1](#api-v1)
 - [Managing API keys (CLI)](#managing-api-keys-cli)
 - [Configuration](#configuration)
-- [Performance tuning](#performance-tuning)
-- [Detailed guides](#detailed-guides)
+- [Performance tuning](/performance-tuning)
 
 ---
 
@@ -55,8 +54,6 @@ So I built it. FaviconAPI brings 10+ favicon providers and four service-icon cat
 
 > Interactive API docs and a live playground are available at `/api` on a running instance.
 
-For the exact provider order, head-start logic, and the scraper's strictly-ordered fallback steps, see [Fallback chain](/faviconapi/fallback-chain) (detailed guide).
-
 ---
 
 ## Quick start (Docker)
@@ -82,6 +79,18 @@ UI_INCLUDE_APP_ICONS=true
 # URL shown and copied in every favicon card (meta row + click on icon).
 # proxy = local proxy URL (default); source = upstream provider URL.
 UI_CARD_URL=proxy
+
+# When true (1/yes/on) or unset, the /docs pages and Docs nav link are
+# available. Set to false (or 0/no/off) to hide documentation routes and
+# remove the Docs link from the Web UI. Default = true.
+UI_ENABLE_DOCS=true
+
+# Optional Umami-compatible analytics on /, /api, and /docs. Both vars must be
+# set; leave empty to disable (recommended default for self-hosters).
+# UI_ANALYTICS_SCRIPT_SRC=https://analytics.example.com/script.js
+# UI_ANALYTICS_WEBSITE_ID=your-website-uuid
+# Optional: restrict tracking to specific hostnames (Umami data-domains).
+# UI_ANALYTICS_DOMAINS=favicon.example.com
 
 # Base directory for on-disk favicon cache files. Default = ./cache (or /cache in Docker).
 CACHE_DIR=/cache
@@ -350,7 +359,7 @@ https://your-host/selfhst/128/png/jellyfin
 https://your-host/svgl/0/svg/github
 ```
 
-Full endpoint list, JSON discovery, and caching headers: [API reference](/faviconapi/api-reference).
+Full endpoint list, JSON discovery, and caching headers: [API reference](api-reference.md).
 
 ### Favicon providers
 
@@ -388,9 +397,11 @@ Look up an icon by app/service name (e.g. `jellyfin`). All support `?variant=col
 
 ### Sizes
 
+- **128×128 is the site default** — the Web UI, service-icon catalogs, LobeHub, SVGL, and the API v1 CDN all standardize on **128** when no size is specified. It sits in the middle of the supported range: large enough to stay sharp on dashboards, bookmark tiles, and password-manager entries (including on retina displays when shown smaller), yet small enough to keep responses fast and cache-friendly. **128** is also a safe minimum icon size when you need a guaranteed baseline that most providers can satisfy without upscaling a tiny source into a blurry icon.
 - **Resized server-side** providers and catalogs accept sizes **16, 32, 64, 128, 256**.
 - **Brandfetch** SVG routes use size **0** in the path; raster routes use native upstream sizes **16, 32, 64, 128, 256, 512** (via Brandfetch's `/h/{size}/w/{size}/icon.png` path).
-- **LobeHub** and **SVGL** use sizes **64, 128, 256**.
+- **LobeHub** and **SVGL** use sizes **64, 128, 256** (default **128**).
+- A few resize-only domain providers (DuckDuckGo, Yandex, Favicon.so, Favicon Extractor) default their sizeless proxy URLs to **64** instead — their upstream icons are often small, and 64 avoids serving an upscaled, soft image when you omit the size segment.
 - Legacy short aliases also accept the original sizeless form (e.g. `/sh/{service}`, `/d/{domain}`).
 
 ### Utility routes
@@ -446,8 +457,6 @@ The id is the base64url of a compact JSON array — keep this contract identical
 ```
 
 Providers are any from the [favicon providers](#favicon-providers) / [catalogs](#appservice-icon-catalogs) tables; minimum sizes are `16, 32, 64, 128`. `logodev`/`brandfetch` only resolve when their credentials are configured (otherwise that step is skipped). Domain-only providers (scraper, raster providers, brandfetch) are skipped for app-name targets.
-
-More detail: [Custom profile URLs](/faviconapi/custom-profile-urls).
 
 ---
 
@@ -506,7 +515,7 @@ Set `API_REQUIRE_KEY=false` for a fully public endpoint (no key, no quotas).
 
 Only `200` responses count toward the monthly quota. Quotas reset each calendar month (UTC).
 
-Full reference — source priority, CDN route, plans, PowerShell notes: [API v1](/faviconapi/api-v1).
+Full reference — source priority, CDN route, plans, PowerShell notes: [API v1](/api-v1.md).
 
 ---
 
@@ -535,7 +544,7 @@ docker compose exec maflplus-favicon-api npm run keys:delete -- --prefix fa_abcd
 
 Plans: `free`, `pro`, `enterprise`. Monthly limits are set via `PLAN_*_LIMIT` env vars. Outside Docker, the same commands work via `npm run keys:create`, `keys:list`, `keys:revoke`, and `keys:delete`.
 
-See also [API v1 — Managing API keys](/faviconapi/api-v1).
+See also [API v1 — Managing API keys](/api-v1.md).
 
 ---
 
@@ -543,7 +552,7 @@ See also [API v1 — Managing API keys](/faviconapi/api-v1).
 
 All settings are documented in [.env](#env). Copy it to `.env` and pass it via `env_file: .env` in Compose (or set `environment:` entries manually).
 
-The tables below cover the most-used variables. For the complete list — including `UI_CARD_URL`, `UI_INCLUDE_APP_ICONS`, `SCRAPER_FALLBACK`, and tuning notes — see [Configuration](/faviconapi/configuration).
+The tables below cover the most-used variables. For the complete list — including `UI_CARD_URL`, `UI_INCLUDE_APP_ICONS`, `SCRAPER_FALLBACK`, and tuning notes — see [Configuration](/configuration.md).
 
 ### Server & cache
 
@@ -598,7 +607,7 @@ The tables below cover the most-used variables. For the complete list — includ
 
 ## Performance tuning
 
-See [Performance tuning](/faviconapi/performance) for cache TTL recommendations, scraper latency, and worker sizing.
+See [Performance tuning](/performance.md) for cache TTL recommendations, scraper latency, and worker sizing.
 
 ---
 

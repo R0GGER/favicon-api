@@ -60,6 +60,7 @@ const {
 const cache = require('./cache');
 const apiRoutes = require('./apiRoutes');
 const apiStore = require('./apiStore');
+const { renderDocPage, NAV_PAGES } = require('./docsRender');
 const { extractDomainFromInput } = require('./domainValidation');
 const { decodeProfile } = require('./customProfile');
 const { resolveProfileIcon } = require('./profileResolve');
@@ -86,6 +87,28 @@ const UI_CARD_URL = (() => {
   return raw === 'source' ? 'source' : 'proxy';
 })();
 
+const UI_ENABLE_DOCS = (() => {
+  const raw = String(process.env.UI_ENABLE_DOCS ?? '').trim().toLowerCase();
+  if (raw === '') return true;
+  return !['false', '0', 'no', 'off'].includes(raw);
+})();
+
+function escapeHtmlAttr(value) {
+  return String(value).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+}
+
+// Umami-compatible analytics snippet for /, /api, and /docs. Both script src
+// and website ID must be set; leave either empty to disable tracking.
+const UI_ANALYTICS_SCRIPT = (() => {
+  const src = String(process.env.UI_ANALYTICS_SCRIPT_SRC ?? '').trim();
+  const id = String(process.env.UI_ANALYTICS_WEBSITE_ID ?? '').trim();
+  if (!src || !id) return '';
+  if (!/^https?:\/\//i.test(src)) return '';
+  const domains = String(process.env.UI_ANALYTICS_DOMAINS ?? '').trim();
+  const domainsAttr = domains ? ` data-domains="${escapeHtmlAttr(domains)}"` : '';
+  return `<script defer src="${escapeHtmlAttr(src)}" data-website-id="${escapeHtmlAttr(id)}"${domainsAttr}></script>`;
+})();
+
 const app = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
 
@@ -104,6 +127,10 @@ const API_HTML_TEMPLATE = fs.readFileSync(
   path.join(__dirname, 'public', 'api.html'),
   'utf8'
 );
+const DOCS_HTML_TEMPLATE = fs.readFileSync(
+  path.join(__dirname, 'public', 'docs.html'),
+  'utf8'
+);
 
 function getBaseUrl(req) {
   return `${req.protocol}://${req.get('host')}`;
@@ -111,9 +138,16 @@ function getBaseUrl(req) {
 
 function renderTemplate(template) {
   return (req, res) => {
+    const baseUrl = getBaseUrl(req);
     const html = template
-      .replace(/__BASE_URL__/g, getBaseUrl(req))
-      .replace(/__VERSION__/g, APP_VERSION);
+      .replace(/__BASE_URL__/g, baseUrl)
+      .replace(/__VERSION__/g, APP_VERSION)
+      .replace(/__ANALYTICS_SCRIPT__/g, UI_ANALYTICS_SCRIPT)
+      .replace(/__DOCS_HIDDEN_ATTR__/g, UI_ENABLE_DOCS ? '' : 'hidden')
+      .replace(
+        /__DOCS_SAMEAS_SUFFIX__/g,
+        UI_ENABLE_DOCS ? `,\n      "${baseUrl}/docs/getting-started"` : ''
+      );
     res.set('Content-Type', 'text/html; charset=utf-8');
     res.set('Cache-Control', 'no-cache');
     res.send(html);
@@ -122,6 +156,42 @@ function renderTemplate(template) {
 
 app.get(['/', '/index.html'], renderTemplate(INDEX_HTML_TEMPLATE));
 app.get(['/api', '/api.html'], renderTemplate(API_HTML_TEMPLATE));
+
+function renderDocsPage(slug) {
+  return (req, res) => {
+    const html = renderDocPage(slug, DOCS_HTML_TEMPLATE);
+    if (!html) {
+      return res.status(404).send('Not found');
+    }
+    const rendered = html
+      .replace(/__BASE_URL__/g, getBaseUrl(req))
+      .replace(/__VERSION__/g, APP_VERSION)
+      .replace(/__ANALYTICS_SCRIPT__/g, UI_ANALYTICS_SCRIPT);
+    res.set('Content-Type', 'text/html; charset=utf-8');
+    res.set('Cache-Control', 'no-cache');
+    res.send(rendered);
+  };
+}
+
+if (UI_ENABLE_DOCS) {
+  app.get(['/docs', '/docs/'], (_req, res) => {
+    res.redirect(301, '/docs/getting-started');
+  });
+  app.get('/docs/:slug', (req, res, next) => {
+    const slug = String(req.params.slug || '').trim();
+    if (!slug || slug.includes('.')) {
+      return next();
+    }
+    return renderDocsPage(slug)(req, res);
+  });
+} else {
+  app.get(['/docs', '/docs/', '/docs.html'], (_req, res) => {
+    res.status(404).send('Not found');
+  });
+  app.get('/docs/:slug', (_req, res) => {
+    res.status(404).send('Not found');
+  });
+}
 
 // Browser custom search engine: /search?q=example.com → homepage with results.
 app.get('/search', (req, res) => {
@@ -154,6 +224,7 @@ app.get('/opensearch.xml', (req, res) => {
 // potentially infinite URL space.
 app.get('/robots.txt', (req, res) => {
   const baseUrl = getBaseUrl(req);
+  const docsAllow = UI_ENABLE_DOCS ? 'Allow: /docs\nAllow: /docs/\n' : '';
   const body =
     '# FaviconAPI\n' +
     '# Index the homepage + static assets only; the favicon API endpoints\n' +
@@ -163,6 +234,7 @@ app.get('/robots.txt', (req, res) => {
     'Allow: /$\n' +
     'Allow: /api\n' +
     'Allow: /api.html\n' +
+    docsAllow +
     'Allow: /favicon.png\n' +
     'Allow: /logo.png\n' +
     'Allow: /sitemap.xml\n' +
@@ -179,6 +251,16 @@ app.get('/robots.txt', (req, res) => {
 // configuration (relies on `trust proxy` above for X-Forwarded-Proto).
 app.get('/sitemap.xml', (req, res) => {
   const baseUrl = getBaseUrl(req);
+  const docsEntries = UI_ENABLE_DOCS
+    ? NAV_PAGES.map(
+        ({ slug }) =>
+          '  <url>\n' +
+          `    <loc>${baseUrl}/docs/${slug}</loc>\n` +
+          '    <changefreq>monthly</changefreq>\n' +
+          '    <priority>0.7</priority>\n' +
+          '  </url>\n'
+      ).join('')
+    : '';
   const body =
     '<?xml version="1.0" encoding="UTF-8"?>\n' +
     '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
@@ -192,6 +274,7 @@ app.get('/sitemap.xml', (req, res) => {
     '    <changefreq>monthly</changefreq>\n' +
     '    <priority>0.8</priority>\n' +
     '  </url>\n' +
+    docsEntries +
     '</urlset>\n';
   res.set('Content-Type', 'application/xml; charset=utf-8');
   res.set('Cache-Control', 'public, max-age=3600');
@@ -1442,6 +1525,7 @@ app.get('/providers', (req, res) => {
     defaultProvider: (process.env.DEFAULT_PROVIDER || '').trim().toLowerCase() || null,
     includeAppIcons: UI_INCLUDE_APP_ICONS,
     urlMode: UI_CARD_URL,
+    docsEnabled: UI_ENABLE_DOCS,
     upstreamIpv4: true,
     api: {
       requireKey: API_REQUIRE_KEY,

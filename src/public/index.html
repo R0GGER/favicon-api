@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <title>FaviconAPI &ndash; Get high-resolution favicons for any domain</title>
-  <meta name="description" content="Free favicon API and web UI that fetches the highest-resolution favicon for any domain from 10+ providers (HTML scraper, Google, DuckDuckGo, Yandex, Favicon.so, Vemetric, Favicon Downloader, FaviconKit, favicon.run, logo.dev) plus selfh.st, homarr-labs/dashboard-icons, LobeHub, and SVGL service icon lookups by name.">
-  <meta name="keywords" content="favicon, favicon api, favicon fetcher, favicon proxy, favicon downloader, get favicon, high resolution favicon, selfhst icons, homarr dashboard icons, MAFL, MAFL+, dashboard icons, homepage icons, self-hosted">
+  <title>FaviconAPI &ndash; Get the highest resolution favicon for any domain</title>
+  <meta name="description" content="Get the highest resolution favicon for any domain - or look up a service icon by name. Favicons are resolved from an HTML scraper and ten upstream providers: Google, DuckDuckGo, Yandex, Favicon.so, Vemetric, Faviconextractor, FaviconKit, favicon.run, logo.dev, and Brandfetch. App icons are resolved from selfh.st, dashboardicons.com, LobeHub, and SVGL. Or build your own custom URL with preferred provider, fallbacks and minimum icon size.">
+  <meta name="keywords" content="favicon, favicon api, HTML scraper, Google, DuckDuckGo, Yandex, Favicon.so, Vemetric, Faviconextractor, FaviconKit, favicon.run, logo.dev, Brandfetch, selfh.st, dashboardicons.com, LobeHub, SVGL, service icon, app icon, custom favicon url, MAFL, MAFL+, self-hosted">
   <meta name="author" content="R0GGER">
   <meta name="robots" content="index, follow">
   <meta name="theme-color" content="#5b2e7e">
@@ -29,8 +29,8 @@
   <!-- Open Graph (Facebook, LinkedIn, Discord, Slack, ...) -->
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="FaviconAPI">
-  <meta property="og:title" content="FaviconAPI &ndash; Get high-resolution favicons for any domain">
-  <meta property="og:description" content="Free favicon API and web UI that fetches the highest-resolution favicon for any domain from 10+ providers, plus selfh.st, homarr-labs/dashboard-icons, LobeHub, and SVGL service icon lookups by name.">
+  <meta property="og:title" content="FaviconAPI &ndash; Get the highest resolution favicon for any domain">
+  <meta property="og:description" content="Get the highest resolution favicon for any domain - or look up a service icon by name. Favicons are resolved from an HTML scraper and ten upstream providers: Google, DuckDuckGo, Yandex, Favicon.so, Vemetric, Faviconextractor, FaviconKit, favicon.run, logo.dev, and Brandfetch. App icons are resolved from selfh.st, dashboardicons.com, LobeHub, and SVGL. Or build your own custom URL with preferred provider, fallbacks and minimum icon size.">
   <meta property="og:url" content="__BASE_URL__/">
   <meta property="og:image" content="__BASE_URL__/logo.png">
   <meta property="og:image:type" content="image/png">
@@ -41,16 +41,15 @@
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="FaviconAPI &ndash; Get high-resolution favicons for any domain">
-  <meta name="twitter:description" content="Free favicon API and web UI that fetches the highest-resolution favicon for any domain from 10+ providers, plus selfh.st, homarr-labs/dashboard-icons, LobeHub, and SVGL service icon lookups by name.">
+  <meta name="twitter:title" content="FaviconAPI &ndash; Get the highest resolution favicon for any domain">
+  <meta name="twitter:description" content="Get the highest resolution favicon for any domain - or look up a service icon by name. Favicons are resolved from an HTML scraper and ten upstream providers: Google, DuckDuckGo, Yandex, Favicon.so, Vemetric, Faviconextractor, FaviconKit, favicon.run, logo.dev, and Brandfetch. App icons are resolved from selfh.st, dashboardicons.com, LobeHub, and SVGL. Or build your own custom URL with preferred provider, fallbacks and minimum icon size.">
   <meta name="twitter:image" content="__BASE_URL__/logo.png">
   <meta name="twitter:image:alt" content="FaviconAPI logo">
   
   <!-- iconify -->
   <script defer src="https://code.iconify.design/iconify-icon/2.3.0/iconify-icon.min.js"></script>
   
-  <!-- analytics  -->
-  <script defer src="https://analytics.hibbit.cloud/script.js" data-website-id="dada58c3-cc4e-4b0d-9961-9390d9b74143"></script>
+  __ANALYTICS_SCRIPT__
 
   <!-- JSON-LD structured data -->
   <script type="application/ld+json">
@@ -59,7 +58,7 @@
     "@type": "WebApplication",
     "name": "FaviconAPI",
     "alternateName": "Favicon API",
-    "description": "Free favicon API and web UI that fetches the highest-resolution favicon for any domain from 10+ providers (HTML scraper, Google, DuckDuckGo, Yandex, Favicon.so, Vemetric, Favicon Downloader, FaviconKit, favicon.run, logo.dev), plus selfh.st, homarr-labs/dashboard-icons, LobeHub, and SVGL service icon lookups by name.",
+    "description": "Get the highest resolution favicon for any domain - or look up a service icon by name. Favicons are resolved from an HTML scraper and ten upstream providers: Google, DuckDuckGo, Yandex, Favicon.so, Vemetric, Faviconextractor, FaviconKit, favicon.run, logo.dev, and Brandfetch. App icons are resolved from selfh.st, dashboardicons.com, LobeHub, and SVGL. Or build your own custom URL with preferred provider, fallbacks and minimum icon size.",
     "url": "__BASE_URL__/",
     "image": "__BASE_URL__/logo.png",
     "applicationCategory": "DeveloperApplication",
@@ -82,8 +81,7 @@
     },
     "sameAs": [
       "https://github.com/R0GGER/maflplus-favicon-api",
-      "https://github.com/R0GGER/maflplus",
-      "https://wiki.maflplus.eu/mafl/icons#favicon-api"
+      "https://github.com/R0GGER/maflplus"__DOCS_SAMEAS_SUFFIX__
     ]
   }
   </script>
@@ -587,16 +585,69 @@
       transition: border-color 0.2s;
     }
 
+    .search-bar-wrap {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+
+    .search-bar-wrap .search-bar {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .search-bar-wrap .cta-pointer--search {
+      position: static;
+      flex-shrink: 0;
+      animation: cta-pointer-bob-x-inline 1.35s ease-in-out infinite;
+    }
+
+    @keyframes cta-pointer-bob-x-inline {
+      0%, 100% { transform: translateX(0); opacity: 0.75; }
+      50% { transform: translateX(4px); opacity: 1; }
+    }
+
     .search-bar:focus-within { border-color: #5b2e7e; }
 
     .search-bar input {
-      flex: 1;
+      width: 100%;
       border: none;
       padding: 0.8rem 1rem;
       font-size: 1rem;
       background: transparent;
       outline: none;
       color: #2d2a26;
+      caret-color: #5b2e7e;
+    }
+
+    .search-input-wrap {
+      position: relative;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .search-fake-caret {
+      position: absolute;
+      left: 1rem;
+      top: 50%;
+      width: 2px;
+      height: 1.125em;
+      margin-top: -0.5625em;
+      background: #5b2e7e;
+      pointer-events: none;
+      opacity: 0;
+      visibility: hidden;
+    }
+
+    .search-bar-wrap.cta-attention .search-input-wrap:not(:focus-within):has(input:placeholder-shown) .search-fake-caret {
+      opacity: 1;
+      visibility: visible;
+      animation: search-caret-blink 1.05s step-end infinite;
+    }
+
+    @keyframes search-caret-blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
     }
 
     .search-bar button {
@@ -1451,7 +1502,7 @@
     .top-nav {
       position: absolute;
       top: 1rem;
-      right: 1.5rem;
+      right: 3.5rem;
       display: flex;
       gap: 1.2rem;
       align-items: center;
@@ -1462,19 +1513,26 @@
       text-decoration: none;
       font-size: 0.85rem;
       font-weight: 500;
-      display: flex;
+      line-height: 1;
+      display: inline-flex;
       align-items: center;
       gap: 0.35rem;
       transition: color 0.15s;
     }
 
     .top-nav a:hover { color: #7b3fa8; text-decoration: underline; }
-    .top-nav a.active { color: #2d2a26; font-weight: 700; }
+    .top-nav a.active { color: #2d2a26; }
 
     .top-nav svg {
+      display: block;
+      flex-shrink: 0;
       width: 16px;
       height: 16px;
       fill: currentColor;
+    }
+
+    .top-nav a[href*="/docs"] svg {
+      transform: translateY(2px);
     }
 
     .top-nav-btn {
@@ -1484,7 +1542,8 @@
       border-radius: 6px;
       font-size: 0.85rem;
       font-weight: 500;
-      display: flex;
+      line-height: 1;
+      display: inline-flex;
       align-items: center;
       gap: 0.35rem;
       padding: 0.35rem 0.65rem;
@@ -1497,6 +1556,14 @@
       color: #7b3fa8;
       background: #f3eaf7;
       border-color: #c4a8d8;
+    }
+
+    .top-nav-btn svg {
+      display: block;
+      flex-shrink: 0;
+      width: 16px;
+      height: 16px;
+      fill: currentColor;
     }
 
     @keyframes cta-attention-wiggle {
@@ -1562,6 +1629,15 @@
       .btn-cta-attention {
         animation: none;
         box-shadow: 0 0 0 2px rgba(91, 46, 126, 0.18);
+      }
+
+      .search-bar-wrap.cta-attention .cta-pointer--search {
+        animation: none;
+      }
+
+      .search-bar-wrap.cta-attention .search-fake-caret {
+        animation: none;
+        opacity: 1;
       }
 
       .btn-cta-attention::after,
@@ -1800,22 +1876,10 @@
 </head>
 <body>
   <nav class="top-nav">
-    <button type="button" class="top-nav-btn btn-cta-attention" id="tools-offcanvas-btn" onclick="openToolsOffcanvas()" aria-expanded="false" aria-controls="tools-offcanvas">
-      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 2.5A1.5 1.5 0 012.5 1h3A1.5 1.5 0 017 2.5v3A1.5 1.5 0 015.5 7h-3A1.5 1.5 0 011 5.5v-3zM2.5 2a.5.5 0 00-.5.5v3a.5.5 0 00.5.5h3a.5.5 0 00.5-.5v-3a.5.5 0 00-.5-.5h-3zm6.5.5A1.5 1.5 0 0110.5 1h3A1.5 1.5 0 0115 2.5v3A1.5 1.5 0 0113.5 7h-3A1.5 1.5 0 019 5.5v-3zm1.5-.5a.5.5 0 00-.5.5v3a.5.5 0 00.5.5h3a.5.5 0 00.5-.5v-3a.5.5 0 00-.5-.5h-3zM1 10.5A1.5 1.5 0 012.5 9h3A1.5 1.5 0 017 10.5v3A1.5 1.5 0 015.5 15h-3A1.5 1.5 0 011 13.5v-3zm1.5-.5a.5.5 0 00-.5.5v3a.5.5 0 00.5.5h3a.5.5 0 00.5-.5v-3a.5.5 0 00-.5-.5h-3zm6.5.5A1.5 1.5 0 0110.5 9h3a1.5 1.5 0 011.5 1.5v3a1.5 1.5 0 01-1.5 1.5h-3A1.5 1.5 0 019 13.5v-3zm1.5-.5a.5.5 0 00-.5.5v3a.5.5 0 00.5.5h3a.5.5 0 00.5-.5v-3a.5.5 0 00-.5-.5h-3z"/></svg>
-      Tools
-    </button>
-    <a href="/" class="active">
-      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.5 14.5v-3.505c0-.245.25-.495.5-.495h2c.25 0 .5.25.5.5v3.5a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.146-.354L13 5.793V2.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.293L8.354 1.146a.5.5 0 0 0-.708 0l-6 6A.5.5 0 0 0 1.5 7.5v7a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5z"/></svg>
-      Home
-    </a>
-    <a href="/api">
-      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.854 4.854a.5.5 0 1 0-.708-.708l-3.5 3.5a.5.5 0 0 0 0 .708l3.5 3.5a.5.5 0 0 0 .708-.708L2.707 8l3.147-3.146zm4.292 0a.5.5 0 0 1 .708-.708l3.5 3.5a.5.5 0 0 1 0 .708l-3.5 3.5a.5.5 0 0 1-.708-.708L13.293 8l-3.147-3.146z"/></svg>
-      API
-    </a>
-    <a href="https://wiki.maflplus.eu/faviconapi" target="_blank" rel="noopener">
-      <svg viewBox="0 0 16 16"><path d="M0 1.75A.75.75 0 01.75 1h4.253c1.227 0 2.317.59 3 1.501A3.744 3.744 0 0111.006 1h4.245a.75.75 0 01.75.75v10.5a.75.75 0 01-.75.75h-4.507a2.25 2.25 0 00-1.591.659l-.622.621a.75.75 0 01-1.06 0l-.622-.621A2.25 2.25 0 005.258 13H.75a.75.75 0 01-.75-.75V1.75zm7.251 10.324V2.922a2.25 2.25 0 00-2.248-2.172H1.5v10h3.757a3.75 3.75 0 012 .578zM8.75 12.074V2.922a2.25 2.25 0 012.248-2.172h3.502v10h-3.757a3.75 3.75 0 00-1.993.574z"/></svg>
-      Wiki
-    </a>
+    <button type="button" class="top-nav-btn btn-cta-attention" id="tools-offcanvas-btn" onclick="openToolsOffcanvas()" aria-expanded="false" aria-controls="tools-offcanvas"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 2.5A1.5 1.5 0 012.5 1h3A1.5 1.5 0 017 2.5v3A1.5 1.5 0 015.5 7h-3A1.5 1.5 0 011 5.5v-3zM2.5 2a.5.5 0 00-.5.5v3a.5.5 0 00.5.5h3a.5.5 0 00.5-.5v-3a.5.5 0 00-.5-.5h-3zm6.5.5A1.5 1.5 0 0110.5 1h3A1.5 1.5 0 0115 2.5v3A1.5 1.5 0 0113.5 7h-3A1.5 1.5 0 019 5.5v-3zm1.5-.5a.5.5 0 00-.5.5v3a.5.5 0 00.5.5h3a.5.5 0 00.5-.5v-3a.5.5 0 00-.5-.5h-3zM1 10.5A1.5 1.5 0 012.5 9h3A1.5 1.5 0 017 10.5v3A1.5 1.5 0 015.5 15h-3A1.5 1.5 0 011 13.5v-3zm1.5-.5a.5.5 0 00-.5.5v3a.5.5 0 00.5.5h3a.5.5 0 00.5-.5v-3a.5.5 0 00-.5-.5h-3zm6.5.5A1.5 1.5 0 0110.5 9h3a1.5 1.5 0 011.5 1.5v3a1.5 1.5 0 01-1.5 1.5h-3A1.5 1.5 0 019 13.5v-3zm1.5-.5a.5.5 0 00-.5.5v3a.5.5 0 00.5.5h3a.5.5 0 00.5-.5v-3a.5.5 0 00-.5-.5h-3z"/></svg>Tools</button>
+    <a href="/" class="active"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.5 14.5v-3.505c0-.245.25-.495.5-.495h2c.25 0 .5.25.5.5v3.5a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.146-.354L13 5.793V2.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.293L8.354 1.146a.5.5 0 0 0-.708 0l-6 6A.5.5 0 0 0 1.5 7.5v7a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5z"/></svg>Home</a>
+    <a href="/api"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.854 4.854a.5.5 0 1 0-.708-.708l-3.5 3.5a.5.5 0 0 0 0 .708l3.5 3.5a.5.5 0 0 0 .708-.708L2.707 8l3.147-3.146zm4.292 0a.5.5 0 0 1 .708-.708l3.5 3.5a.5.5 0 0 1 0 .708l-3.5 3.5a.5.5 0 0 1-.708-.708L13.293 8l-3.147-3.146z"/></svg>API</a>
+    <a href="/docs/getting-started" id="docs-nav-link" __DOCS_HIDDEN_ATTR__><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M0 1.75A.75.75 0 01.75 1h4.253c1.227 0 2.317.59 3 1.501A3.744 3.744 0 0111.006 1h4.245a.75.75 0 01.75.75v10.5a.75.75 0 01-.75.75h-4.507a2.25 2.25 0 00-1.591.659l-.622.621a.75.75 0 01-1.06 0l-.622-.621A2.25 2.25 0 005.258 13H.75a.75.75 0 01-.75-.75V1.75zm7.251 10.324V2.922a2.25 2.25 0 00-2.248-2.172H1.5v10h3.757a3.75 3.75 0 012 .578zM8.75 12.074V2.922a2.25 2.25 0 012.248-2.172h3.502v10h-3.757a3.75 3.75 0 00-1.993.574z"/></svg>Docs</a>
   </nav>
   <div class="container">
     <a href="/" class="site-logo-link" aria-label="FaviconAPI home">
@@ -1823,7 +1887,7 @@
     </a>
     <h1>FaviconAPI</h1>
     <p class="subtitle">Get the highest resolution favicon for any domain - or look up a service icon by name.</p>
-    <p class="providers-line">Favicons are resolved from an HTML scraper and ten upstream providers: Google, DuckDuckGo, Yandex, Favicon.so, Vemetric, Faviconextractor, FaviconKit, favicon.run, logo.dev, and Brandfetch. App icons are resolved from selfh.st, dashboardicons.com, LobeHub, and SVGL.</p>
+    <p class="providers-line">Favicons are resolved from an HTML scraper and ten upstream providers: Google, DuckDuckGo, Yandex, Favicon.so, Vemetric, Faviconextractor, FaviconKit, favicon.run, logo.dev, and Brandfetch. App icons are resolved from selfh.st, dashboardicons.com, LobeHub, and SVGL. Or build your own custom URL with preferred provider, fallbacks and minimum icon size.</p>
 
     <div class="tip">
       <strong><span class="icon">&#9881;</span> Tip</strong>
@@ -1833,12 +1897,18 @@
 
     <div class="search-section">
       <label for="domain-input">Domain or app name</label>
-      <div class="search-bar">
-        <input type="text" id="domain-input" placeholder="example.com  or  immich" autofocus>
-        <button type="button" id="reset-btn" class="search-reset" onclick="resetSearch()" disabled aria-label="Reset search" data-tip="Reset">
-          <svg viewBox="0 0 21 21" aria-hidden="true"><g fill="none" fill-rule="evenodd" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3.578 6.487A8 8 0 1 1 2.5 10.5"/><path d="M7.5 6.5h-4v-4"/></g></svg>
-        </button>
-        <button type="button" id="fetch-btn" onclick="fetchFavicons()">Fetch</button>
+      <div class="search-bar-wrap cta-attention" id="search-bar-cta">
+        <span class="cta-pointer cta-pointer--search" aria-hidden="true">👉</span>
+        <div class="search-bar">
+          <div class="search-input-wrap">
+            <input type="text" id="domain-input" placeholder="example.com  or  immich" autofocus>
+            <span class="search-fake-caret" aria-hidden="true"></span>
+          </div>
+          <button type="button" id="reset-btn" class="search-reset" onclick="resetSearch()" disabled aria-label="Reset search" data-tip="Reset">
+            <svg viewBox="0 0 21 21" aria-hidden="true"><g fill="none" fill-rule="evenodd" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3.578 6.487A8 8 0 1 1 2.5 10.5"/><path d="M7.5 6.5h-4v-4"/></g></svg>
+          </button>
+          <button type="button" id="fetch-btn" onclick="fetchFavicons()">Fetch</button>
+        </div>
       </div>
       <div class="search-options">
         <label for="selfhst-toggle">
@@ -2598,13 +2668,18 @@
       document.querySelectorAll('.btn-cta-attention').forEach((el) => {
         el.classList.remove('btn-cta-attention');
       });
+      document.querySelectorAll('.search-bar-wrap.cta-attention').forEach((el) => {
+        el.classList.remove('cta-attention');
+      });
       document.querySelectorAll('.cta-pointer').forEach((el) => el.remove());
     }
 
     function initCtaAttention() {
       if (sessionStorage.getItem('faviconapi-cta-dismissed')) {
         dismissCtaAttention();
+        return;
       }
+      input.focus({ preventScroll: true });
     }
 
     function openProfileModal() {
@@ -2914,7 +2989,23 @@
       btn.disabled = !hasQuery && !hasResults;
     }
 
+    function isMobileViewport() {
+      return window.matchMedia('(max-width: 700px)').matches;
+    }
+
+    function hideResultsGrid() {
+      const results = document.getElementById('results');
+      results.classList.remove('visible', 'placeholder');
+      setDownloadToolbarVisible(false);
+      updateResetButton();
+    }
+
     function showPlaceholderResults() {
+      if (isMobileViewport()) {
+        hideResultsGrid();
+        return;
+      }
+
       const results = document.getElementById('results');
       results.classList.add('visible', 'placeholder');
       setDownloadToolbarVisible(true);
@@ -3647,6 +3738,8 @@
       const stripped = raw.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim();
       if (!stripped) return;
 
+      dismissCtaAttention();
+
       if (stripped.includes('.')) {
         runDomainSearch(stripped);
       } else {
@@ -3744,23 +3837,23 @@
       startServiceIconLoads(resolveData, true);
     }
 
-    function loadGoogle(domain, size) {
+    function loadGoogle(domain, size, opts) {
       // faviconV2 (v2) is the only Google endpoint that serves 180px and 256px;
       // the smaller sizes come from the classic s2/favicons (v1) service.
       if (size === 256 || size === 180) {
         const src = `https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${domain}&size=${size}`;
-        loadFavicon('google', domainProxyPath('googlev2', domain, size), src);
+        loadFavicon('google', domainProxyPath('googlev2', domain, size), src, opts);
       } else {
-        loadFavicon('google', domainProxyPath('google', domain, size), `https://www.google.com/s2/favicons?domain=${domain}&sz=${size}`);
+        loadFavicon('google', domainProxyPath('google', domain, size), `https://www.google.com/s2/favicons?domain=${domain}&sz=${size}`, opts);
       }
     }
 
-    function loadFaviconkit(domain, size) {
-      loadFavicon('faviconkit', domainProxyPath('faviconkit', domain, size), `https://ico.faviconkit.net/favicon/${domain}?sz=${size}`);
+    function loadFaviconkit(domain, size, opts) {
+      loadFavicon('faviconkit', domainProxyPath('faviconkit', domain, size), `https://ico.faviconkit.net/favicon/${domain}?sz=${size}`, opts);
     }
 
-    function loadFaviconrun(domain, size) {
-      loadFavicon('faviconrun', domainProxyPath('faviconrun', domain, size), `https://favicon.run/favicon?domain=${domain}&sz=${size}`);
+    function loadFaviconrun(domain, size, opts) {
+      loadFavicon('faviconrun', domainProxyPath('faviconrun', domain, size), `https://favicon.run/favicon?domain=${domain}&sz=${size}`, opts);
     }
 
     function buildBrandfetchUrl(domain, options = {}) {
@@ -3929,7 +4022,7 @@
         preferred: 128,
         probePath: (d) => domainProxyPath('googlev2', d, 256),
         setCurrent: (s) => { currentGoogleSize = s; },
-        load: (d, s) => loadGoogle(d, s),
+        load: (d, s, opts) => loadGoogle(d, s, opts),
       },
       faviconkit: {
         group: 'faviconkit-sizes',
@@ -3937,15 +4030,16 @@
         preferred: 128,
         probePath: (d) => domainProxyPath('faviconkit', d, 256),
         setCurrent: (s) => { currentFaviconkitSize = s; },
-        load: (d, s) => loadFaviconkit(d, s),
+        load: (d, s, opts) => loadFaviconkit(d, s, opts),
       },
       faviconrun: {
         group: 'faviconrun-sizes',
         sizes: [256, 128, 64, 32, 16],
         preferred: 128,
         probePath: (d) => domainProxyPath('faviconrun', d, 256),
+        probeEachSize: true,
         setCurrent: (s) => { currentFaviconrunSize = s; },
-        load: (d, s) => loadFaviconrun(d, s),
+        load: (d, s, opts) => loadFaviconrun(d, s, opts),
       },
     };
 
@@ -3980,22 +4074,86 @@
     function detectNativeMax(id, domain) {
       const cfg = NATIVE_SIZE_CARDS[id];
       if (!cfg || cfg.skipNativeDetect) return;
+      if (cfg.probeEachSize) {
+        probeAvailableSizes(id, domain);
+        return;
+      }
+      probeNativeSize(id, domain, 256, () => {
+        probeNativeSize(id, domain, cfg.preferred);
+      });
+    }
+
+    function probeNativeSize(id, domain, size, onFail) {
+      const cfg = NATIVE_SIZE_CARDS[id];
+      let path;
+      if (id === 'google' && size !== 256 && size !== 180) {
+        path = domainProxyPath('google', domain, size);
+      } else if (cfg.probePath && size === 256) {
+        path = cfg.probePath(domain);
+      } else {
+        path = domainProxyPath(id === 'google' ? 'googlev2' : id, domain, size);
+      }
       const probe = new Image();
       probe.onload = () => {
         if (currentMode !== 'domain' || currentDomain !== domain) return;
         const native = Math.max(probe.naturalWidth || 0, probe.naturalHeight || 0);
         if (native > 0) refineSizeButtons(id, domain, native);
       };
-      // On failure leave the offered buttons untouched.
-      probe.onerror = () => {};
-      probe.src = `${cfg.probePath(domain)}?_=${Date.now()}`;
+      probe.onerror = () => {
+        if (typeof onFail === 'function') onFail();
+      };
+      probe.src = `${path}?_=${Date.now()}`;
     }
 
-    function refineSizeButtons(id, domain, native) {
+    function probeAvailableSizes(id, domain) {
+      const cfg = NATIVE_SIZE_CARDS[id];
+      const working = new Set();
+      let pending = cfg.sizes.length;
+      if (!pending) return;
+
+      const finishSizeProbe = () => {
+        pending -= 1;
+        if (pending > 0) return;
+        if (currentMode !== 'domain' || currentDomain !== domain) return;
+        if (!working.size) return;
+
+        const maxSize = Math.max(...working);
+        const nativeProbe = new Image();
+        nativeProbe.onload = () => {
+          if (currentMode !== 'domain' || currentDomain !== domain) return;
+          const native = Math.max(nativeProbe.naturalWidth || 0, nativeProbe.naturalHeight || 0);
+          refineSizeButtons(id, domain, native > 0 ? native : maxSize, working);
+        };
+        nativeProbe.onerror = () => {
+          if (currentMode !== 'domain' || currentDomain !== domain) return;
+          refineSizeButtons(id, domain, maxSize, working);
+        };
+        nativeProbe.src = `${domainProxyPath(id, domain, maxSize)}?_=${Date.now()}`;
+      };
+
+      cfg.sizes.forEach((size) => {
+        const img = new Image();
+        img.onload = () => {
+          working.add(size);
+          finishSizeProbe();
+        };
+        img.onerror = finishSizeProbe;
+        img.src = `${domainProxyPath(id, domain, size)}?_=${Date.now()}`;
+      });
+    }
+
+    function refineSizeButtons(id, domain, native, workingSizes = null) {
       const cfg = NATIVE_SIZE_CARDS[id];
       if (!cfg) return;
       let effective = cfg.sizes.filter((s) => s <= native);
-      if (!effective.length) effective = [Math.min(...cfg.sizes)];
+      if (workingSizes && workingSizes.size) {
+        effective = effective.filter((s) => workingSizes.has(s));
+      }
+      if (!effective.length) {
+        effective = workingSizes && workingSizes.size
+          ? cfg.sizes.filter((s) => workingSizes.has(s))
+          : [Math.min(...cfg.sizes)];
+      }
       applyVisibleSizes(cfg.group, effective);
 
       const active = getActiveSize(cfg.group);
@@ -4006,7 +4164,25 @@
         : Math.max(...effective);
       cfg.setCurrent(target);
       setActiveSize(cfg.group, target);
-      cfg.load(domain, target);
+      cfg.load(domain, target, { hideCardOnError: false });
+    }
+
+    function ensureSizeUnavailableEl(display) {
+      if (!display) return null;
+      let el = display.querySelector('.size-unavailable');
+      if (!el) {
+        el = document.createElement('span');
+        el.className = 'unavailable size-unavailable';
+        el.textContent = 'size not available';
+        el.style.display = 'none';
+        display.appendChild(el);
+      }
+      return el;
+    }
+
+    function setSizeUnavailable(display, show) {
+      const el = ensureSizeUnavailableEl(display);
+      if (el) el.style.display = show ? 'block' : 'none';
     }
 
     function selfhstProxyPath(slug, variant, format = currentSelfhstFormat, size = currentSelfhstSize) {
@@ -5065,8 +5241,10 @@
       const meta = document.getElementById(`${id}-meta`);
       const display = document.getElementById(`${id}-display`) || img?.closest('.favicon-display');
       const card = img.closest('.card');
+      const hadImage = !!(img.complete && img.naturalWidth > 0 && img.style.display !== 'none');
 
       if (card && id !== 'brandfetch') card.style.display = '';
+      setSizeUnavailable(display, false);
       img.style.display = 'none';
       spinner.style.display = 'block';
       meta.textContent = '';
@@ -5083,12 +5261,19 @@
         img.src = imgEl.src;
         img.style.display = 'block';
         spinner.style.display = 'none';
+        setSizeUnavailable(display, false);
         if (card) card.style.display = '';
         if (opts?.onMeta) opts.onMeta(imgEl);
         else showFaviconMeta(id, imgEl, proxyUrl, sourceUrl, opts);
       };
       imgEl.onerror = () => {
         spinner.style.display = 'none';
+        if (opts?.hideCardOnError === false || hadImage) {
+          if (hadImage) img.style.display = 'block';
+          setSizeUnavailable(display, true);
+          if (card) card.style.display = '';
+          return;
+        }
         if (card) card.style.display = 'none';
       };
       if (opts?.objectUrl) {
@@ -5128,21 +5313,21 @@
       if (!currentDomain) return;
       currentGoogleSize = size;
       setActiveSize('google-sizes', size);
-      loadGoogle(currentDomain, size);
+      loadGoogle(currentDomain, size, { hideCardOnError: false });
     }
 
     function switchFaviconkitSize(size) {
       if (!currentDomain) return;
       currentFaviconkitSize = size;
       setActiveSize('faviconkit-sizes', size);
-      loadFaviconkit(currentDomain, size);
+      loadFaviconkit(currentDomain, size, { hideCardOnError: false });
     }
 
     function switchFaviconrunSize(size) {
       if (!currentDomain) return;
       currentFaviconrunSize = size;
       setActiveSize('faviconrun-sizes', size);
-      loadFaviconrun(currentDomain, size);
+      loadFaviconrun(currentDomain, size, { hideCardOnError: false });
     }
 
     function switchBrandfetchSize(size) {

@@ -5,6 +5,33 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.0] — 2026-07-04
+
+### Added
+
+- **Selfhosted docs (`/docs`)** — markdown guides from `src/docs-content/` rendered at runtime via `marked` (`src/docsRender.js`, `src/public/docs.html`). Pages: Getting Started, Tweaks, API reference, API v1, Proxy, and Tools. Three-column layout with sidebar nav, per-page table of contents, code copy buttons, and responsive tables. `/docs` redirects (301) to `/docs/getting-started`. Toggle with `UI_ENABLE_DOCS` (default on); when off, routes return 404 and the **Docs** nav link is hidden on `/` and `/api`. `GET /providers` exposes `docsEnabled`.
+- **Configurable analytics** — optional Umami-compatible tracking snippet injected on `/`, `/api`, and `/docs` via `UI_ANALYTICS_SCRIPT_SRC`, `UI_ANALYTICS_WEBSITE_ID`, and optional `UI_ANALYTICS_DOMAINS`. Both script src and website ID must be set; empty by default so self-hosters are not tracked unless they opt in. Replaces the hardcoded faviconapi.com analytics script in the HTML templates.
+- **API docs & selfhosted docs — Tools offcanvas** — `/api` and `/docs` include the same **Tools** panel as the homepage (browser search engine setup, custom URL builder, FaviconAPI Copy bookmarklet), including `/#tools` deep-link support.
+
+### Changed
+
+- **Homepage SEO** — `<title>`, meta description, keywords, Open Graph, Twitter Card, and JSON-LD aligned with visible body copy (full provider list, app-icon catalogs, custom URL builder). Title wording updated to “highest resolution favicon”.
+- **Docs SEO** — per-page meta description (first markdown paragraph), keywords, Open Graph, Twitter Card, and `TechArticle` + `BreadcrumbList` JSON-LD. All doc slugs listed in `/sitemap.xml` (`<priority>0.7</priority>`). `/robots.txt` allows `/docs` when enabled. Homepage JSON-LD `sameAs` includes the docs URL.
+- **README** — expanded into a full getting-started guide (why FaviconAPI, how it works, routes, Docker quick start, configuration tables, API v1, performance tuning) mirroring the selfhosted docs content.
+- **Web UI navigation** — **Docs** link added to the homepage and API docs top nav (hidden when `UI_ENABLE_DOCS=false`).
+- **Docker image** — `src/docs-content/` included in the build (`.dockerignore` exception for markdown under that path).
+- **`.env.example`** — documents `UI_ENABLE_DOCS` and optional Umami analytics vars (`UI_ANALYTICS_SCRIPT_SRC`, `UI_ANALYTICS_WEBSITE_ID`, `UI_ANALYTICS_DOMAINS`).
+- **Dependencies** — `marked` for server-side markdown rendering.
+
+## [2.7.6] — 2026-07-04
+
+### Fixed
+
+- **Web UI — sized provider cards no longer vanish on failed size switch** — switching Google, FaviconKit, or Favicon.run to a size that fails (upstream 502/500) no longer hides the whole card; the previous icon stays visible with a “size not available” notice instead.
+- **Web UI — Favicon.run size buttons match upstream** — each offered size is probed on load so buttons for sizes the provider cannot serve (e.g. 16, 32, and 256 for `hosthatch.com`) are hidden automatically.
+- **Web UI — Google size buttons and routing** — size availability is probed per size using the correct Google v1/v2 proxy paths (`/google/` for ≤128, `/googlev2/` for 180/256), so working sizes like 180 stay visible when v2 succeeds even if 256 fails.
+- **Web UI — small non-square favicons stay visible** — provider preview frames use a fixed 140px-tall box with icons scaled up to 128×128 via `object-fit: contain`, so tiny wide icons (e.g. Google 11×16 or 22×32 for `hosthatch.com`) no longer look blank or collapse the layout when switching between 32 and 16.
+
 ## [2.7.5] — 2026-07-04
 
 ### Added

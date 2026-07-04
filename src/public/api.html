@@ -41,8 +41,7 @@
   <meta name="twitter:description" content="JSON API reference and interactive playground for the FaviconAPI.">
   <meta name="twitter:image" content="__BASE_URL__/logo.png">
 
-  <!-- analytics -->
-  <script defer src="https://analytics.hibbit.cloud/script.js" data-website-id="dada58c3-cc4e-4b0d-9961-9390d9b74143"></script>
+  __ANALYTICS_SCRIPT__
 
   <script type="application/ld+json">
   {
@@ -119,7 +118,7 @@
     .top-nav {
       position: absolute;
       top: 1rem;
-      right: 1.5rem;
+      right: 3.5rem;
       display: flex;
       gap: 1.2rem;
       align-items: center;
@@ -130,19 +129,26 @@
       text-decoration: none;
       font-size: 0.85rem;
       font-weight: 500;
-      display: flex;
+      line-height: 1;
+      display: inline-flex;
       align-items: center;
       gap: 0.35rem;
       transition: color 0.15s;
     }
 
     .top-nav a:hover { color: #7b3fa8; text-decoration: underline; }
-    .top-nav a.active { color: #2d2a26; font-weight: 700; }
+    .top-nav a.active { color: #2d2a26; }
 
     .top-nav svg {
+      display: block;
+      flex-shrink: 0;
       width: 16px;
       height: 16px;
       fill: currentColor;
+    }
+
+    .top-nav a[href*="/docs"] svg {
+      transform: translateY(2px);
     }
 
     .top-nav-btn {
@@ -152,7 +158,8 @@
       border-radius: 6px;
       font-size: 0.85rem;
       font-weight: 500;
-      display: flex;
+      line-height: 1;
+      display: inline-flex;
       align-items: center;
       gap: 0.35rem;
       padding: 0.35rem 0.65rem;
@@ -168,6 +175,8 @@
     }
 
     .top-nav-btn svg {
+      display: block;
+      flex-shrink: 0;
       width: 16px;
       height: 16px;
       fill: currentColor;
@@ -430,6 +439,135 @@
       font-size: 0.82rem;
       color: #8a8480;
       font-style: italic;
+    }
+
+    .modal.profile-modal {
+      width: min(620px, 100%);
+      max-height: min(94vh, 920px);
+    }
+
+    .profile-modal .modal-intro { margin-bottom: 0.75rem; }
+
+    .profile-form {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+      margin-bottom: 0.85rem;
+    }
+
+    .profile-url-box {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+      padding: 0.6rem 0.75rem;
+    }
+
+    .profile-url-box code { font-size: 0.78rem; }
+
+    .profile-url-box .modal-copy-btn { align-self: flex-end; }
+
+    .profile-field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+    }
+
+    .profile-field label {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #2d2a26;
+    }
+
+    .profile-field select,
+    .profile-field input[type="text"] {
+      width: 100%;
+      padding: 0.5rem 0.6rem;
+      font-size: 0.88rem;
+      color: #2d2a26;
+      background: #fff;
+      border: 1px solid #e0dbd5;
+      border-radius: 6px;
+      font-family: inherit;
+    }
+
+    .profile-field select:focus,
+    .profile-field input[type="text"]:focus {
+      outline: none;
+      border-color: #5b2e7e;
+    }
+
+    .profile-fallbacks {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.6rem;
+    }
+
+    .profile-fallback-cell {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      min-width: 0;
+    }
+
+    .profile-fallback-cell select { flex: 1; min-width: 0; }
+
+    .profile-fallback-num {
+      flex: 0 0 auto;
+      width: 1.4rem;
+      height: 1.4rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #5b2e7e;
+      background: #f0e9f5;
+      border: 1px solid #e0d3ec;
+      border-radius: 50%;
+    }
+
+    .profile-hint {
+      font-size: 0.78rem;
+      color: #8a8480;
+      font-style: italic;
+    }
+
+    .profile-preview {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.6rem;
+      background: #faf8f5;
+      border: 1px solid #ece6de;
+      border-radius: 8px;
+    }
+
+    .profile-preview-thumb {
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 56px;
+      height: 56px;
+      border-radius: 6px;
+      background: #fff;
+      border: 1px solid #ece6de;
+    }
+
+    .profile-preview img {
+      max-width: 100%;
+      max-height: 100%;
+      width: auto;
+      height: auto;
+      object-fit: contain;
+      image-rendering: auto;
+    }
+
+    .profile-preview .profile-preview-meta {
+      font-size: 0.8rem;
+      color: #6b6560;
+      word-break: break-all;
     }
 
     .api-mode {
@@ -943,6 +1081,21 @@
       flex: 0 0 auto;
     }
 
+    .global-toast .toast-text {
+      flex: 0 0 auto;
+      white-space: nowrap;
+    }
+
+    .global-toast .toast-url {
+      font-family: monospace;
+      font-size: 0.8rem;
+      color: #d8d3cd;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
+    }
+
     footer.page-footer {
       margin-top: 2.5rem;
       padding-top: 1.25rem;
@@ -1018,22 +1171,10 @@
 </head>
 <body>
   <nav class="top-nav">
-    <button type="button" class="top-nav-btn" id="tools-offcanvas-btn" onclick="openToolsOffcanvas()" aria-expanded="false" aria-controls="tools-offcanvas">
-      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 2.5A1.5 1.5 0 012.5 1h3A1.5 1.5 0 017 2.5v3A1.5 1.5 0 015.5 7h-3A1.5 1.5 0 011 5.5v-3zM2.5 2a.5.5 0 00-.5.5v3a.5.5 0 00.5.5h3a.5.5 0 00.5-.5v-3a.5.5 0 00-.5-.5h-3zm6.5.5A1.5 1.5 0 0110.5 1h3A1.5 1.5 0 0115 2.5v3A1.5 1.5 0 0113.5 7h-3A1.5 1.5 0 019 5.5v-3zm1.5-.5a.5.5 0 00-.5.5v3a.5.5 0 00.5.5h3a.5.5 0 00.5-.5v-3a.5.5 0 00-.5-.5h-3zM1 10.5A1.5 1.5 0 012.5 9h3A1.5 1.5 0 017 10.5v3A1.5 1.5 0 015.5 15h-3A1.5 1.5 0 011 13.5v-3zm1.5-.5a.5.5 0 00-.5.5v3a.5.5 0 00.5.5h3a.5.5 0 00.5-.5v-3a.5.5 0 00-.5-.5h-3zm6.5.5A1.5 1.5 0 0110.5 9h3a1.5 1.5 0 011.5 1.5v3a1.5 1.5 0 01-1.5 1.5h-3A1.5 1.5 0 019 13.5v-3zm1.5-.5a.5.5 0 00-.5.5v3a.5.5 0 00.5.5h3a.5.5 0 00.5-.5v-3a.5.5 0 00-.5-.5h-3z"/></svg>
-      Tools
-    </button>
-    <a href="/">
-      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.5 14.5v-3.505c0-.245.25-.495.5-.495h2c.25 0 .5.25.5.5v3.5a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.146-.354L13 5.793V2.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.293L8.354 1.146a.5.5 0 0 0-.708 0l-6 6A.5.5 0 0 0 1.5 7.5v7a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5z"/></svg>
-      Home
-    </a>
-    <a href="/api" class="active">
-      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.854 4.854a.5.5 0 1 0-.708-.708l-3.5 3.5a.5.5 0 0 0 0 .708l3.5 3.5a.5.5 0 0 0 .708-.708L2.707 8l3.147-3.146zm4.292 0a.5.5 0 0 1 .708-.708l3.5 3.5a.5.5 0 0 1 0 .708l-3.5 3.5a.5.5 0 0 1-.708-.708L13.293 8l-3.147-3.146z"/></svg>
-      API
-    </a>
-    <a href="https://wiki.maflplus.eu/faviconapi" target="_blank" rel="noopener">
-      <svg viewBox="0 0 16 16"><path d="M0 1.75A.75.75 0 01.75 1h4.253c1.227 0 2.317.59 3 1.501A3.744 3.744 0 0111.006 1h4.245a.75.75 0 01.75.75v10.5a.75.75 0 01-.75.75h-4.507a2.25 2.25 0 00-1.591.659l-.622.621a.75.75 0 01-1.06 0l-.622-.621A2.25 2.25 0 005.258 13H.75a.75.75 0 01-.75-.75V1.75zm7.251 10.324V2.922a2.25 2.25 0 00-2.248-2.172H1.5v10h3.757a3.75 3.75 0 012 .578zM8.75 12.074V2.922a2.25 2.25 0 012.248-2.172h3.502v10h-3.757a3.75 3.75 0 00-1.993.574z"/></svg>
-      Wiki
-    </a>
+    <button type="button" class="top-nav-btn" id="tools-offcanvas-btn" onclick="openToolsOffcanvas()" aria-expanded="false" aria-controls="tools-offcanvas"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 2.5A1.5 1.5 0 012.5 1h3A1.5 1.5 0 017 2.5v3A1.5 1.5 0 015.5 7h-3A1.5 1.5 0 011 5.5v-3zM2.5 2a.5.5 0 00-.5.5v3a.5.5 0 00.5.5h3a.5.5 0 00.5-.5v-3a.5.5 0 00-.5-.5h-3zm6.5.5A1.5 1.5 0 0110.5 1h3A1.5 1.5 0 0115 2.5v3A1.5 1.5 0 0113.5 7h-3A1.5 1.5 0 019 5.5v-3zm1.5-.5a.5.5 0 00-.5.5v3a.5.5 0 00.5.5h3a.5.5 0 00.5-.5v-3a.5.5 0 00-.5-.5h-3zM1 10.5A1.5 1.5 0 012.5 9h3A1.5 1.5 0 017 10.5v3A1.5 1.5 0 015.5 15h-3A1.5 1.5 0 011 13.5v-3zm1.5-.5a.5.5 0 00-.5.5v3a.5.5 0 00.5.5h3a.5.5 0 00.5-.5v-3a.5.5 0 00-.5-.5h-3zm6.5.5A1.5 1.5 0 0110.5 9h3a1.5 1.5 0 011.5 1.5v3a1.5 1.5 0 01-1.5 1.5h-3A1.5 1.5 0 019 13.5v-3zm1.5-.5a.5.5 0 00-.5.5v3a.5.5 0 00.5.5h3a.5.5 0 00.5-.5v-3a.5.5 0 00-.5-.5h-3z"/></svg>Tools</button>
+    <a href="/"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.5 14.5v-3.505c0-.245.25-.495.5-.495h2c.25 0 .5.25.5.5v3.5a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.146-.354L13 5.793V2.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.293L8.354 1.146a.5.5 0 0 0-.708 0l-6 6A.5.5 0 0 0 1.5 7.5v7a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5z"/></svg>Home</a>
+    <a href="/api" class="active"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.854 4.854a.5.5 0 1 0-.708-.708l-3.5 3.5a.5.5 0 0 0 0 .708l3.5 3.5a.5.5 0 0 0 .708-.708L2.707 8l3.147-3.146zm4.292 0a.5.5 0 0 1 .708-.708l3.5 3.5a.5.5 0 0 1 0 .708l-3.5 3.5a.5.5 0 0 1-.708-.708L13.293 8l-3.147-3.146z"/></svg>API</a>
+    <a href="/docs/getting-started" id="docs-nav-link" __DOCS_HIDDEN_ATTR__><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M0 1.75A.75.75 0 01.75 1h4.253c1.227 0 2.317.59 3 1.501A3.744 3.744 0 0111.006 1h4.245a.75.75 0 01.75.75v10.5a.75.75 0 01-.75.75h-4.507a2.25 2.25 0 00-1.591.659l-.622.621a.75.75 0 01-1.06 0l-.622-.621A2.25 2.25 0 005.258 13H.75a.75.75 0 01-.75-.75V1.75zm7.251 10.324V2.922a2.25 2.25 0 00-2.248-2.172H1.5v10h3.757a3.75 3.75 0 012 .578zM8.75 12.074V2.922a2.25 2.25 0 012.248-2.172h3.502v10h-3.757a3.75 3.75 0 00-1.993.574z"/></svg>Docs</a>
   </nav>
 
   <div class="offcanvas-overlay" id="tools-offcanvas" hidden aria-hidden="true" onclick="onToolsOffcanvasBackdropClick(event)">
@@ -1053,6 +1194,17 @@
           <button type="button" class="bookmarklet-btn tool-action" id="search-browser-btn" onclick="openSearchModal()">
             <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/></svg>
             Search from browser
+          </button>
+        </div>
+
+        <div class="tool-card">
+          <div>
+            <strong><span class="icon">&#128279;</span> Custom URL</strong>
+            <p>Build a shareable URL with your own preferred provider, fallbacks and minimum icon size. The settings are encoded in the URL &mdash; no account needed.</p>
+          </div>
+          <button type="button" class="bookmarklet-btn tool-action" onclick="openProfileModal()">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.715 6.542 3.343 7.914a3 3 0 1 0 4.243 4.243l1.828-1.829A3 3 0 0 0 8.586 5.5L8 6.086a1.002 1.002 0 0 0-.154.199 2 2 0 0 1 .861 3.337L6.88 11.45a2 2 0 1 1-2.83-2.83l.793-.792a4.018 4.018 0 0 1-.128-1.287z"/><path d="M6.586 4.672A3 3 0 0 0 7.414 9.5l.775-.776a2 2 0 0 1-.896-3.346L9.12 3.55a2 2 0 1 1 2.83 2.83l-.793.792c.112.42.155.855.128 1.287l1.372-1.372a3 3 0 1 0-4.243-4.243L6.586 4.672z"/></svg>
+            Build custom URL
           </button>
         </div>
 
@@ -1121,6 +1273,58 @@
             </ol>
             <p class="note">Use Chrome, Edge or Firefox for this feature, or use the bookmarklet in Tools.</p>
           </section>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="profile-modal" hidden aria-hidden="true">
+    <div class="modal profile-modal" role="dialog" aria-modal="true" aria-labelledby="profile-modal-title">
+      <div class="modal-header">
+        <h2 id="profile-modal-title">Build custom URL</h2>
+        <button type="button" class="modal-close" onclick="closeProfileModal()" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-intro">Pick a preferred provider, optional fallbacks and a minimum icon size. The URL below encodes your choices - use it as <code>&lt;url&gt;/{domain-or-appname}</code>.</p>
+
+        <div class="profile-form">
+          <div class="profile-field">
+            <label for="profile-preferred">Preferred provider</label>
+            <select id="profile-preferred"></select>
+          </div>
+
+          <div class="profile-field">
+            <label>Fallbacks (optional, in order)</label>
+            <div class="profile-fallbacks">
+              <div class="profile-fallback-cell"><span class="profile-fallback-num">1</span><select id="profile-fallback-1" aria-label="Fallback 1"></select></div>
+              <div class="profile-fallback-cell"><span class="profile-fallback-num">2</span><select id="profile-fallback-2" aria-label="Fallback 2"></select></div>
+              <div class="profile-fallback-cell"><span class="profile-fallback-num">3</span><select id="profile-fallback-3" aria-label="Fallback 3"></select></div>
+              <div class="profile-fallback-cell"><span class="profile-fallback-num">4</span><select id="profile-fallback-4" aria-label="Fallback 4"></select></div>
+            </div>
+          </div>
+
+          <div class="profile-field">
+            <label for="profile-size">Minimum icon size</label>
+            <select id="profile-size"></select>
+            <span class="profile-hint">SVG = unlimited (vector, served as-is). PNG = served at exactly this size; sources smaller than this are skipped.</span>
+          </div>
+
+          <div class="profile-field">
+            <label for="profile-test">Preview with a domain or app name (optional)</label>
+            <input type="text" id="profile-test" placeholder="example.com  or  immich" autocomplete="off">
+          </div>
+        </div>
+
+        <div class="search-url-box profile-url-box">
+          <code id="profile-url"></code>
+          <button type="button" class="modal-copy-btn" onclick="copyProfileUrl()">Copy URL</button>
+        </div>
+
+        <div class="profile-preview" id="profile-preview" style="display:none">
+          <span class="profile-preview-thumb">
+            <img id="profile-preview-img" alt="Custom favicon preview">
+          </span>
+          <span class="profile-preview-meta" id="profile-preview-meta"></span>
         </div>
       </div>
     </div>
@@ -1414,7 +1618,8 @@ docker compose exec maflplus-favicon-api npm run keys:revoke -- --prefix fa_abcd
 
   <div class="global-toast" id="global-toast" role="status" aria-live="polite">
     <span class="check">&#10003;</span>
-    <span class="toast-text" id="global-toast-text">Copied</span>
+    <span class="toast-text" id="global-toast-text">URL copied</span>
+    <span class="toast-url" id="global-toast-url"></span>
   </div>
 
   <script>
@@ -1447,11 +1652,40 @@ docker compose exec maflplus-favicon-api npm run keys:revoke -- --prefix fa_abcd
     }
 
     function showToast(text) {
+      showGlobalToast(text);
+    }
+
+    let globalToastTimer = null;
+    function showGlobalToast(url) {
       const toast = document.getElementById('global-toast');
-      document.getElementById('global-toast-text').textContent = text || 'Copied';
+      const textEl = document.getElementById('global-toast-text');
+      const urlEl = document.getElementById('global-toast-url');
+      if (!toast) return;
+      if (url && url.startsWith('Copied:')) {
+        textEl.textContent = url;
+        urlEl.textContent = '';
+        urlEl.style.display = 'none';
+      } else if (url) {
+        textEl.textContent = 'URL copied';
+        urlEl.textContent = url;
+        urlEl.style.display = '';
+      } else {
+        textEl.textContent = 'Copied';
+        urlEl.textContent = '';
+        urlEl.style.display = 'none';
+      }
       toast.classList.add('show');
-      clearTimeout(showToast._t);
-      showToast._t = setTimeout(() => toast.classList.remove('show'), 1800);
+      if (globalToastTimer) clearTimeout(globalToastTimer);
+      globalToastTimer = setTimeout(() => toast.classList.remove('show'), 2000);
+    }
+
+    function modalsAllowBodyScroll() {
+      const toolsOpen = document.getElementById('tools-offcanvas')?.classList.contains('open');
+      const searchOpen = document.getElementById('search-modal')?.classList.contains('open');
+      const profileOpen = document.getElementById('profile-modal')?.classList.contains('open');
+      if (!toolsOpen && !searchOpen && !profileOpen) {
+        document.body.style.overflow = '';
+      }
     }
 
     /* ---------------------- Tools offcanvas + Search modal ---------------------- */
@@ -1488,8 +1722,7 @@ docker compose exec maflplus-favicon-api npm run keys:revoke -- --prefix fa_abcd
       modal.hidden = true;
       modal.classList.remove('open');
       modal.setAttribute('aria-hidden', 'true');
-      const toolsOpen = document.getElementById('tools-offcanvas')?.classList.contains('open');
-      if (!toolsOpen) document.body.style.overflow = '';
+      modalsAllowBodyScroll();
       modal.removeEventListener('click', onSearchModalBackdropClick);
       document.removeEventListener('keydown', onSearchModalKeydown);
     }
@@ -1514,10 +1747,7 @@ docker compose exec maflplus-favicon-api npm run keys:revoke -- --prefix fa_abcd
       panel.classList.remove('open');
       panel.setAttribute('aria-hidden', 'true');
       if (btn) btn.setAttribute('aria-expanded', 'false');
-      const searchModal = document.getElementById('search-modal');
-      if (!searchModal || !searchModal.classList.contains('open')) {
-        document.body.style.overflow = '';
-      }
+      modalsAllowBodyScroll();
       document.removeEventListener('keydown', onToolsOffcanvasKeydown);
     }
 
@@ -1548,8 +1778,179 @@ docker compose exec maflplus-favicon-api npm run keys:revoke -- --prefix fa_abcd
     async function copySearchEngineUrl() {
       try {
         await navigator.clipboard.writeText(searchEngineUrl);
-        showToast('Copied: ' + searchEngineUrl);
+        showGlobalToast('Copied: ' + searchEngineUrl);
       } catch { /* clipboard API not available */ }
+    }
+
+    // --- Custom profile URL builder -------------------------------------
+    const PROFILE_PROVIDER_OPTIONS = [
+      { value: 'scraper', label: 'HTML scraper' },
+      { value: 'google', label: 'Google' },
+      { value: 'googlev2', label: 'Google v2' },
+      { value: 'duckduckgo', label: 'DuckDuckGo' },
+      { value: 'yandex', label: 'Yandex' },
+      { value: 'faviconso', label: 'Favicon.so' },
+      { value: 'vemetric', label: 'Vemetric' },
+      { value: 'favicondev', label: 'Favicon Extractor' },
+      { value: 'faviconkit', label: 'Faviconkit' },
+      { value: 'faviconrun', label: 'favicon.run' },
+      { value: 'logodev', label: 'logo.dev', needs: 'logoDev' },
+      { value: 'brandfetch', label: 'Brandfetch', needs: 'brandfetch' },
+      { value: 'selfhst', label: 'selfh.st icons' },
+      { value: 'dashboardicons', label: 'Dashboard Icons' },
+      { value: 'lobehub', label: 'LobeHub' },
+      { value: 'svgl', label: 'SVGL' },
+    ];
+    const PROFILE_SIZE_OPTIONS = [16, 32, 64, 128];
+    const PROFILE_DEFAULT_SIZE = 128;
+
+    let providersConfig = { logoDev: false, brandfetch: false };
+    let profileProvidersReadyResolve;
+    const profileProvidersReady = new Promise((resolve) => {
+      profileProvidersReadyResolve = resolve;
+    });
+
+    let profileBuilderReady = false;
+    let profileCopyUrl = '';
+
+    function encodeProfileClient(preferred, fallbacks, size) {
+      const json = JSON.stringify([1, preferred, fallbacks, size]);
+      return btoa(unescape(encodeURIComponent(json)))
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+    }
+
+    function profileOptionDisabled(opt) {
+      return opt.needs ? !providersConfig[opt.needs] : false;
+    }
+
+    function fillProfileSelect(select, { includeNone }) {
+      const frag = document.createDocumentFragment();
+      if (includeNone) {
+        const none = document.createElement('option');
+        none.value = '';
+        none.textContent = '— none —';
+        frag.appendChild(none);
+      }
+      for (const opt of PROFILE_PROVIDER_OPTIONS) {
+        const o = document.createElement('option');
+        o.value = opt.value;
+        const disabled = profileOptionDisabled(opt);
+        o.textContent = disabled ? `${opt.label} (not configured)` : opt.label;
+        o.disabled = disabled;
+        frag.appendChild(o);
+      }
+      select.appendChild(frag);
+    }
+
+    async function initProfileBuilder() {
+      if (profileBuilderReady) return;
+      await profileProvidersReady;
+
+      const preferred = document.getElementById('profile-preferred');
+      fillProfileSelect(preferred, { includeNone: false });
+      preferred.value = 'scraper';
+
+      for (let i = 1; i <= 4; i += 1) {
+        fillProfileSelect(document.getElementById(`profile-fallback-${i}`), { includeNone: true });
+      }
+
+      const sizeSelect = document.getElementById('profile-size');
+      const sizeFrag = document.createDocumentFragment();
+      for (const size of PROFILE_SIZE_OPTIONS) {
+        const o = document.createElement('option');
+        o.value = String(size);
+        o.textContent = `${size}px`;
+        sizeFrag.appendChild(o);
+      }
+      sizeSelect.appendChild(sizeFrag);
+      sizeSelect.value = String(PROFILE_DEFAULT_SIZE);
+
+      const inputs = [
+        preferred,
+        sizeSelect,
+        document.getElementById('profile-test'),
+        ...[1, 2, 3, 4].map((i) => document.getElementById(`profile-fallback-${i}`)),
+      ];
+      for (const el of inputs) {
+        el.addEventListener('input', updateProfileUrl);
+        el.addEventListener('change', updateProfileUrl);
+      }
+
+      profileBuilderReady = true;
+      updateProfileUrl();
+    }
+
+    function updateProfileUrl() {
+      const preferred = document.getElementById('profile-preferred').value || 'scraper';
+      const fallbacks = [1, 2, 3, 4]
+        .map((i) => document.getElementById(`profile-fallback-${i}`).value)
+        .filter(Boolean);
+      const size = parseInt(document.getElementById('profile-size').value, 10) || PROFILE_DEFAULT_SIZE;
+
+      const id = encodeProfileClient(preferred, fallbacks, size);
+      const base = `${location.origin}/${id}/`;
+      profileCopyUrl = base;
+
+      const test = document.getElementById('profile-test').value.trim();
+      const urlEl = document.getElementById('profile-url');
+      const preview = document.getElementById('profile-preview');
+      const previewImg = document.getElementById('profile-preview-img');
+      const previewMeta = document.getElementById('profile-preview-meta');
+
+      if (test) {
+        const full = base + encodeURIComponent(test);
+        urlEl.textContent = full;
+        profileCopyUrl = full;
+        previewImg.src = full;
+        previewMeta.textContent = full;
+        preview.style.display = '';
+      } else {
+        urlEl.textContent = `${base}{domain-or-appname}`;
+        preview.style.display = 'none';
+        previewImg.removeAttribute('src');
+      }
+    }
+
+    async function copyProfileUrl() {
+      if (!profileCopyUrl) return;
+      try {
+        await navigator.clipboard.writeText(profileCopyUrl);
+        showGlobalToast(profileCopyUrl);
+      } catch {}
+    }
+
+    function openProfileModal() {
+      closeToolsOffcanvas();
+      const modal = document.getElementById('profile-modal');
+      if (!modal) return;
+      initProfileBuilder();
+      modal.hidden = false;
+      modal.classList.add('open');
+      modal.setAttribute('aria-hidden', 'false');
+      document.body.style.overflow = 'hidden';
+      modal.addEventListener('click', onProfileModalBackdropClick);
+      document.addEventListener('keydown', onProfileModalKeydown);
+    }
+
+    function closeProfileModal() {
+      const modal = document.getElementById('profile-modal');
+      if (!modal) return;
+      modal.hidden = true;
+      modal.classList.remove('open');
+      modal.setAttribute('aria-hidden', 'true');
+      modalsAllowBodyScroll();
+      modal.removeEventListener('click', onProfileModalBackdropClick);
+      document.removeEventListener('keydown', onProfileModalKeydown);
+    }
+
+    function onProfileModalBackdropClick(e) {
+      if (e.target.id === 'profile-modal') closeProfileModal();
+    }
+
+    function onProfileModalKeydown(e) {
+      if (e.key === 'Escape') closeProfileModal();
     }
 
     (function setupBookmarklet() {
@@ -1719,10 +2120,18 @@ print(data["url"])`;
         if (res.ok) {
           const cfg = await res.json();
           if (cfg && cfg.api) providersCfg = cfg;
+          if (cfg) {
+            providersConfig = {
+              ...providersConfig,
+              logoDev: !!cfg.logoDev,
+              brandfetch: !!cfg.brandfetch,
+            };
+          }
         }
       } catch { /* keep defaults */ }
       renderApiMode(providersCfg.api);
       renderPlans(providersCfg.api.plans);
+      profileProvidersReadyResolve();
     }
 
     function setupTabs() {
