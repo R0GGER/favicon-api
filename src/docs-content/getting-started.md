@@ -33,7 +33,7 @@ FaviconAPI is a self-hosted favicon proxy with a browser-based UI that fetches w
 
 ## Why FaviconAPI?
 
-FaviconAPI started out of a very practical need. While building my own dashboards with [Mafl+ (`R0GGER/maflplus`)](https://github.com/R0GGER/maflplus), I wanted a simple, low-friction way to fetch favicons and logos and link them to the services on my dashboard - without manually downloading and hosting an image for every single tile.
+FaviconAPI started out of a very practical need. While building my own dashboards with [Mafl+ (`R0GGER/maflplus`)](https://github.com/R0GGER/maflplus), I wanted a hassle-free way to fetch favicons and logos and link them to the services on my dashboard - without manually downloading and hosting an image for every single tile.
 
 In practice that turned out to be surprisingly painful. To get decent coverage I always ended up combining **multiple sources**, and time and again I noticed that the "different" tools I was using were really just reaching for the **same underlying providers** behind the scenes - mostly Google and DuckDuckGo. When one of those came back with a blank, low-resolution, or generic placeholder icon, I had no fallback and was stuck.
 
