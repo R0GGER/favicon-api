@@ -2715,6 +2715,17 @@
       } catch {}
     }
 
+    const PLACEHOLDER_SEEN_KEY = 'faviconapi-placeholder-seen';
+
+    function markInitialPlaceholderConsumed() {
+      initialPlaceholderPending = false;
+      try {
+        sessionStorage.setItem(PLACEHOLDER_SEEN_KEY, '1');
+      } catch {
+        /* storage blocked */
+      }
+    }
+
     function dismissCtaAttention() {
       sessionStorage.setItem('faviconapi-cta-dismissed', '1');
       document.querySelectorAll('.btn-cta-attention').forEach((el) => {
@@ -2834,6 +2845,13 @@
     let currentDomain = '';
     let currentService = '';
     let currentMode = '';
+    let initialPlaceholderPending = (() => {
+      try {
+        return !sessionStorage.getItem(PLACEHOLDER_SEEN_KEY);
+      } catch {
+        return true;
+      }
+    })();
     let currentGoogleSize = 128;
     let currentFaviconkitSize = 128;
     let currentFaviconrunSize = 128;
@@ -3052,18 +3070,7 @@
       updateResetButton();
     }
 
-    function showPlaceholderResults() {
-      if (isMobileViewport()) {
-        hideResultsGrid();
-        return;
-      }
-
-      const results = document.getElementById('results');
-      results.classList.add('visible', 'placeholder');
-      setDownloadToolbarVisible(true);
-      const downloadAllBtn = document.getElementById('download-all-btn');
-      if (downloadAllBtn) downloadAllBtn.disabled = true;
-
+    function applyPlaceholderVisibility() {
       document.querySelectorAll('[data-card-type="domain"]').forEach((card) => {
         if (card.id === 'logodev-card') {
           card.style.display = providersConfig.logoDev ? '' : 'none';
@@ -3078,6 +3085,28 @@
       setServiceCardsVisible(selfhstToggle.checked);
       updateServiceIconsDivider();
       updateResetButton();
+    }
+
+    function showPlaceholderResults() {
+      if (!initialPlaceholderPending) {
+        if (document.getElementById('results').classList.contains('placeholder')) {
+          applyPlaceholderVisibility();
+        }
+        return;
+      }
+      markInitialPlaceholderConsumed();
+
+      if (isMobileViewport()) {
+        hideResultsGrid();
+        return;
+      }
+
+      const results = document.getElementById('results');
+      results.classList.add('visible', 'placeholder');
+      setDownloadToolbarVisible(true);
+      const downloadAllBtn = document.getElementById('download-all-btn');
+      if (downloadAllBtn) downloadAllBtn.disabled = true;
+      applyPlaceholderVisibility();
     }
 
     function exitPlaceholderMode() {
@@ -3385,7 +3414,8 @@
       resetLobehubFormatControls();
       resetSvglVariantButtons();
       resetSvglFormatControls();
-      showPlaceholderResults();
+      markInitialPlaceholderConsumed();
+      hideResultsGrid();
     }
 
     fetch('/providers')
@@ -3890,6 +3920,7 @@
     }
 
     function runDomainSearch(domain) {
+      markInitialPlaceholderConsumed();
       exitPlaceholderMode();
       currentMode = 'domain';
       currentDomain = domain;
@@ -3961,6 +3992,7 @@
       const resolveData = await resolveServiceSlugClient(rawSlug);
       if (!resolveData) return;
 
+      markInitialPlaceholderConsumed();
       exitPlaceholderMode();
       currentMode = 'service';
       currentService = resolveData.resolved || resolveData.input;
