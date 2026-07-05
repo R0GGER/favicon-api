@@ -85,6 +85,7 @@
 
     .top-nav a:hover { color: #7b3fa8; text-decoration: underline; }
     .top-nav a.active { color: #2d2a26; }
+    .top-nav-about.active { color: #2d2a26; }
 
     .top-nav svg {
       display: block;
@@ -96,6 +97,88 @@
 
     .top-nav a[href*="/docs"] svg {
       transform: translateY(2px);
+    }
+
+    .nav-desktop-only { display: inline-flex; }
+    .nav-mobile-only { display: none !important; }
+
+    .top-nav-about {
+      color: #5b2e7e;
+      background: none;
+      border: none;
+      font-size: 0.85rem;
+      font-weight: 500;
+      line-height: 1;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0;
+      cursor: pointer;
+      font-family: inherit;
+      transition: color 0.15s;
+    }
+
+    .top-nav-about:hover { color: #7b3fa8; text-decoration: underline; }
+
+    .top-nav-about svg {
+      display: block;
+      flex-shrink: 0;
+      width: 16px;
+      height: 16px;
+      fill: currentColor;
+    }
+
+    .about-modal { width: min(640px, 100%); }
+
+    .about-modal-body p,
+    .docs-mobile-about p {
+      margin-bottom: 0.85rem;
+      color: #4a4540;
+    }
+
+    .about-modal-body p:last-child,
+    .docs-mobile-about p:last-child { margin-bottom: 0; }
+
+    .about-modal-body a,
+    .docs-mobile-about a { color: #5b2e7e; }
+
+    .about-modal-body strong,
+    .docs-mobile-about strong { color: #2d2a26; }
+
+    .about-desktop-note {
+      margin-top: 1rem;
+      padding-top: 0.85rem;
+      border-top: 1px solid #ece6de;
+      color: #6b6560;
+      font-size: 0.88rem;
+    }
+
+    .docs-mobile-about {
+      display: none;
+      max-width: 640px;
+      margin: 0 auto 2rem;
+      padding: 1.25rem 1rem;
+      background: #fff;
+      border: 1px solid #e8e2da;
+      border-radius: 10px;
+    }
+
+    .docs-mobile-about h2 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: #2d2a26;
+      margin-bottom: 1rem;
+    }
+
+    /* Docs vs About: below 1210px (smartphones and tablets) */
+    @media (max-width: 1209px) {
+      .nav-desktop-only { display: none !important; }
+      .nav-mobile-only:not([hidden]) { display: inline-flex !important; }
+
+      .docs-header .subtitle { display: none; }
+
+      .docs-shell { display: none; }
+
+      .docs-mobile-about { display: block; }
     }
 
     .top-nav-btn {
@@ -799,13 +882,12 @@
       font-size: 0.875rem;
       line-height: 1.45;
       margin: 0;
-      table-layout: fixed;
+      table-layout: auto;
     }
 
     .docs-main .table-wrap {
-      overflow-x: auto;
+      overflow-x: visible;
       margin: 1rem 0 1.25rem;
-      -webkit-overflow-scrolling: touch;
     }
 
     .docs-main th,
@@ -816,67 +898,40 @@
       vertical-align: top;
     }
 
-    /* Keep Variable / Provider names on one line — don't crush the first column */
-    .docs-main th:first-child,
-    .docs-main td:first-child {
-      width: 1%;
-      min-width: 11rem;
-      white-space: nowrap;
-    }
-
-    /* Default / Alias columns — short values, don't wrap mid-word (3+ column tables) */
-    .docs-main th:nth-child(2):not(:last-child),
-    .docs-main td:nth-child(2):not(:last-child) {
+    /* Non-last columns: shrink to content width */
+    .docs-main th:not(:last-child),
+    .docs-main td:not(:last-child) {
       width: 1%;
       white-space: nowrap;
     }
 
-    /* Two-column tables (Scenario / How it helps, Browser / Support, …) */
-    .docs-main th:first-child:nth-last-child(2),
-    .docs-main td:first-child:nth-last-child(2) {
-      width: 36%;
-      min-width: 0;
-      white-space: normal;
-    }
-
-    .docs-main th:nth-child(2):last-child,
-    .docs-main td:nth-child(2):last-child {
+    /* Last column: flexible — fills remaining table width and wraps */
+    .docs-main th:last-child,
+    .docs-main td:last-child {
       width: auto;
       min-width: 0;
       white-space: normal;
-      word-wrap: break-word;
       overflow-wrap: break-word;
+      word-wrap: break-word;
     }
 
-    .docs-main td:nth-child(2):last-child code {
+    .docs-main th:last-child code,
+    .docs-main td:last-child code {
       white-space: normal;
       overflow-wrap: anywhere;
       word-break: break-word;
     }
 
+    .docs-main th:not(:last-child) code,
+    .docs-main td:not(:last-child) code {
+      white-space: nowrap;
+      word-break: normal;
+      overflow-wrap: normal;
+    }
+
     .docs-main th {
       background: #f5f0ea;
       font-weight: 600;
-    }
-
-    .docs-main td:first-child code,
-    .docs-main td:nth-child(2) code {
-      white-space: nowrap;
-      word-break: normal;
-    }
-
-    .docs-main td code {
-      word-break: break-word;
-    }
-
-    .docs-main td:last-child {
-      min-width: 0;
-      word-wrap: break-word;
-      overflow-wrap: break-word;
-    }
-
-    .docs-main td:last-child:not(:nth-child(2)) {
-      min-width: 14rem;
     }
 
     .docs-main tr:nth-child(even) td { background: #fcfaf7; }
@@ -988,38 +1043,12 @@
         display: none;
       }
 
-      .docs-shell {
-        grid-template-columns: 1fr;
-        gap: 1rem;
-      }
-
-      .docs-sidebar {
-        position: static;
-        background: #fff;
-        border: 1px solid #e8e2da;
-        border-radius: 10px;
-        padding: 1rem;
-      }
-
-      .docs-nav-list {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.35rem;
-      }
-
-      .docs-nav-list li { flex: 1 1 auto; }
-      .docs-nav-list a { text-align: center; margin-bottom: 0; }
-
       .docs-main { padding: 1.25rem 1rem; }
 
-      /* Wide 3+ column tables only — 2-column tables wrap and stay within the page */
-      .docs-main .table-wrap:has(th:nth-child(3)),
-      .docs-main .table-wrap:has(td:nth-child(3)) {
-        overflow-x: auto;
-      }
-
-      .docs-main .table-wrap:not(:has(th:nth-child(3))):not(:has(td:nth-child(3))) {
-        overflow-x: visible;
+      .docs-main th,
+      .docs-main td {
+        padding: 0.5rem 0.6rem;
+        font-size: 0.82rem;
       }
     }
   </style>
@@ -1029,7 +1058,8 @@
     <button type="button" class="top-nav-btn" id="tools-offcanvas-btn" onclick="openToolsOffcanvas()" aria-expanded="false" aria-controls="tools-offcanvas"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 2.5A1.5 1.5 0 012.5 1h3A1.5 1.5 0 017 2.5v3A1.5 1.5 0 015.5 7h-3A1.5 1.5 0 011 5.5v-3zM2.5 2a.5.5 0 00-.5.5v3a.5.5 0 00.5.5h3a.5.5 0 00.5-.5v-3a.5.5 0 00-.5-.5h-3zm6.5.5A1.5 1.5 0 0110.5 1h3A1.5 1.5 0 0115 2.5v3A1.5 1.5 0 0113.5 7h-3A1.5 1.5 0 019 5.5v-3zm1.5-.5a.5.5 0 00-.5.5v3a.5.5 0 00.5.5h3a.5.5 0 00.5-.5v-3a.5.5 0 00-.5-.5h-3zM1 10.5A1.5 1.5 0 012.5 9h3A1.5 1.5 0 017 10.5v3A1.5 1.5 0 015.5 15h-3A1.5 1.5 0 011 13.5v-3zm1.5-.5a.5.5 0 00-.5.5v3a.5.5 0 00.5.5h3a.5.5 0 00.5-.5v-3a.5.5 0 00-.5-.5h-3zm6.5.5A1.5 1.5 0 0110.5 9h3a1.5 1.5 0 011.5 1.5v3a1.5 1.5 0 01-1.5 1.5h-3A1.5 1.5 0 019 13.5v-3zm1.5-.5a.5.5 0 00-.5.5v3a.5.5 0 00.5.5h3a.5.5 0 00.5-.5v-3a.5.5 0 00-.5-.5h-3z"/></svg>Tools</button>
     <a href="/"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.5 14.5v-3.505c0-.245.25-.495.5-.495h2c.25 0 .5.25.5.5v3.5a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.146-.354L13 5.793V2.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.293L8.354 1.146a.5.5 0 0 0-.708 0l-6 6A.5.5 0 0 0 1.5 7.5v7a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5z"/></svg>Home</a>
     <a href="/api"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.854 4.854a.5.5 0 1 0-.708-.708l-3.5 3.5a.5.5 0 0 0 0 .708l3.5 3.5a.5.5 0 0 0 .708-.708L2.707 8l3.147-3.146zm4.292 0a.5.5 0 0 1 .708-.708l3.5 3.5a.5.5 0 0 1 0 .708l-3.5 3.5a.5.5 0 0 1-.708-.708L13.293 8l-3.147-3.146z"/></svg>API</a>
-    <a href="/docs/getting-started" class="active"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M0 1.75A.75.75 0 01.75 1h4.253c1.227 0 2.317.59 3 1.501A3.744 3.744 0 0111.006 1h4.245a.75.75 0 01.75.75v10.5a.75.75 0 01-.75.75h-4.507a2.25 2.25 0 00-1.591.659l-.622.621a.75.75 0 01-1.06 0l-.622-.621A2.25 2.25 0 005.258 13H.75a.75.75 0 01-.75-.75V1.75zm7.251 10.324V2.922a2.25 2.25 0 00-2.248-2.172H1.5v10h3.757a3.75 3.75 0 012 .578zM8.75 12.074V2.922a2.25 2.25 0 012.248-2.172h3.502v10h-3.757a3.75 3.75 0 00-1.993.574z"/></svg>Docs</a>
+    <a href="/docs/getting-started" class="nav-desktop-only active"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M0 1.75A.75.75 0 01.75 1h4.253c1.227 0 2.317.59 3 1.501A3.744 3.744 0 0111.006 1h4.245a.75.75 0 01.75.75v10.5a.75.75 0 01-.75.75h-4.507a2.25 2.25 0 00-1.591.659l-.622.621a.75.75 0 01-1.06 0l-.622-.621A2.25 2.25 0 005.258 13H.75a.75.75 0 01-.75-.75V1.75zm7.251 10.324V2.922a2.25 2.25 0 00-2.248-2.172H1.5v10h3.757a3.75 3.75 0 012 .578zM8.75 12.074V2.922a2.25 2.25 0 012.248-2.172h3.502v10h-3.757a3.75 3.75 0 00-1.993.574z"/></svg>Docs</a>
+    <button type="button" class="top-nav-about nav-mobile-only active" onclick="openAboutModal()" aria-haspopup="dialog"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533L8.93 6.588zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/></svg>About</button>
   </nav>
 
   <div class="offcanvas-overlay" id="tools-offcanvas" hidden aria-hidden="true" onclick="onToolsOffcanvasBackdropClick(event)">
@@ -1185,6 +1215,22 @@
     </div>
   </div>
 
+  <div class="modal-overlay" id="about-modal" hidden aria-hidden="true">
+    <div class="modal about-modal" role="dialog" aria-modal="true" aria-labelledby="about-modal-title">
+      <div class="modal-header">
+        <h2 id="about-modal-title">Why FaviconAPI?</h2>
+        <button type="button" class="modal-close" onclick="closeAboutModal()" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body about-modal-body">
+        <p>FaviconAPI started out of a very practical need. While building my own dashboards with <a href="https://github.com/R0GGER/maflplus" target="_blank" rel="noopener">Mafl+ (<code>R0GGER/maflplus</code>)</a>, I wanted a hassle-free way to fetch favicons and logos and link them to the services on my dashboard - without manually downloading and hosting an image for every single tile.</p>
+        <p>In practice that turned out to be surprisingly painful. To get decent coverage I always ended up combining <strong>multiple sources</strong>, and time and again I noticed that the &ldquo;different&rdquo; tools I was using were really just reaching for the <strong>same underlying providers</strong> behind the scenes - mostly Google and DuckDuckGo. When one of those came back with a blank, low-resolution, or generic placeholder icon, I had no fallback and was stuck.</p>
+        <p>What I was missing was a single tool that treats favicon lookup as a <strong>first-class problem</strong>: one that knows about many independent sources, queries them together, and intelligently picks the best result instead of betting everything on one upstream. No tool offered that kind of complete, source-aware solution where different providers are connected and complement each other.</p>
+        <p>So I built it. FaviconAPI brings 10+ favicon providers and four service-icon catalogs together behind one consistent API. It <strong>races providers in parallel</strong>, <strong>normalizes and caches</strong> the results, and returns the highest-quality icon it can find - with the others available as explicit fallbacks. It grew from a helper for my own dashboards into a self-hosted favicon proxy that anyone can run.</p>
+        <p class="about-desktop-note">Full documentation is best read on a desktop computer.</p>
+      </div>
+    </div>
+  </div>
+
   <header class="docs-header">
     <a href="/" class="site-logo-link" aria-label="FaviconAPI home">
       <img src="/logo.svg" alt="FaviconAPI logo" class="site-logo">
@@ -1192,6 +1238,15 @@
     <h1>FaviconAPI</h1>
     <p class="subtitle">__PAGE_DESCRIPTION__</p>
   </header>
+
+  <section class="docs-mobile-about" aria-labelledby="docs-mobile-about-title">
+    <h2 id="docs-mobile-about-title">Why FaviconAPI?</h2>
+    <p>FaviconAPI started out of a very practical need. While building my own dashboards with <a href="https://github.com/R0GGER/maflplus" target="_blank" rel="noopener">Mafl+ (<code>R0GGER/maflplus</code>)</a>, I wanted a hassle-free way to fetch favicons and logos and link them to the services on my dashboard - without manually downloading and hosting an image for every single tile.</p>
+    <p>In practice that turned out to be surprisingly painful. To get decent coverage I always ended up combining <strong>multiple sources</strong>, and time and again I noticed that the &ldquo;different&rdquo; tools I was using were really just reaching for the <strong>same underlying providers</strong> behind the scenes - mostly Google and DuckDuckGo. When one of those came back with a blank, low-resolution, or generic placeholder icon, I had no fallback and was stuck.</p>
+    <p>What I was missing was a single tool that treats favicon lookup as a <strong>first-class problem</strong>: one that knows about many independent sources, queries them together, and intelligently picks the best result instead of betting everything on one upstream. No tool offered that kind of complete, source-aware solution where different providers are connected and complement each other.</p>
+    <p>So I built it. FaviconAPI brings 10+ favicon providers and four service-icon catalogs together behind one consistent API. It <strong>races providers in parallel</strong>, <strong>normalizes and caches</strong> the results, and returns the highest-quality icon it can find - with the others available as explicit fallbacks. It grew from a helper for my own dashboards into a self-hosted favicon proxy that anyone can run.</p>
+    <p class="about-desktop-note">Full documentation is best read on a desktop computer.</p>
+  </section>
 
   <main class="docs-shell">
     <aside class="docs-sidebar">
@@ -1254,9 +1309,41 @@
       const toolsOpen = document.getElementById('tools-offcanvas')?.classList.contains('open');
       const searchOpen = document.getElementById('search-modal')?.classList.contains('open');
       const profileOpen = document.getElementById('profile-modal')?.classList.contains('open');
-      if (!toolsOpen && !searchOpen && !profileOpen) {
+      const aboutOpen = document.getElementById('about-modal')?.classList.contains('open');
+      if (!toolsOpen && !searchOpen && !profileOpen && !aboutOpen) {
         document.body.style.overflow = '';
       }
+    }
+
+    function openAboutModal() {
+      closeToolsOffcanvas();
+      const modal = document.getElementById('about-modal');
+      if (!modal) return;
+      modal.hidden = false;
+      modal.classList.add('open');
+      modal.setAttribute('aria-hidden', 'false');
+      document.body.style.overflow = 'hidden';
+      modal.addEventListener('click', onAboutModalBackdropClick);
+      document.addEventListener('keydown', onAboutModalKeydown);
+    }
+
+    function closeAboutModal() {
+      const modal = document.getElementById('about-modal');
+      if (!modal) return;
+      modal.hidden = true;
+      modal.classList.remove('open');
+      modal.setAttribute('aria-hidden', 'true');
+      modalsAllowBodyScroll();
+      modal.removeEventListener('click', onAboutModalBackdropClick);
+      document.removeEventListener('keydown', onAboutModalKeydown);
+    }
+
+    function onAboutModalBackdropClick(e) {
+      if (e.target.id === 'about-modal') closeAboutModal();
+    }
+
+    function onAboutModalKeydown(e) {
+      if (e.key === 'Escape') closeAboutModal();
     }
 
     (function setupSearchEngineModal() {

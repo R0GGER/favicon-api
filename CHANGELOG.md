@@ -5,6 +5,16 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.5] — 2026-07-05
+
+### Added
+
+- **Web UI — About on small screens** — on viewports below 1210px (smartphones and tablets), the top nav shows **About** instead of **Docs**. Tapping it opens a modal with the *Why FaviconAPI?* intro from the getting-started guide. On `/docs/*` at the same breakpoint, the full documentation layout is hidden and only that About text is shown, with a note that full docs are best read on a desktop.
+
+### Changed
+
+- **Web UI — Docs nav desktop-only** — the **Docs** link is visible from 1210px upward only; **About** is hidden on desktop.
+
 ## [2.8.4] — 2026-07-05
 
 ### Changed
