@@ -1,4 +1,4 @@
-# Getting Started
+# FaviconAPI
 
 FaviconAPI is a self-hosted favicon proxy with a browser-based UI that fetches website and service icons from multiple upstream sources (10+), caches results, and exposes them through simple HTTP routes.
 
