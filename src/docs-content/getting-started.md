@@ -272,10 +272,10 @@ PLAN_ENTERPRISE_LIMIT=0
 
 ```yaml
 services:
-  maflplus-favicon-api:
+  favicon-api:
     #build: .
     image: ghcr.io/r0gger/favicon-api:latest
-    container_name: maflplus-favicon-api
+    container_name: favicon-api
     restart: unless-stopped
     ports:
       - "3100:3000"
