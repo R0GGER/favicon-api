@@ -5,6 +5,21 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.6] — 2026-07-05
+
+### Added
+
+- **Selfhosted docs — Changelog** — root `CHANGELOG.md` rendered at `/docs/changelog` with a sidebar nav entry (`src/docsRender.js`); single source of truth with the repo changelog (Keep a Changelog).
+- **Selfhosted docs — Changelog modal** — the **CHANGELOG** link on Getting Started opens a scrollable modal with the same rendered content (client-side cache after first load); sidebar **Changelog** still navigates to the full page; modal footer links to GitHub.
+
+### Changed
+
+- **Selfhosted docs — Getting Started source links** — GitHub repo and version/changelog grouped under a **Source** section; version shown as `FaviconAPI v{version}` via `__VERSION__` placeholder substituted from `package.json`.
+- **Docker image** — `CHANGELOG.md` included in the build (`.dockerignore` exception + `Dockerfile` COPY) so `/docs/changelog` works in containers.
+- **GitHub repository renamed** — `R0GGER/maflplus-favicon-api` is now `R0GGER/favicon-api`; selfhosted docs and README links updated accordingly.
+- **GHCR image** — published images are now `ghcr.io/r0gger/favicon-api:latest` (was `ghcr.io/r0gger/maflplus-favicon-api:latest`). The Docker Publish workflow still uses `${{ github.repository }}`, so no workflow edit is required after a rename.
+- **Docker Compose service** — compose service and `container_name` renamed from `maflplus-favicon-api` to `favicon-api`; update `docker compose exec` commands and any external references that used the old service name.
+
 ## [2.8.5] — 2026-07-05
 
 ### Added
