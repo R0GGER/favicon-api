@@ -60,7 +60,7 @@ So I built it. FaviconAPI brings 10+ favicon providers and four service-icon cat
 
 ### Docker image:
 ```bash
-docker pull ghcr.io/r0gger/maflplus-favicon-api:latest
+docker pull ghcr.io/r0gger/favicon-api:latest
 ```
 
 ### .env
@@ -274,7 +274,7 @@ PLAN_ENTERPRISE_LIMIT=0
 services:
   maflplus-favicon-api:
     #build: .
-    image: ghcr.io/r0gger/maflplus-favicon-api:latest
+    image: ghcr.io/r0gger/favicon-api:latest
     container_name: maflplus-favicon-api
     restart: unless-stopped
     ports:

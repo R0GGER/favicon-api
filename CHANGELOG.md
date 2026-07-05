@@ -781,5 +781,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Bookmarklet ("Mafl+ Favicon Copy") that copies the favicon URL of the current page.
   - "Show source" indicator displaying which upstream provider returned the favicon.
 - Configuration via environment variables: `PORT`, `CACHE_DIR`, `MEMORY_CACHE_MAX`, `MEMORY_CACHE_TTL`, `DISK_CACHE_TTL`, `UPSTREAM_TIMEOUT`.
-- Dockerfile, `docker-entrypoint.sh` and `docker-compose.yml` for container deployment, plus a GitHub Actions workflow that publishes images to `ghcr.io/r0gger/maflplus-favicon-api`.
+- Dockerfile, `docker-entrypoint.sh` and `docker-compose.yml` for container deployment, plus a GitHub Actions workflow that publishes images to `ghcr.io/r0gger/favicon-api:latest`.
 - `.gitattributes` enforcing LF line endings.
