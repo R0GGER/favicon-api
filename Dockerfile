@@ -13,6 +13,7 @@ WORKDIR /app
 RUN addgroup -S app && adduser -S app -G app
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json ./
+COPY CHANGELOG.md ./
 COPY src ./src
 # scripts/ contains the API key management CLI invoked via
 # `docker compose exec maflplus-favicon-api npm run keys:*`.

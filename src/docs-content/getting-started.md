@@ -12,7 +12,9 @@ FaviconAPI is a self-hosted favicon proxy with a browser-based UI that fetches w
 - **Custom URL** - Build a shareable URL with your own preferred provider, fallbacks and minimum icon size. 
 - **Bookmarklet** - drag **FaviconAPI Copy** to your bookmarks bar to copy a site's favicon URL
 
-### Github: [R0GGER/favicon-api](https://github.com/R0GGER/favicon-api) (MIT)
+## Source
+* Github: [R0GGER/favicon-api](https://github.com/R0GGER/favicon-api)
+* FaviconAPI v__VERSION__ - [CHANGELOG](/docs/changelog)
 
 ---
 

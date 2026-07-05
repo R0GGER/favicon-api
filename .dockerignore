@@ -2,6 +2,7 @@ node_modules
 cache
 .env
 *.md
+!CHANGELOG.md
 !src/docs-content/
 !src/docs-content/**
 .git

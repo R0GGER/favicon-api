@@ -1,9 +1,11 @@
 const fs = require('fs');
 const path = require('path');
 const { marked } = require('marked');
+const { version: APP_VERSION } = require('../package.json');
 
 const DOCS_CONTENT_DIR = path.join(__dirname, 'docs-content');
 const README_PATH = path.join(DOCS_CONTENT_DIR, 'README.md');
+const CHANGELOG_PATH = path.join(__dirname, '..', 'CHANGELOG.md');
 
 /** URL slug → filename when they differ. */
 const SLUG_ALIASES = {
@@ -18,7 +20,7 @@ const NAV_PAGES = [
   { slug: `api-v1`, title: 'API v1', label: 'API v1', file: 'api-v1.md' },
   { slug: 'proxy', title: 'Proxy', label: 'Proxy', file: 'proxy.md' },
   { slug: 'tools', title: 'Tools', label: 'Tools', file: 'tools.md' },
-  
+  { slug: 'changelog', title: 'Changelog', label: 'Changelog', rootFile: CHANGELOG_PATH },
 ];
 
 function slugify(text) {
@@ -41,11 +43,17 @@ function resolveDocPath(slug) {
   if (!/^[a-z0-9-]+$/.test(resolvedSlug)) {
     return null;
   }
+  const nav = NAV_PAGES.find((p) => p.slug === normalized || p.slug === resolvedSlug);
+  if (nav?.rootFile) {
+    if (!fs.existsSync(nav.rootFile)) {
+      return null;
+    }
+    return { filePath: nav.rootFile, slug: normalized, title: nav.title };
+  }
   const filePath = path.join(DOCS_CONTENT_DIR, `${resolvedSlug}.md`);
   if (!fs.existsSync(filePath)) {
     return null;
   }
-  const nav = NAV_PAGES.find((p) => p.slug === normalized || p.slug === resolvedSlug);
   const title = nav
     ? nav.title
     : normalized.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
@@ -261,6 +269,7 @@ function renderDocPage(slug, template) {
   }
 
   markdown = prepareMarkdown(markdown, resolved.slug);
+  markdown = markdown.replace(/__VERSION__/g, APP_VERSION);
   const headings = extractHeadings(markdown);
   const contentHtml = renderMarkdown(markdown);
   const tocHtml = buildTocHtml(headings, resolved.slug);

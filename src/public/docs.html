@@ -129,6 +129,43 @@
 
     .about-modal { width: min(640px, 100%); }
 
+    .changelog-modal {
+      width: min(720px, 100%);
+      max-height: min(90vh, 900px);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .changelog-modal .modal-body {
+      flex: 1 1 auto;
+      min-height: 0;
+      padding: 0 1.35rem;
+      overflow: auto;
+    }
+
+    .changelog-modal-body {
+      padding: 1rem 0 1.25rem;
+    }
+
+    .changelog-modal-body > h1:first-child {
+      display: none;
+    }
+
+    .changelog-modal-loading {
+      padding: 1.5rem 0;
+      color: #4a4540;
+    }
+
+    .changelog-modal-footer {
+      flex: 0 0 auto;
+      margin: 0;
+      padding: 0.75rem 1.35rem 1rem;
+      border-top: 1px solid #ece6de;
+      font-size: 0.88rem;
+    }
+
+    .changelog-modal-footer a { color: #5b2e7e; }
+
     .about-modal-body p,
     .docs-mobile-about p {
       margin-bottom: 0.85rem;
@@ -1231,6 +1268,23 @@
     </div>
   </div>
 
+  <div class="modal-overlay" id="changelog-modal" hidden aria-hidden="true">
+    <div class="modal changelog-modal" role="dialog" aria-modal="true" aria-labelledby="changelog-modal-title">
+      <div class="modal-header">
+        <h2 id="changelog-modal-title">Changelog</h2>
+        <button type="button" class="modal-close" onclick="closeChangelogModal()" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="changelog-modal-body docs-main" id="changelog-modal-content">
+          <p class="changelog-modal-loading">Loading&hellip;</p>
+        </div>
+      </div>
+      <p class="changelog-modal-footer">
+        <a href="https://github.com/R0GGER/favicon-api/blob/main/CHANGELOG.md" target="_blank" rel="noopener">View on GitHub</a>
+      </p>
+    </div>
+  </div>
+
   <header class="docs-header">
     <a href="/" class="site-logo-link" aria-label="FaviconAPI home">
       <img src="/logo.svg" alt="FaviconAPI logo" class="site-logo">
@@ -1310,9 +1364,129 @@
       const searchOpen = document.getElementById('search-modal')?.classList.contains('open');
       const profileOpen = document.getElementById('profile-modal')?.classList.contains('open');
       const aboutOpen = document.getElementById('about-modal')?.classList.contains('open');
-      if (!toolsOpen && !searchOpen && !profileOpen && !aboutOpen) {
+      const changelogOpen = document.getElementById('changelog-modal')?.classList.contains('open');
+      if (!toolsOpen && !searchOpen && !profileOpen && !aboutOpen && !changelogOpen) {
         document.body.style.overflow = '';
       }
+    }
+
+    const CHANGELOG_DOC_URL = '/docs/changelog';
+    let changelogModalHtml = null;
+
+    function isChangelogDocLink(anchor) {
+      if (!anchor || anchor.target === '_blank') return false;
+      try {
+        const url = new URL(anchor.getAttribute('href'), location.origin);
+        return url.origin === location.origin && url.pathname === CHANGELOG_DOC_URL && !url.hash;
+      } catch {
+        return false;
+      }
+    }
+
+    function setupCodeCopyButtons(root) {
+      (root || document).querySelectorAll('pre').forEach((pre) => {
+        if (pre.closest('.code-block')) return;
+
+        const wrap = document.createElement('div');
+        wrap.className = 'code-block';
+        pre.parentNode.insertBefore(wrap, pre);
+        wrap.appendChild(pre);
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'copy-btn';
+        btn.textContent = 'Copy';
+        btn.addEventListener('click', async () => {
+          const code = pre.querySelector('code');
+          const text = code ? code.textContent : pre.textContent;
+          try {
+            await navigator.clipboard.writeText(text);
+            const orig = btn.textContent;
+            btn.classList.add('copied');
+            btn.textContent = 'Copied';
+            setTimeout(() => {
+              btn.classList.remove('copied');
+              btn.textContent = orig;
+            }, 1200);
+          } catch {
+            /* clipboard API not available */
+          }
+        });
+        wrap.appendChild(btn);
+      });
+    }
+
+    function wrapDocsTables(root) {
+      (root || document).querySelectorAll('table').forEach((table) => {
+        if (table.parentElement?.classList.contains('table-wrap')) return;
+        const wrap = document.createElement('div');
+        wrap.className = 'table-wrap';
+        table.parentNode.insertBefore(wrap, table);
+        wrap.appendChild(table);
+      });
+    }
+
+    async function loadChangelogModalContent() {
+      const contentEl = document.getElementById('changelog-modal-content');
+      if (!contentEl) return;
+
+      if (changelogModalHtml) {
+        contentEl.innerHTML = changelogModalHtml;
+        setupCodeCopyButtons(contentEl);
+        wrapDocsTables(contentEl);
+        return;
+      }
+
+      contentEl.innerHTML = '<p class="changelog-modal-loading">Loading&hellip;</p>';
+      try {
+        const res = await fetch(CHANGELOG_DOC_URL, { credentials: 'same-origin' });
+        if (!res.ok) throw new Error('fetch failed');
+        const html = await res.text();
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        const main = doc.querySelector('.docs-main');
+        if (!main) throw new Error('no content');
+        changelogModalHtml = main.innerHTML;
+        contentEl.innerHTML = changelogModalHtml;
+        setupCodeCopyButtons(contentEl);
+        wrapDocsTables(contentEl);
+      } catch {
+        contentEl.innerHTML =
+          '<p>Could not load changelog. <a href="' +
+          CHANGELOG_DOC_URL +
+          '">Open full page</a> or <a href="https://github.com/R0GGER/favicon-api/blob/main/CHANGELOG.md" target="_blank" rel="noopener">view on GitHub</a>.</p>';
+      }
+    }
+
+    function openChangelogModal() {
+      closeToolsOffcanvas();
+      const modal = document.getElementById('changelog-modal');
+      if (!modal) return;
+      modal.hidden = false;
+      modal.classList.add('open');
+      modal.setAttribute('aria-hidden', 'false');
+      document.body.style.overflow = 'hidden';
+      modal.addEventListener('click', onChangelogModalBackdropClick);
+      document.addEventListener('keydown', onChangelogModalKeydown);
+      loadChangelogModalContent();
+    }
+
+    function closeChangelogModal() {
+      const modal = document.getElementById('changelog-modal');
+      if (!modal) return;
+      modal.hidden = true;
+      modal.classList.remove('open');
+      modal.setAttribute('aria-hidden', 'true');
+      modalsAllowBodyScroll();
+      modal.removeEventListener('click', onChangelogModalBackdropClick);
+      document.removeEventListener('keydown', onChangelogModalKeydown);
+    }
+
+    function onChangelogModalBackdropClick(e) {
+      if (e.target.id === 'changelog-modal') closeChangelogModal();
+    }
+
+    function onChangelogModalKeydown(e) {
+      if (e.key === 'Escape') closeChangelogModal();
     }
 
     function openAboutModal() {
@@ -1633,46 +1807,20 @@
       alert('Drag this button to your bookmarks bar (the name will auto-fill as "FaviconAPI Copy"). Then click the saved bookmark on any website to copy that site\u2019s favicon URL.\n\nTip: if you copy-paste the URL into a manual "Add bookmark" dialog instead, browsers can\u2019t pre-fill the name for security reasons \u2014 you\u2019ll have to type it yourself.');
     }
 
-    (function setupCodeCopyButtons() {
-      document.querySelectorAll('.docs-main pre').forEach((pre) => {
-        if (pre.closest('.code-block')) return;
-
-        const wrap = document.createElement('div');
-        wrap.className = 'code-block';
-        pre.parentNode.insertBefore(wrap, pre);
-        wrap.appendChild(pre);
-
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'copy-btn';
-        btn.textContent = 'Copy';
-        btn.addEventListener('click', async () => {
-          const code = pre.querySelector('code');
-          const text = code ? code.textContent : pre.textContent;
-          try {
-            await navigator.clipboard.writeText(text);
-            const orig = btn.textContent;
-            btn.classList.add('copied');
-            btn.textContent = 'Copied';
-            setTimeout(() => {
-              btn.classList.remove('copied');
-              btn.textContent = orig;
-            }, 1200);
-          } catch {
-            /* clipboard API not available */
-          }
-        });
-        wrap.appendChild(btn);
-      });
+    (function setupCodeCopyButtonsOnPage() {
+      setupCodeCopyButtons(document.querySelector('.docs-main'));
     })();
 
-    (function wrapDocsTables() {
-      document.querySelectorAll('.docs-main table').forEach((table) => {
-        if (table.parentElement?.classList.contains('table-wrap')) return;
-        const wrap = document.createElement('div');
-        wrap.className = 'table-wrap';
-        table.parentNode.insertBefore(wrap, table);
-        wrap.appendChild(table);
+    (function wrapDocsTablesOnPage() {
+      wrapDocsTables(document.querySelector('.docs-main'));
+    })();
+
+    (function setupChangelogModalLinks() {
+      document.querySelector('.docs-main')?.addEventListener('click', (e) => {
+        const anchor = e.target.closest('a');
+        if (!isChangelogDocLink(anchor)) return;
+        e.preventDefault();
+        openChangelogModal();
       });
     })();
   </script>
