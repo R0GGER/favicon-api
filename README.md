@@ -607,7 +607,7 @@ The tables below cover the most-used variables. For the complete list — includ
 
 ## Performance tuning
 
-See [Performance tuning](/performance.md) for cache TTL recommendations, scraper latency, and worker sizing.
+See [Tweaks](src/docs-content/tweaks.md) for cache TTL recommendations, scraper latency, and worker sizing.
 
 ---
 
