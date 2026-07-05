@@ -9,8 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Selfhosted docs — Changelog** — root `CHANGELOG.md` rendered at `/docs/changelog` with a sidebar nav entry (`src/docsRender.js`); single source of truth with the repo changelog (Keep a Changelog).
-- **Selfhosted docs — Changelog modal** — the **CHANGELOG** link on Getting Started opens a scrollable modal with the same rendered content (client-side cache after first load); sidebar **Changelog** still navigates to the full page; modal footer links to GitHub.
+- **Selfhosted docs — Changelog** — root `CHANGELOG.md` rendered at `/docs/changelog` with a sidebar nav entry (`src/docsRender.js`); single source of truth with the repo changelog (Keep a Changelog). The **CHANGELOG** link on Getting Started navigates to that page.
 
 ### Changed
 
