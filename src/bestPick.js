@@ -9,6 +9,8 @@ const {
   fetchFaviconDev,
   fetchFaviconkit,
   fetchFaviconRun,
+  fetchTwentyIcons,
+  fetchRyanjc,
   fetchSelfhst,
   fetchDashboardIcons,
   fetchLobehub,
@@ -22,7 +24,7 @@ const { notFoundEntry } = require('./notFoundPlaceholder');
 
 const VALID_DEFAULT_PROVIDERS = new Set([
   'scraper', 'google', 'googlev2', 'duckduckgo', 'yandex',
-  'faviconso', 'vemetric', 'favicondev', 'faviconkit', 'faviconrun',
+  'faviconso', 'vemetric', 'favicondev', 'faviconkit', 'faviconrun', 'twentyicons', 'ryanjc',
   'logodev', 'brandfetch', 'selfhst', 'dashboardicons', 'lobehub', 'svgl',
 ]);
 
@@ -91,6 +93,8 @@ function buildFallbackFetchers(domain) {
     google:     () => fetchWithCache('google', domain, 32, () => fetchGoogle(domain, 32)),
     faviconkit: () => fetchWithCache('faviconkit', domain, 128, () => fetchFaviconkit(domain, 128)),
     faviconrun: () => fetchWithCache('faviconrun', domain, 128, () => fetchFaviconRun(domain, 128)),
+    twentyicons: () => fetchWithCache('twentyicons', domain, 128, () => fetchTwentyIcons(domain, 128)),
+    ryanjc:     () => fetchWithCache('ryanjc', domain, null, () => fetchRyanjc(domain)),
     faviconso:  () => fetchWithCache('faviconso', domain, null, () => fetchFaviconSo(domain)),
     vemetric:   () => fetchWithCache('vemetric', domain, null, () => fetchVemetric(domain)),
     favicondev: () => fetchWithCache('favicondev', domain, null, () => fetchFaviconDev(domain)),
@@ -125,7 +129,7 @@ function buildFallbackFetchers(domain) {
 
   const defaultOrder = [
     'scraper', 'googlev2', 'duckduckgo',
-    'google', 'faviconkit', 'faviconrun', 'faviconso', 'vemetric', 'favicondev', 'yandex',
+    'google', 'faviconkit', 'faviconrun', 'twentyicons', 'ryanjc', 'faviconso', 'vemetric', 'favicondev', 'yandex',
   ];
 
   if (DEFAULT_PROVIDER && all[DEFAULT_PROVIDER]) {

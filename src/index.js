@@ -16,8 +16,10 @@ const {
   fetchVemetric,
   fetchFaviconDev,
   fetchFaviconkit,
-  fetchLogoDev,
   fetchFaviconRun,
+  fetchTwentyIcons,
+  fetchRyanjc,
+  fetchLogoDev,
   fetchBrandfetch,
   normalizeBrandfetchOptions,
   brandfetchCacheKey,
@@ -317,6 +319,8 @@ const VALID_SVGL_VARIANTS = new Set(['color', 'light', 'dark']);
 const VALID_CATALOG_FORMATS = new Set(['png', 'svg']);
 const VALID_FAVICONRUN_SIZES = new Set([16, 32, 64, 128, 256]);
 const FAVICONRUN_SIZES_ARRAY = [16, 32, 64, 128, 256];
+const VALID_TWENTYICONS_SIZES = new Set([16, 32, 64, 128, 180, 192]);
+const TWENTYICONS_SIZES_ARRAY = [16, 32, 64, 128, 180, 192];
 const VALID_BRANDFETCH_SIZES = new Set([16, 32, 64, 128, 256, 512]);
 const BRANDFETCH_SIZES_ARRAY = [16, 32, 64, 128, 256, 512];
 const VALID_LOBEHUB_SIZES = new Set([64, 128, 256]);
@@ -910,6 +914,37 @@ async function faviconRunSizedHandler(req, res) {
 }
 app.get(['/faviconrun/:size/:ext/:domain', '/fr/:size/:ext/:domain'], faviconRunSizedHandler);
 app.get(['/faviconrun/:size/:domain', '/fr/:size/:domain'], faviconRunSizedHandler);
+
+// twenty-icons.com proxy: /twentyicons/:size/:ext/:domain (alias: /ti/:size/:ext/:domain)
+async function twentyIconsSizedHandler(req, res) {
+  const extResult = resolvePngPathExtension(req);
+  if (extResult.error) return res.status(400).json({ error: extResult.error });
+
+  const size = parseInt(req.params.size, 10);
+  if (!VALID_TWENTYICONS_SIZES.has(size)) {
+    return res.status(400).json({ error: 'Invalid size. Use 16, 32, 64, 128, 180, or 192.' });
+  }
+
+  const domain = extractDomain(req.params.domain);
+  if (!domain) return res.status(400).json({ error: 'Invalid domain.' });
+
+  try {
+    const entry = await fetchWithCache('twentyicons', domain, size, () => fetchTwentyIcons(domain, size));
+    if (!entry) return res.status(502).json({ error: 'Upstream fetch failed.' });
+    sendFavicon(res, entry);
+  } catch (err) {
+    console.error('twenty-icons.com proxy error:', err.message);
+    res.status(500).json({ error: 'Internal error.' });
+  }
+}
+app.get(['/twentyicons/:size/:ext/:domain', '/ti/:size/:ext/:domain'], twentyIconsSizedHandler);
+app.get(['/twentyicons/:size/:domain', '/ti/:size/:domain'], twentyIconsSizedHandler);
+
+// favicon.ryanjc.com proxy: /ryanjc/:size/:ext/:domain (alias: /rj/:size/:ext/:domain)
+const ryanjcSizedHandler = makeResizeProviderHandler('ryanjc', 'favicon.ryanjc.com', fetchRyanjc);
+app.get(['/ryanjc/:size/:ext/:domain', '/rj/:size/:ext/:domain'], ryanjcSizedHandler);
+app.get(['/ryanjc/:size/:domain', '/rj/:size/:domain'], ryanjcSizedHandler);
+app.get('/rj/:domain', makeNativeProviderHandler('ryanjc', 'favicon.ryanjc.com', fetchRyanjc));
 
 // logo.dev proxy: /logodev/:size/:domain (alias: /l/:size/:domain) - requires LOGODEV_TOKEN
 async function logoDevSizedHandler(req, res) {
@@ -1759,6 +1794,18 @@ app.get('/:domain/json', async (req, res) => {
         FAVICONRUN_SIZES_ARRAY,
         DEFAULT_NATIVE_SIZE,
         (size) => PROVIDERS.faviconRun(domain, size)
+      ),
+      twentyicons: uniformProvider(
+        'twentyicons',
+        TWENTYICONS_SIZES_ARRAY,
+        DEFAULT_NATIVE_SIZE,
+        (size) => PROVIDERS.twentyIcons(domain, size)
+      ),
+      ryanjc: uniformProvider(
+        'ryanjc',
+        RESIZE_SIZES_ARRAY,
+        DEFAULT_RESIZE_SIZE,
+        () => PROVIDERS.ryanjc(domain)
       ),
       logodev,
       brandfetch,

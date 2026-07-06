@@ -2225,6 +2225,46 @@
         <div class="meta" id="faviconrun-meta"></div>
       </div>
 
+      <!-- twenty-icons.com -->
+      <div class="card" data-card-type="domain">
+        <div class="card-header">
+          <h3><a href="https://twenty-icons.com" target="_blank" rel="noopener noreferrer">Twenty-icons.com</a></h3>
+          <a class="refresh-btn alt-url-link" href="#" target="_blank" rel="noopener noreferrer" onclick="return copyAltCardUrl(event, this)" hidden>
+            <span class="alt-url-link-label">source</span>
+          </a>
+        </div>
+        <div class="favicon-display" id="twentyicons-display" onclick="copyImage(this)">
+          <div class="spinner" id="twentyicons-spinner" style="display:none"></div>
+          <img id="twentyicons-img" style="display:none" alt="twenty-icons.com favicon">
+          <span class="copied-toast">URL copied!</span>
+        </div>
+        <div class="size-buttons" id="twentyicons-sizes">
+          <button class="size-btn" onclick="switchTwentyiconsSize(192)">192</button>
+          <button class="size-btn" onclick="switchTwentyiconsSize(180)">180</button>
+          <button class="size-btn active" onclick="switchTwentyiconsSize(128)">128</button>
+          <button class="size-btn" onclick="switchTwentyiconsSize(64)">64</button>
+          <button class="size-btn" onclick="switchTwentyiconsSize(32)">32</button>
+          <button class="size-btn" onclick="switchTwentyiconsSize(16)">16</button>
+        </div>
+        <div class="meta" id="twentyicons-meta"></div>
+      </div>
+
+      <!-- favicon.ryanjc.com -->
+      <div class="card" data-card-type="domain">
+        <div class="card-header">
+          <h3><a href="https://api.favicon.ryanjc.com" target="_blank" rel="noopener noreferrer">Favicon.ryanjc.com</a></h3>
+          <a class="refresh-btn alt-url-link" href="#" target="_blank" rel="noopener noreferrer" onclick="return copyAltCardUrl(event, this)" hidden>
+            <span class="alt-url-link-label">source</span>
+          </a>
+        </div>
+        <div class="favicon-display" id="ryanjc-display" onclick="copyImage(this)">
+          <div class="spinner" id="ryanjc-spinner" style="display:none"></div>
+          <img id="ryanjc-img" style="display:none" alt="favicon.ryanjc.com favicon">
+          <span class="copied-toast">URL copied!</span>
+        </div>
+        <div class="meta" id="ryanjc-meta"></div>
+      </div>
+
       <!-- Brandfetch -->
       <div class="card" id="brandfetch-card" data-card-type="domain" style="display:none">
         <div class="card-header">
@@ -2707,6 +2747,8 @@
       { value: 'favicondev', label: 'Favicon Extractor' },
       { value: 'faviconkit', label: 'Faviconkit' },
       { value: 'faviconrun', label: 'favicon.run' },
+      { value: 'twentyicons', label: 'twenty-icons.com' },
+      { value: 'ryanjc', label: 'favicon.ryanjc.com' },
       { value: 'logodev', label: 'logo.dev', needs: 'logoDev' },
       { value: 'brandfetch', label: 'Brandfetch', needs: 'brandfetch' },
       { value: 'selfhst', label: 'selfh.st icons' },
@@ -2965,6 +3007,7 @@
     let currentGoogleSize = 128;
     let currentFaviconkitSize = 128;
     let currentFaviconrunSize = 128;
+    let currentTwentyiconsSize = 128;
     let currentBrandfetchSize = 128;
     let currentBrandfetchTheme = 'color';
     let currentBrandfetchResolvedFormat = null;
@@ -2994,7 +3037,7 @@
     const svglCatalogCache = new Map();
     const SERVICE_ICON_PROVIDERS = ['selfhst', 'dashboardicons', 'lobehub', 'svgl'];
     const DOMAIN_FAVICON_PROVIDERS = [
-      'scraper', 'google', 'ddg', 'yandex', 'faviconso', 'vemetric', 'favicondev', 'faviconkit', 'faviconrun', 'logodev', 'brandfetch',
+      'scraper', 'google', 'ddg', 'yandex', 'faviconso', 'vemetric', 'favicondev', 'faviconkit', 'faviconrun', 'twentyicons', 'ryanjc', 'logodev', 'brandfetch',
     ];
     const SERVICE_PROXY_PREFIX = { selfhst: '/selfhst', dashboardicons: '/dashboardicons', lobehub: '/lobehub', svgl: '/svgl' };
     let providersConfig = { logoDev: false, logoDevToken: null, brandfetch: false, includeAppIcons: true, urlMode: 'proxy' };
@@ -3511,6 +3554,7 @@
       setActiveSize('google-sizes', 128);
       setActiveSize('faviconkit-sizes', 128);
       setActiveSize('faviconrun-sizes', 128);
+      setActiveSize('twentyicons-sizes', 128);
       setActiveSize('brandfetch-sizes', 128);
       setActiveSize('selfhst-sizes', 128);
       setActiveSize('dashboardicons-sizes', 128);
@@ -4063,6 +4107,8 @@
       loadFavicon('favicondev', domainProxyPath('favicondev', domain, 64), `https://www.faviconextractor.com/favicon/${domain}`);
       initSizedCard('faviconkit', domain);
       initSizedCard('faviconrun', domain);
+      initSizedCard('twentyicons', domain);
+      loadFavicon('ryanjc', domainProxyPath('ryanjc', domain, 64), `https://api.favicon.ryanjc.com/?url=${domain}`);
 
       if (providersConfig.logoDev) {
         // Show the proxy URL under the image instead of the upstream URL,
@@ -4145,6 +4191,10 @@
 
     function loadFaviconrun(domain, size, opts) {
       loadFavicon('faviconrun', domainProxyPath('faviconrun', domain, size), `https://favicon.run/favicon?domain=${domain}&sz=${size}`, opts);
+    }
+
+    function loadTwentyicons(domain, size, opts) {
+      loadFavicon('twentyicons', domainProxyPath('twentyicons', domain, size), `https://twenty-icons.com/${domain}/${size}`, opts);
     }
 
     function buildBrandfetchUrl(domain, options = {}) {
@@ -4332,6 +4382,15 @@
         setCurrent: (s) => { currentFaviconrunSize = s; },
         load: (d, s, opts) => loadFaviconrun(d, s, opts),
       },
+      twentyicons: {
+        group: 'twentyicons-sizes',
+        sizes: [192, 180, 128, 64, 32, 16],
+        preferred: 128,
+        probePath: (d) => domainProxyPath('twentyicons', d, 192),
+        probeEachSize: true,
+        setCurrent: (s) => { currentTwentyiconsSize = s; },
+        load: (d, s, opts) => loadTwentyicons(d, s, opts),
+      },
     };
 
     function resetSizeButtons(groupId) {
@@ -4407,25 +4466,14 @@
         if (pending > 0) return;
         if (currentMode !== 'domain' || currentDomain !== domain) return;
         if (!working.size) return;
-
-        const maxSize = Math.max(...working);
-        const nativeProbe = new Image();
-        nativeProbe.onload = () => {
-          if (currentMode !== 'domain' || currentDomain !== domain) return;
-          const native = Math.max(nativeProbe.naturalWidth || 0, nativeProbe.naturalHeight || 0);
-          refineSizeButtons(id, domain, native > 0 ? native : maxSize, working);
-        };
-        nativeProbe.onerror = () => {
-          if (currentMode !== 'domain' || currentDomain !== domain) return;
-          refineSizeButtons(id, domain, maxSize, working);
-        };
-        nativeProbe.src = `${domainProxyPath(id, domain, maxSize)}?_=${Date.now()}`;
+        refineSizeButtons(id, domain, Math.max(...working), working);
       };
 
       cfg.sizes.forEach((size) => {
         const img = new Image();
         img.onload = () => {
-          working.add(size);
+          const native = Math.max(img.naturalWidth || 0, img.naturalHeight || 0);
+          if (native >= size) working.add(size);
           finishSizeProbe();
         };
         img.onerror = finishSizeProbe;
@@ -5626,6 +5674,13 @@
       currentFaviconrunSize = size;
       setActiveSize('faviconrun-sizes', size);
       loadFaviconrun(currentDomain, size, { hideCardOnError: false });
+    }
+
+    function switchTwentyiconsSize(size) {
+      if (!currentDomain) return;
+      currentTwentyiconsSize = size;
+      setActiveSize('twentyicons-sizes', size);
+      loadTwentyicons(currentDomain, size, { hideCardOnError: false });
     }
 
     function switchBrandfetchSize(size) {

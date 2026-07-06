@@ -28,6 +28,8 @@ const PROFILE_PROVIDERS = [
   'favicondev',
   'faviconkit',
   'faviconrun',
+  'twentyicons',
+  'ryanjc',
   'logodev',
   'brandfetch',
   'selfhst',
