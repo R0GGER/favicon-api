@@ -53,6 +53,8 @@ Unchanged: `/logodev/{size}/{domain}` (alias `/l/`). No `ext` segment.
 | `GET /favicondev/{size}/{ext}/{domain}` | Favicon Extractor (alias `/p/`) |
 | `GET /faviconkit/{size}/{ext}/{domain}` | Faviconkit (alias `/k/`) — sizes 16–256 |
 | `GET /faviconrun/{size}/{ext}/{domain}` | Favicon.run (alias `/fr/`) — sizes 16–256 |
+| `GET /twentyicons/{size}/{ext}/{domain}` | twenty-icons.com (alias `/ti/`) — sizes 16, 32, 64, 128, 180, 192 |
+| `GET /ryanjc/{size}/{ext}/{domain}` | favicon.ryanjc.com (alias `/rj/`) |
 | `GET /logodev/{size}/{domain}` | [logo.dev](https://www.logo.dev/) — requires `LOGODEV_TOKEN`; **503** when unset |
 | `GET /brandfetch/{size}/{ext}/{domain}` | [Brandfetch](https://docs.brandfetch.com/logo-api/overview) (alias `/bf/`). Requires `BRANDFETCH_CLIENT_ID`. SVG: `/brandfetch/0/svg/{domain}`. Raster: 16–512. `?type=icon\|symbol\|logo`, `?theme=light\|dark` |
 | `GET /selfhst/{size}/{format}/{service}` | [selfh.st icons](https://github.com/selfhst/icons) (alias `/sh/`). `?variant=color\|light\|dark` |
