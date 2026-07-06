@@ -5,6 +5,18 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.7] — 2026-07-06
+
+### Added
+
+- **favicon.ryanjc.com provider** — new domain favicon provider backed by [api.favicon.ryanjc.com](https://api.favicon.ryanjc.com). Upstream accepts a domain via `?url=`. Canonical route: `/ryanjc/{size}/{domain}`, short alias: `/rj/{size}/{domain}`. Resized server-side. Included in `/{domain}/json` discovery, the best-pick race (`GET /:domain`), `DEFAULT_PROVIDER` options, custom profile URLs, and the Web UI.
+
+- **twenty-icons.com provider** — new domain favicon provider backed by [twenty-icons.com](https://twenty-icons.com). Upstream supports native sizes (16, 32, 64, 128, 180, 192) via `/{domain}/{size}` path. Canonical route: `/twentyicons/{size}/{domain}`, short alias: `/ti/{size}/{domain}`. Included in `/{domain}/json` discovery, the best-pick race (`GET /:domain`), `DEFAULT_PROVIDER` options, custom profile URLs, and the Web UI with size-button strip. Size buttons are hidden when the upstream does not return an icon at that native resolution; upscaled responses (correct dimensions but no extra detail vs. the next smaller size, e.g. reddit.com/128 ≈ soft 64px) are rejected server-side so only genuinely sharper sizes are offered.
+
+### Fixed
+
+- **Upstream fetch — Cloudflare multi-A fallback** — forced-IPv4 upstream requests used only the first DNS A record (`dns.lookup` with `all: false`). Some Cloudflare anycast nodes refuse connections on certain routes while a sibling address works, which broke providers such as favicon.ryanjc.com (`ECONNREFUSED`). `upstreamFetch` now retries with the system resolver when the pinned IPv4 attempt fails to connect (`ECONNREFUSED`, `ETIMEDOUT`, `ENETUNREACH`, `EHOSTUNREACH`).
+
 ## [2.8.6] — 2026-07-05
 
 ### Added
