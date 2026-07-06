@@ -506,7 +506,60 @@ const PROVIDERS = {
   },
   faviconRun: (domain, size = 128) =>
     `https://favicon.run/favicon?domain=${encodeURIComponent(domain)}&sz=${size}`,
+  twentyIcons: (domain, size = 128) =>
+    `https://twenty-icons.com/${encodeURIComponent(domain)}/${size}`,
+  ryanjc: (domain) =>
+    `https://api.favicon.ryanjc.com/?url=${encodeURIComponent(domain)}`,
 };
+
+const TWENTYICONS_NATIVE_SIZES = [16, 32, 64, 128, 180, 192];
+
+function twentyIconsReferenceSize(requestedSize) {
+  const idx = TWENTYICONS_NATIVE_SIZES.indexOf(requestedSize);
+  if (idx <= 0) return null;
+  return TWENTYICONS_NATIVE_SIZES[idx - 1];
+}
+
+async function twentyIconsUpscaleMetrics(largeBuf, smallBuf, largeSize, smallSize) {
+  const ch = 4;
+  const downscaled = await sharp(largeBuf)
+    .resize(smallSize, smallSize)
+    .ensureAlpha()
+    .raw()
+    .toBuffer();
+  const smallRaw = await sharp(smallBuf).ensureAlpha().raw().toBuffer();
+  const len = Math.min(downscaled.length, smallRaw.length);
+  let sumSq = 0;
+  for (let i = 0; i < len; i++) {
+    const d = downscaled[i] - smallRaw[i];
+    sumSq += d * d;
+  }
+  const rms = Math.sqrt(sumSq / len);
+
+  const gradientEnergy = (data, w, h) => {
+    let sum = 0;
+    let count = 0;
+    for (let y = 1; y < h - 1; y++) {
+      for (let x = 1; x < w - 1; x++) {
+        const i = (y * w + x) * ch;
+        sum += Math.abs(data[i] - data[i - ch]) + Math.abs(data[i] - data[i + ch]);
+        count++;
+      }
+    }
+    return count ? sum / count : 0;
+  };
+
+  const largeRaw = await sharp(largeBuf).ensureAlpha().raw().toBuffer();
+  const smallEnergy = gradientEnergy(smallRaw, smallSize, smallSize);
+  const ratio = gradientEnergy(largeRaw, largeSize, largeSize) / Math.max(smallEnergy, 1);
+  return { rms, ratio };
+}
+
+function looksLikeTwentyIconsUpscale({ rms, ratio }) {
+  // Upstream often returns the correct pixel dimensions while upscaling from the
+  // previous native step (e.g. reddit.com/128 is a soft 64→128 upscale).
+  return ratio < 0.55 && rms < 15;
+}
 
 const FAVICON_FETCH_HEADERS = {
   'User-Agent': SCRAPER_USER_AGENT,
@@ -715,6 +768,46 @@ async function fetchFaviconRun(domain, size = 128) {
   const url = PROVIDERS.faviconRun(domain, size);
   const result = await fetchFavicon(url);
   return result ? { ...result, provider: 'faviconrun' } : null;
+}
+
+async function fetchTwentyIcons(domain, size = 128) {
+  const url = PROVIDERS.twentyIcons(domain, size);
+  const result = await fetchFavicon(url);
+  if (!result) return null;
+  const meta = { contentType: result.contentType, url: result.url };
+  const dims = await readImageDimensions(result.buffer, meta);
+  if (dims) {
+    const side = Math.min(dims.width || 0, dims.height || dims.width || 0);
+    if (side < size) return null;
+  }
+
+  const refSize = twentyIconsReferenceSize(size);
+  if (refSize) {
+    const refResult = await fetchFavicon(PROVIDERS.twentyIcons(domain, refSize));
+    if (refResult) {
+      try {
+        const metrics = await twentyIconsUpscaleMetrics(
+          result.buffer,
+          refResult.buffer,
+          size,
+          refSize
+        );
+        if (looksLikeTwentyIconsUpscale(metrics)) return null;
+      } catch {
+        // If analysis fails, keep the nominal-size result.
+      }
+    }
+  }
+
+  return { ...result, provider: 'twentyicons' };
+}
+
+async function fetchRyanjc(domain) {
+  const url = PROVIDERS.ryanjc(domain);
+  const result = await fetchFavicon(url);
+  if (!result) return null;
+  if (await isUnusableIcon(result.buffer, { ...result, provider: 'ryanjc' })) return null;
+  return { ...result, provider: 'ryanjc' };
 }
 
 async function fetchBrandfetch(domain, size = 128, opts = {}) {
@@ -1950,6 +2043,8 @@ module.exports = {
   fetchFaviconkit,
   fetchLogoDev,
   fetchFaviconRun,
+  fetchTwentyIcons,
+  fetchRyanjc,
   fetchBrandfetch,
   normalizeBrandfetchOptions,
   brandfetchCacheKey,
