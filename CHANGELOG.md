@@ -5,6 +5,16 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.11] — 2026-07-07
+
+### Changed
+
+- **`DEFAULT_PROVIDER` on `/{domain}`** — when set, that provider now runs **exclusively first**; the fallback race only starts after it fails (null, empty, or placeholder). Previously it only received a head-start (`PICK_HEAD_START_MS`, default 150ms), so fast CDN placeholders (e.g. ryanjc's generic globe SVG) could still win over a slower scraper even with `DEFAULT_PROVIDER=scraper`. `PICK_HEAD_START_MS` now applies only when `DEFAULT_PROVIDER` is unset, or to the first fallback after the default fails. Docs updated in `.env.example`, [Getting Started](/docs/getting-started), and [Tweaks §7](/docs/tweaks#7-pick-a-fast-default-provider-for-domain).
+
+### Fixed
+
+- **Best-pick — ryanjc placeholder on private / unreachable hosts**  — `GET /{domain}` could return favicon.ryanjc.com's generic tabler **earth** SVG (often rendered as a black globe) while `GET /scraper/{domain}` correctly served the site's own icon. The placeholder is now detected in `isUnusableIcon` (same pattern as favicon.so and Vemetric placeholders) and rejected in the best-pick race and per-provider caches. Stale `best` cache entries that hold the placeholder are invalidated on the next request.
+
 ## [2.8.10] — 2026-07-07
 
 ### Added
