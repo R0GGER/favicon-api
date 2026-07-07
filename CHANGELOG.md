@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.8.14] — 2026-07-08
 
+### Changed
+
+- **Web UI — size filter default** — the dual-range slider now starts at **16–512px** on first visit (no saved preference in `localStorage`).
+
 ### Fixed
 
 - **HTML Scraper — SVG-only sites (e.g. hosthatch.com)** — domains with only an SVG `<link rel="icon">` were missing from `/{domain}/json` icons and sized routes (`/scraper/256/png/…`, `/scraper/512/png/…`) could return blurry upscaled PNGs when `SCRAPER_MAX_ICON_SIZE` capped the default cache at 128px. The scraper now probes HTML page link candidates (including sized variants), treats SVG sources as **512×512** for discovery/ranking, rasterizes SVG **directly at the requested size**, and only downscales raster icons when the source is larger than the target. Empty icon lists are no longer treated as a valid disk/memory cache hit.
