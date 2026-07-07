@@ -176,6 +176,7 @@ async function raceFetchers(fallbacks, cacheProvider, cacheKey, cacheSize) {
       buffer: result.buffer,
       contentType: result.contentType,
       provider: result.provider,
+      url: result.url,
     };
     await cache.set(cacheProvider, cacheKey, cacheSize, entry);
     return entry;
@@ -225,6 +226,11 @@ async function pickBest(domain) {
   if (cached) {
     if (cached.notFound || cached.provider === 'none') {
       await cache.del('best', domain, 32);
+    } else if (DEFAULT_PROVIDER && cached.provider !== DEFAULT_PROVIDER) {
+      // Pre-2.8.12 `best` entries can hold a fast CDN fallback (e.g. duckduckgo's
+      // generic Google favicon for calendar.google.com) even when DEFAULT_PROVIDER
+      // is scraper. Those icons pass isUnusableIcon, so invalidate and re-pick.
+      await cache.del('best', domain, 32);
     } else if (!(await isUnusableIcon(cached.buffer, cached))) {
       return cached;
     } else {
@@ -240,6 +246,8 @@ async function pickBestService(service) {
   const cached = await cache.get('best-service', service, null);
   if (cached) {
     if (cached.notFound || cached.provider === 'none') {
+      await cache.del('best-service', service, null);
+    } else if (DEFAULT_PROVIDER && cached.provider !== DEFAULT_PROVIDER) {
       await cache.del('best-service', service, null);
     } else if (!(await isUnusableIcon(cached.buffer, cached))) {
       return cached;
