@@ -233,19 +233,19 @@ Run the script inside the running FaviconAPI container (the service listens on p
 **Via Docker Compose** (from the directory that contains `docker-compose.yml`):
 
 ```bash
-# Default: top 500, concurrency 4
-docker compose exec favicon-api node scripts/preload-top-sites.js --base-url http://127.0.0.1:3000
+# Default: top 500, concurrency 2 (recommended for VPS / scheduled runs)
+docker compose exec favicon-api node scripts/preload-top-sites.js --base-url http://127.0.0.1:3000 --concurrency 2
 
 # With options
 docker compose exec favicon-api node scripts/preload-top-sites.js \
-  --base-url http://127.0.0.1:3000 --limit 500 --concurrency 4
+  --base-url http://127.0.0.1:3000 --limit 500 --concurrency 2
 ```
 
 **Via Docker CLI** (when the container is already running — no compose file needed). Use the container name from `docker ps` (e.g. `favicon-api`):
 
 ```bash
 docker exec favicon-api node scripts/preload-top-sites.js \
-  --base-url http://127.0.0.1:3000 --limit 500 --concurrency 4
+  --base-url http://127.0.0.1:3000 --limit 500 --concurrency 2
 ```
 
 When `API_REQUIRE_KEY=true`, pass a key for the v1 calls:
@@ -276,7 +276,7 @@ docker exec favicon-api node scripts/preload-top-sites.js \
 |---|---|---|
 | `--base-url` | `http://127.0.0.1:3000` (inside container) | FaviconAPI base URL |
 | `--limit` | `500` | Number of domains from Tranco |
-| `--concurrency` | `4` | Parallel domain workers |
+| `--concurrency` | `4` | Parallel domain workers — use **`2`** (or **`1`** on a small VPS) for scheduled runs |
 | `--api-key` | `PRELOAD_API_KEY` / `API_KEY` env | Bearer key for `/api/v1/favicon` |
 | `--domains-file` | — | Local domain list instead of Tranco |
 | `--skip-standard` | — | Skip `GET /{domain}` |
@@ -298,6 +298,71 @@ docker exec favicon-api node scripts/preload-top-sites.js \
 - **Persistence.** Preloaded data is written to the same `CACHE_DIR` /
   `API_CACHE_DIR` volume as normal requests — ensure it is mounted persistently
   (see [Persist all caches](#1-persist-all-caches-on-a-durable-volume) above).
+
+#### Recommended `.env` for weekly preload
+
+Preload fills both cache layers, but **default TTLs expire long before a weekly
+re-run** unless you align them. Match the [TL;DR](#tldr) block at the top of this
+page and add headroom for 500 Tranco domains in the scraper LRU:
+
+```bash
+# Scraper discovery + image bytes: 7 days (same horizon as API v1)
+SCRAPER_DISK_CACHE=true
+SCRAPER_ICONS_CACHE_TTL=604800
+DISK_CACHE_TTL=604800
+MEMORY_CACHE_TTL=86400
+
+# Preload uses 500 domains; default LRU max is 500 — raise so normal traffic
+# does not evict preloaded entries immediately
+SCRAPER_ICONS_CACHE_MAX=1000
+
+# Bound disk growth (LRU eviction of oldest files)
+CACHE_SIZE_MB=512
+
+# v1 PNG cache — keep at 7 days; do not raise when running weekly preload
+API_CACHE_TTL=604800
+```
+
+| Variable | Recommendation | Why |
+|---|---|---|
+| `SCRAPER_DISK_CACHE` | **`true`** | Persists scraper discovery across restarts; shared across cluster workers. `{CACHE_DIR}/scraper-discovery` is the default path — set `SCRAPER_DISK_CACHE_DIR` only if you need a custom location. |
+| `SCRAPER_ICONS_CACHE_MAX` | **`1000`** | Default `500` equals the preload size; the LRU evicts entries as soon as it is full. `1000` leaves room for Tranco domains plus day-to-day lookups. Busy instances can use `2000` (see [§3](#3-right-size-the-in-memory-cache)). |
+| `SCRAPER_ICONS_CACHE_TTL` | **`604800`** (7 days) | Default `3600` (1 hour) — discovery expires before the next weekly run, forcing full re-scrapes. |
+| `DISK_CACHE_TTL` | **`604800`** (7 days) | Default `86400` (1 day) — image bytes expire too soon for weekly preload. |
+| `API_CACHE_TTL` | **`604800`** (7 days) | Already the default. **Do not increase** for weekly preload — seven days matches a Sunday-to-Sunday schedule. Raising it (e.g. to 14 or 30 days) only makes sense if you run preload **less often**; it also lengthens browser/CDN `Cache-Control` on `/cdn/favicons/`. |
+
+Raising `SCRAPER_ICONS_CACHE_MAX` alone is not enough — without longer TTLs and
+`SCRAPER_DISK_CACHE=true`, weekly preload re-does expensive discovery work every
+run.
+
+#### Automate with cron
+
+On a VPS you do not need the git repository or a `docker-compose.yml` on disk —
+only a **running container**. Schedule preload during off-peak hours so upstream
+load stays low.
+
+**Recommended:** every **Sunday at 03:00**, `--concurrency 2` (~30–60 minutes for
+500 domains). Use **`--concurrency 1`** on a small VPS or when upstreams
+rate-limit you (slower, but gentler).
+
+```cron
+# crontab -e  (adjust container name from `docker ps` and path from `which docker`)
+0 3 * * 0 /usr/bin/docker exec favicon-api node scripts/preload-top-sites.js --base-url http://127.0.0.1:3000 --limit 500 --concurrency 2 >> /var/log/favicon-preload.log 2>&1
+```
+
+When `API_REQUIRE_KEY=true`, add `--api-key fa_your_key_here` to the command.
+
+**Cron checklist:**
+
+- **Container must be running** — use `restart: unless-stopped` (or equivalent) on your deploy.
+- **Full path to `docker`** — cron's `PATH` is minimal; run `which docker` on the host.
+- **Container name** — match `docker ps` (e.g. `favicon-api` or `maflplus-favicon-api`).
+- **Logging** — redirect stdout/stderr to a log file; configure logrotate so it does not grow unbounded.
+- **Image version** — the script ships in the image from v2.8.10 onward (`scripts/preload-top-sites.js`).
+
+Weekly preload plus the [recommended `.env`](#recommended-env-for-weekly-preload)
+above keeps standard, scraper, and v1 caches warm through the week without daily
+upstream traffic.
 
 ### Optional code change: align browser cache with `DISK_CACHE_TTL`
 
