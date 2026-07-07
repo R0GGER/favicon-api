@@ -2560,9 +2560,9 @@
                   <div class="size-range-fill" id="size-range-fill"></div>
                 </div>
                 <input type="range" id="size-filter-min" min="0" max="7" step="1" value="1" aria-label="Minimum icon size">
-                <input type="range" id="size-filter-max" min="0" max="7" step="1" value="6" aria-label="Maximum icon size">
+                <input type="range" id="size-filter-max" min="0" max="7" step="1" value="7" aria-label="Maximum icon size">
               </div>
-              <span class="size-filter-value" id="size-filter-label" aria-live="polite">All sizes</span>
+              <span class="size-filter-value" id="size-filter-label" aria-live="polite">16–512px</span>
             </div>
           </div>
         </div>
@@ -3594,10 +3594,10 @@
     let svglProbeSeq = 0;
     let currentSvglSize = 128;
     let currentMinSizeFilter = 16;
-    let currentMaxSizeFilter = 256;
+    let currentMaxSizeFilter = 512;
     const SIZE_FILTER_STEPS = [16, 32, 64, 128, 180, 256, 512];
     const DEFAULT_SIZE_FILTER_MIN = 16;
-    const DEFAULT_SIZE_FILTER_MAX = 256;
+    const DEFAULT_SIZE_FILTER_MAX = 512;
     const CATALOG_RASTER_SIZES = [16, 32, 64, 128, 256];
     const SVGL_RASTER_SIZES = [64, 128, 256];
     const SIZE_FILTER_INDEX_VALUES = [0, ...SIZE_FILTER_STEPS];
