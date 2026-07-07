@@ -171,6 +171,28 @@ async function raceFetchers(fallbacks, cacheProvider, cacheKey, cacheSize) {
       return r;
     });
 
+  const storeAndReturn = async (result) => {
+    const entry = {
+      buffer: result.buffer,
+      contentType: result.contentType,
+      provider: result.provider,
+    };
+    await cache.set(cacheProvider, cacheKey, cacheSize, entry);
+    return entry;
+  };
+
+  // When DEFAULT_PROVIDER is set, use it exclusively before any fallback race.
+  // A head-start alone is not enough for slow providers (e.g. scraper): fast CDN
+  // placeholders such as ryanjc's generic globe SVG would still win after 150ms.
+  if (DEFAULT_PROVIDER) {
+    try {
+      return await storeAndReturn(await wrap(fallbacks[0]));
+    } catch {
+      if (fallbacks.length === 1) return notFoundEntry(cacheSize || 32);
+      fallbacks = fallbacks.slice(1);
+    }
+  }
+
   const firstPromise = wrap(fallbacks[0]);
   const racers = [firstPromise];
 
@@ -192,14 +214,7 @@ async function raceFetchers(fallbacks, cacheProvider, cacheKey, cacheSize) {
   }
 
   try {
-    const result = await Promise.any(racers);
-    const entry = {
-      buffer: result.buffer,
-      contentType: result.contentType,
-      provider: result.provider,
-    };
-    await cache.set(cacheProvider, cacheKey, cacheSize, entry);
-    return entry;
+    return await storeAndReturn(await Promise.any(racers));
   } catch {
     return notFoundEntry(cacheSize || 32);
   }

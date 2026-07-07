@@ -334,6 +334,11 @@ function isVemetricResult(meta = {}) {
   return hint.includes('vemetric.com') || hint.includes('vemetric');
 }
 
+function isRyanjcResult(meta = {}) {
+  const hint = providerHint(meta);
+  return hint.includes('favicon.ryanjc.com') || hint.includes('ryanjc');
+}
+
 // Favicon.so returns a generic SVG code-bracket icon when the site has no favicon;
 // real hits are always raster (png/ico).
 function isFaviconSoPlaceholder(buffer, meta = {}) {
@@ -364,10 +369,30 @@ function isVemetricPlaceholder(buffer, meta = {}) {
   return VEMETRIC_PLACEHOLDER_SHA256.has(hash);
 }
 
+// favicon.ryanjc.com serves a tabler "earth" SVG when it cannot resolve a favicon.
+const RYANJC_PLACEHOLDER_SHA256 = new Set([
+  '58d5367b47452a2a8d47ea0e5e39f9b3203af531011a189189754b10e6632258',
+]);
+
+function isRyanjcPlaceholder(buffer, meta = {}) {
+  if (!isRyanjcResult(meta)) return false;
+  if (!buffer || buffer.length === 0) return false;
+
+  const hint = (meta.contentType || '').toLowerCase();
+  if (looksLikeSvg(buffer) || hint.includes('svg')) {
+    const svg = buffer.toString('utf8').toLowerCase();
+    if (svg.includes('viewbox="0 0 24 24"') && svg.includes('m1-16a10 10')) return true;
+    const hash = crypto.createHash('sha256').update(buffer.toString('utf8').trim()).digest('hex');
+    return RYANJC_PLACEHOLDER_SHA256.has(hash);
+  }
+  return false;
+}
+
 async function isUnusableIcon(buffer, meta = {}) {
   if (await isBlankFavicon(buffer, meta)) return true;
   if (isFaviconSoPlaceholder(buffer, meta)) return true;
   if (isVemetricPlaceholder(buffer, meta)) return true;
+  if (isRyanjcPlaceholder(buffer, meta)) return true;
   return false;
 }
 
