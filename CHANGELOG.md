@@ -5,6 +5,14 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.14] — 2026-07-08
+
+### Fixed
+
+- **HTML Scraper — SVG-only sites (e.g. hosthatch.com)** — domains with only an SVG `<link rel="icon">` were missing from `/{domain}/json` icons and sized routes (`/scraper/256/png/…`, `/scraper/512/png/…`) could return blurry upscaled PNGs when `SCRAPER_MAX_ICON_SIZE` capped the default cache at 128px. The scraper now probes HTML page link candidates (including sized variants), treats SVG sources as **512×512** for discovery/ranking, rasterizes SVG **directly at the requested size**, and only downscales raster icons when the source is larger than the target. Empty icon lists are no longer treated as a valid disk/memory cache hit.
+
+- **Web UI — HTML Scraper card hidden with size filter** — with the default **16–256px** filter active, the scraper card could vanish from the grid for SVG-only domains: `writeCardMeta` ignored `isVector: false` when the source URL ended in `.svg`, so the card was classified as vector and hidden whenever a maximum size was set. Explicit `isVector: false` is now respected; scraper cards are never treated as vector; the scraper card **stays visible** in the grid while size buttons outside the filter range are disabled. The **Fast proxy** button (`/{domain}`, e.g. 128px with `SCRAPER_MAX_ICON_SIZE=128`) stays clickable; proxy and proxy-size selections are preserved when the size slider changes.
+
 ## [2.8.13] — 2026-07-08
 
 ### Fixed
