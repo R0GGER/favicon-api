@@ -128,9 +128,9 @@ WORKERS=
 # entries but more concurrent upstream load. Default = 4.
 SCRAPER_PROBE_BATCH_SIZE=4
 
-# Head-start (ms) for DEFAULT_PROVIDER (or the built-in first provider) on
-# /:domain requests. Other providers start after this delay unless the preferred
-# one already failed. Default = 150.
+# Head-start (ms) for the built-in first provider on /:domain when DEFAULT_PROVIDER
+# is unset. When DEFAULT_PROVIDER is set, that provider runs exclusively first;
+# fallbacks only race after it fails. Default = 150.
 PICK_HEAD_START_MS=150
 
 # Optional: enables the logo.dev provider (/logodev/:size/:domain) when set to a valid publishable key.
@@ -581,8 +581,8 @@ The tables below cover the most-used variables. For the complete list — includ
 
 | Variable                   | Default                         | Description                                                                                                                                                                                                                                                                          |
 | -------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `DEFAULT_PROVIDER`         | `scraper`                       | Preferred provider for `/{domain}` (gets the head-start). Values: `scraper`, `google`, `googlev2`, `duckduckgo`, `yandex`, `faviconso`, `vemetric`, `favicondev`, `faviconkit`, `faviconrun`, `twentyicons`, `ryanjc`, `logodev`, `brandfetch`, `selfhst`, `dashboardicons`, `lobehub`, `svgl`. `logodev` requires `LOGODEV_TOKEN`; `brandfetch` requires `BRANDFETCH_CLIENT_ID`. |
-| `PICK_HEAD_START_MS`       | `150`                           | Head-start (ms) for `DEFAULT_PROVIDER` on `/{domain}` before other providers start.                                                                                                                                                                                                  |
+| `DEFAULT_PROVIDER`         | `scraper`                       | Preferred provider for `/{domain}`. When set, it runs exclusively first; fallbacks only race after it fails. Values: `scraper`, `google`, `googlev2`, `duckduckgo`, `yandex`, `faviconso`, `vemetric`, `favicondev`, `faviconkit`, `faviconrun`, `twentyicons`, `ryanjc`, `logodev`, `brandfetch`, `selfhst`, `dashboardicons`, `lobehub`, `svgl`. `logodev` requires `LOGODEV_TOKEN`; `brandfetch` requires `BRANDFETCH_CLIENT_ID`. |
+| `PICK_HEAD_START_MS`       | `150`                           | Head-start (ms) for the built-in first provider on `/{domain}` when `DEFAULT_PROVIDER` is unset.                                                                                                                                                                                                  |
 | `LOGODEV_TOKEN`            | *(unset)*                       | [logo.dev](https://www.logo.dev/) publishable key. Enables `/logodev/{size}/{domain}`; without it the route returns 503.                                                                                                                                                             |
 | `BRANDFETCH_CLIENT_ID`     | *(unset)*                       | [Brandfetch](https://docs.brandfetch.com/logo-api/overview) Logo API client ID. Enables `/brandfetch/{size}/{ext}/{domain}`; without it the route returns 503.                                                                                                                             |
 | `BESTICON_URL`             | *(unset)*                       | Base URL of a sidecar [besticon](https://github.com/mat/besticon) instance (e.g. `http://besticon:8080`). `/scraper/{domain}` asks besticon first, then falls back to the built-in scraper.                                                                                          |

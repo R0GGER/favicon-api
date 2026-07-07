@@ -166,10 +166,12 @@ besticon service from compose to save resources.
 
 ### 7. Pick a fast default provider for `/{domain}`
 
-`/{domain}` races providers in parallel and gives `DEFAULT_PROVIDER` a head start
-(`PICK_HEAD_START_MS`, default 150ms). The scraper produces the best icons but is
-slower than CDN providers. If you favor latency over icon quality, set a fast CDN
-provider as the default:
+`/{domain}` races providers in parallel. When `DEFAULT_PROVIDER` is set, that
+provider runs **exclusively first**; the fallback race only starts if it fails
+(null, empty, or placeholder). Without `DEFAULT_PROVIDER`, the built-in first
+provider (scraper) gets a head start (`PICK_HEAD_START_MS`, default 150ms) before
+others join. The scraper produces the best icons but is slower than CDN providers.
+If you favor latency over icon quality, set a fast CDN provider as the default:
 
 ```bash
 DEFAULT_PROVIDER=googlev2
