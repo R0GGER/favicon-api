@@ -5,6 +5,16 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.9] — 2026-07-07
+
+### Added
+
+- **Web UI — results table view** — switch between the existing card grid and a compact **table layout** from the download toolbar (grid / table toggle). The choice is **remembered in `localStorage`** (`faviconapi-results-view`). Columns: **Icon**, **Provider**, **Extension** (PNG/SVG toggle for catalog providers that support both), **Size**, **Link**, **Source**, and **Download**. The table stays in sync with the grid: size filter, loading skeletons, app-icons section divider, extension switches, and per-row download all mirror card behaviour. **Copy URL** from the icon, **Size**, **Link** (dedicated copy button), or **Source** column; the link text itself still opens in a new tab.
+
+### Changed
+
+- **Web UI — table Download column** — download buttons are **centered** in the column.
+
 ## [2.8.8] — 2026-07-07
 
 ### Added
