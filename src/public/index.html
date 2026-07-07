@@ -1363,14 +1363,151 @@
     .download-toolbar {
       grid-column: 1 / -1;
       display: none;
-      justify-content: flex-end;
-      gap: 0.5rem;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
       margin-bottom: -0.2rem;
       overflow: visible;
+      flex-wrap: wrap;
     }
 
     .download-toolbar.visible {
       display: flex;
+    }
+
+    .download-toolbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-left: auto;
+    }
+
+    .size-filter-group {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      flex-wrap: wrap;
+      min-width: 0;
+    }
+
+    .size-filter-panel {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      font-size: 0.85rem;
+      color: #6b6560;
+      min-width: 0;
+    }
+
+    .size-filter-heading {
+      font-weight: 500;
+      white-space: nowrap;
+      flex: 0 0 auto;
+    }
+
+    .size-range-slider {
+      position: relative;
+      width: min(220px, 42vw);
+      height: 1.35rem;
+      flex: 0 1 auto;
+    }
+
+    .size-range-track {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 50%;
+      height: 4px;
+      transform: translateY(-50%);
+      border-radius: 999px;
+      background: #e4dfd9;
+      pointer-events: none;
+    }
+
+    .size-range-fill {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      border-radius: inherit;
+      background: #5b2e7e;
+      opacity: 0.55;
+    }
+
+    .size-range-slider input[type="range"] {
+      position: absolute;
+      left: 0;
+      width: 100%;
+      height: 1.35rem;
+      margin: 0;
+      padding: 0;
+      background: transparent;
+      pointer-events: none;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+
+    .size-range-slider input[type="range"]::-webkit-slider-runnable-track {
+      height: 4px;
+      background: transparent;
+      border: none;
+    }
+
+    .size-range-slider input[type="range"]::-moz-range-track {
+      height: 4px;
+      background: transparent;
+      border: none;
+    }
+
+    .size-range-slider input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: 2px solid #fff;
+      background: #5b2e7e;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+      cursor: pointer;
+      pointer-events: auto;
+      margin-top: -5px;
+    }
+
+    .size-range-slider input[type="range"]::-moz-range-thumb {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: 2px solid #fff;
+      background: #5b2e7e;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+      cursor: pointer;
+      pointer-events: auto;
+    }
+
+    .size-range-slider input[type="range"]:focus-visible::-webkit-slider-thumb {
+      outline: 2px solid rgba(91, 46, 126, 0.35);
+      outline-offset: 2px;
+    }
+
+    .size-range-slider input[type="range"]:focus-visible::-moz-range-thumb {
+      outline: 2px solid rgba(91, 46, 126, 0.35);
+      outline-offset: 2px;
+    }
+
+    #size-filter-min { z-index: 3; }
+    #size-filter-max { z-index: 4; }
+
+    .size-filter-value {
+      font-weight: 600;
+      color: #5b2e7e;
+      white-space: nowrap;
+      min-width: 5.5rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .card.size-filter-hidden {
+      display: none !important;
     }
 
     .download-all-btn {
@@ -2031,15 +2168,30 @@
 
     <div class="results" id="results">
       <div class="download-toolbar" id="download-toolbar">
-        <button type="button" class="download-all-btn btn-cta-attention" id="profile-builder-btn" onclick="openProfileModal()" data-tip="Build a shareable URL with your own preferred provider, fallbacks and minimum icon size. The settings are encoded in the URL — no account needed." aria-label="Build a custom favicon URL: a shareable URL with your own preferred provider, fallbacks and minimum icon size, encoded in the URL with no account needed">
-          <span class="cta-pointer cta-pointer--left" aria-hidden="true">👉</span>
-          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.715 6.542 3.343 7.914a3 3 0 1 0 4.243 4.243l1.828-1.829A3 3 0 0 0 8.586 5.5L8 6.086a1.002 1.002 0 0 0-.154.199 2 2 0 0 1 .861 3.337L6.88 11.45a2 2 0 1 1-2.83-2.83l.793-.792a4.018 4.018 0 0 1-.128-1.287z"/><path d="M6.586 4.672A3 3 0 0 0 7.414 9.5l.775-.776a2 2 0 0 1-.896-3.346L9.12 3.55a2 2 0 1 1 2.83 2.83l-.793.792c.112.42.155.855.128 1.287l1.372-1.372a3 3 0 1 0-4.243-4.243L6.586 4.672z"/></svg>
-          Build custom URL
-        </button>
-        <button type="button" class="download-all-btn" id="download-all-btn" onclick="downloadAllFavicons()" data-tip="Download all loaded icons as ZIP" aria-label="Download all loaded icons as ZIP">
-          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>
-          Download all
-        </button>
+        <div class="size-filter-group">
+          <div class="size-filter-panel">
+            <span class="size-filter-heading">Size</span>
+            <div class="size-range-slider" id="size-range-slider">
+              <div class="size-range-track" aria-hidden="true">
+                <div class="size-range-fill" id="size-range-fill"></div>
+              </div>
+              <input type="range" id="size-filter-min" min="0" max="7" step="1" value="1" aria-label="Minimum icon size">
+              <input type="range" id="size-filter-max" min="0" max="7" step="1" value="6" aria-label="Maximum icon size">
+            </div>
+            <span class="size-filter-value" id="size-filter-label" aria-live="polite">All sizes</span>
+          </div>
+        </div>
+        <div class="download-toolbar-actions">
+          <button type="button" class="download-all-btn btn-cta-attention" id="profile-builder-btn" onclick="openProfileModal()" data-tip="Build a shareable URL with your own preferred provider, fallbacks and minimum icon size. The settings are encoded in the URL — no account needed." aria-label="Build a custom favicon URL: a shareable URL with your own preferred provider, fallbacks and minimum icon size, encoded in the URL with no account needed">
+            <span class="cta-pointer cta-pointer--left" aria-hidden="true">👉</span>
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.715 6.542 3.343 7.914a3 3 0 1 0 4.243 4.243l1.828-1.829A3 3 0 0 0 8.586 5.5L8 6.086a1.002 1.002 0 0 0-.154.199 2 2 0 0 1 .861 3.337L6.88 11.45a2 2 0 1 1-2.83-2.83l.793-.792a4.018 4.018 0 0 1-.128-1.287z"/><path d="M6.586 4.672A3 3 0 0 0 7.414 9.5l.775-.776a2 2 0 0 1-.896-3.346L9.12 3.55a2 2 0 1 1 2.83 2.83l-.793.792c.112.42.155.855.128 1.287l1.372-1.372a3 3 0 1 0-4.243-4.243L6.586 4.672z"/></svg>
+            Build custom URL
+          </button>
+          <button type="button" class="download-all-btn" id="download-all-btn" onclick="downloadAllFavicons()" data-tip="Download all loaded icons as ZIP" aria-label="Download all loaded icons as ZIP">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>
+            Download all
+          </button>
+        </div>
       </div>
       <div class="no-icon-notice" id="no-icon-notice" role="status" aria-live="polite">
         <strong>No icon found.</strong>
@@ -2252,7 +2404,7 @@
       <!-- favicon.ryanjc.com -->
       <div class="card" data-card-type="domain">
         <div class="card-header">
-          <h3><a href="https://api.favicon.ryanjc.com" target="_blank" rel="noopener noreferrer">Favicon.ryanjc.com</a></h3>
+          <h3><a href="https://favicon.ryanjc.com" target="_blank" rel="noopener noreferrer">Favicon.ryanjc.com</a></h3>
           <a class="refresh-btn alt-url-link" href="#" target="_blank" rel="noopener noreferrer" onclick="return copyAltCardUrl(event, this)" hidden>
             <span class="alt-url-link-label">source</span>
           </a>
@@ -3034,8 +3186,19 @@
     let currentSvglFormat = 'svg';
     let svglProbeSeq = 0;
     let currentSvglSize = 128;
+    let currentMinSizeFilter = 16;
+    let currentMaxSizeFilter = 256;
+    const SIZE_FILTER_STEPS = [16, 32, 64, 128, 180, 256, 512];
+    const DEFAULT_SIZE_FILTER_MIN = 16;
+    const DEFAULT_SIZE_FILTER_MAX = 256;
+    const CATALOG_RASTER_SIZES = [16, 32, 64, 128, 256];
+    const SVGL_RASTER_SIZES = [64, 128, 256];
+    const SIZE_FILTER_INDEX_VALUES = [0, ...SIZE_FILTER_STEPS];
+    const SIZE_FILTER_STORAGE_KEY = 'faviconapi-size-filter';
+    const SIZE_FILTER_ALLOWED = new Set([0, ...SIZE_FILTER_STEPS]);
     const svglCatalogCache = new Map();
     const SERVICE_ICON_PROVIDERS = ['selfhst', 'dashboardicons', 'lobehub', 'svgl'];
+    const CATALOG_SVG_PROVIDERS = new Set(['selfhst', 'dashboardicons', 'lobehub', 'svgl']);
     const DOMAIN_FAVICON_PROVIDERS = [
       'scraper', 'google', 'ddg', 'yandex', 'faviconso', 'vemetric', 'favicondev', 'faviconkit', 'faviconrun', 'twentyicons', 'ryanjc', 'logodev', 'brandfetch',
     ];
@@ -3160,7 +3323,82 @@
       return origin ? `${origin}${newPath}` : newPath;
     }
 
-    function writeCardMeta(meta, display, { w, h, proxyUrl, sourceUrl, forceProxy, hideDimensions }) {
+    function isVectorIconUrl(...urls) {
+      for (const raw of urls) {
+        if (!raw) continue;
+        try {
+          const path = new URL(raw, location.origin).pathname.toLowerCase();
+          if (/\/png(?:\/|$)/.test(path)) return false;
+          if (path.endsWith('.svg')) return true;
+          if (/\/svg(?:\/|$)/.test(path)) return true;
+        } catch {
+          /* ignore */
+        }
+      }
+      return false;
+    }
+
+    function getCatalogFormat(providerId) {
+      switch (providerId) {
+        case 'selfhst': return currentSelfhstFormat;
+        case 'dashboardicons': return currentDashboardIconsFormat;
+        case 'lobehub': return currentLobehubFormat;
+        case 'svgl': return currentSvglFormat;
+        default: return null;
+      }
+    }
+
+    function prepareCatalogForSizeFilter(providerId) {
+      if (!CATALOG_SVG_PROVIDERS.has(providerId) || !catalogProviderIsActive(providerId) || !isSizeFilterActive()) return;
+
+      const min = currentMinSizeFilter;
+      const max = currentMaxSizeFilter;
+
+      if (max > 0) {
+        const size = pickCatalogRasterSize(min, max, providerId);
+        if (!size) {
+          if (min > 0) switchCatalogToSvg(providerId);
+          return;
+        }
+        switch (providerId) {
+          case 'selfhst':
+            currentSelfhstFormat = 'png';
+            currentSelfhstSize = size;
+            setActiveFormat('selfhst-format', 'png');
+            updateCatalogFormatControls('selfhst', 'png');
+            setActiveSize('selfhst-sizes', size);
+            break;
+          case 'dashboardicons':
+            currentDashboardIconsFormat = 'png';
+            currentDashboardIconsSize = size;
+            setActiveFormat('dashboardicons-format', 'png');
+            updateCatalogFormatControls('dashboardicons', 'png');
+            setActiveSize('dashboardicons-sizes', size);
+            break;
+          case 'lobehub':
+            currentLobehubFormat = 'png';
+            currentLobehubSize = size;
+            setActiveFormat('lobehub-format', 'png');
+            updateCatalogFormatControls('lobehub', 'png');
+            setActiveSize('lobehub-sizes', size);
+            break;
+          case 'svgl':
+            currentSvglFormat = 'png';
+            currentSvglSize = size;
+            setActiveFormat('svgl-format', 'png');
+            updateCatalogFormatControls('svgl', 'png');
+            setActiveSize('svgl-sizes', size);
+            break;
+        }
+        return;
+      }
+
+      if (min > 0) {
+        switchCatalogToSvg(providerId);
+      }
+    }
+
+    function writeCardMeta(meta, display, { w, h, proxyUrl, sourceUrl, forceProxy, hideDimensions, isVector }) {
       const adjustedProxy = hideDimensions
         ? proxyUrl
         : adjustProxyUrlToNativeSize(proxyUrl, w, h);
@@ -3168,9 +3406,22 @@
       const fullProxy = adjustedProxy.startsWith('http')
         ? adjustedProxy
         : `${location.origin}${adjustedProxy}`;
+      const vector = isVector || isVectorIconUrl(adjustedProxy, sourceUrl, fullProxy, url);
       if (display) {
         display.dataset.proxyUrl = fullProxy;
         display.dataset.copyUrl = url;
+        const iconSize = Math.min(Number(w) || 0, Number(h) || 0);
+        display.dataset.iconWidth = String(w);
+        display.dataset.iconHeight = String(h);
+        display.dataset.iconSize = String(iconSize);
+        const card = display.closest('.card');
+        if (card) {
+          card.dataset.iconSize = String(iconSize);
+          if (vector) card.dataset.iconVector = 'true';
+          else delete card.dataset.iconVector;
+        }
+        if (vector) display.dataset.iconVector = 'true';
+        else delete display.dataset.iconVector;
       }
       syncAltUrlButton(display, resolveAlternateCardUrl(adjustedProxy, sourceUrl, { forceProxy }));
       const escapedUrl = escapeHtml(url);
@@ -3185,6 +3436,7 @@
         e.stopPropagation();
         copySource(copyBtn, url);
       });
+      applySizeFilter();
     }
 
     function clearDisplayUrls(display) {
@@ -3192,7 +3444,420 @@
       delete display.dataset.proxyUrl;
       delete display.dataset.copyUrl;
       delete display.dataset.altCopyUrl;
+      delete display.dataset.iconWidth;
+      delete display.dataset.iconHeight;
+      delete display.dataset.iconSize;
+      delete display.dataset.iconVector;
+      const card = display.closest('.card');
+      if (card) {
+        delete card.dataset.iconSize;
+        delete card.dataset.iconVector;
+      }
       syncAltUrlButton(display, null);
+    }
+
+    function getCardProviderId(card) {
+      if (!card?.id) return null;
+      if (card.id.endsWith('-card')) return card.id.slice(0, -5);
+      return null;
+    }
+
+    function catalogProviderIsActive(providerId) {
+      switch (providerId) {
+        case 'selfhst': return !!currentSelfhstSlug;
+        case 'dashboardicons': return !!currentDashboardIconsSlug;
+        case 'lobehub': return !!currentLobehubSlug;
+        case 'svgl': return !!currentSvglSlug;
+        default: return false;
+      }
+    }
+
+    function normalizeSizeFilterValue(value) {
+      const n = parseInt(value, 10);
+      return SIZE_FILTER_ALLOWED.has(n) ? n : 0;
+    }
+
+    function saveSizeFilterToStorage() {
+      try {
+        localStorage.setItem(SIZE_FILTER_STORAGE_KEY, JSON.stringify({
+          min: currentMinSizeFilter,
+          max: currentMaxSizeFilter,
+        }));
+      } catch {
+        /* ignore quota / private mode */
+      }
+    }
+
+    function sizeFilterIndexFromValue(value) {
+      const v = normalizeSizeFilterValue(value);
+      const idx = SIZE_FILTER_INDEX_VALUES.indexOf(v);
+      return idx >= 0 ? idx : 0;
+    }
+
+    function sizeFilterValueFromIndex(index) {
+      const idx = Math.max(0, Math.min(parseInt(index, 10) || 0, SIZE_FILTER_INDEX_VALUES.length - 1));
+      return SIZE_FILTER_INDEX_VALUES[idx] || 0;
+    }
+
+    function formatSizeFilterLabel() {
+      const min = currentMinSizeFilter;
+      const max = currentMaxSizeFilter;
+      if (min > 0 && max > 0) return `${min}–${max}px`;
+      if (min > 0) return `≥ ${min}px`;
+      if (max > 0) return `≤ ${max}px`;
+      return 'All sizes';
+    }
+
+    function syncSizeFilterSliders() {
+      const minSlider = document.getElementById('size-filter-min');
+      const maxSlider = document.getElementById('size-filter-max');
+      const fill = document.getElementById('size-range-fill');
+      const label = document.getElementById('size-filter-label');
+      if (!minSlider || !maxSlider) return;
+
+      const minIdx = sizeFilterIndexFromValue(currentMinSizeFilter);
+      const maxIdx = sizeFilterIndexFromValue(currentMaxSizeFilter);
+      minSlider.value = String(minIdx);
+      maxSlider.value = String(maxIdx);
+
+      const steps = SIZE_FILTER_INDEX_VALUES.length - 1;
+      const pct = (idx) => (idx / steps) * 100;
+
+      if (fill) {
+        if (!isSizeFilterActive()) {
+          fill.style.left = '0%';
+          fill.style.right = '0%';
+          fill.style.opacity = '0';
+        } else if (currentMinSizeFilter > 0 && currentMaxSizeFilter > 0) {
+          fill.style.left = `${pct(minIdx)}%`;
+          fill.style.right = `${100 - pct(maxIdx)}%`;
+          fill.style.opacity = '';
+        } else if (currentMinSizeFilter > 0) {
+          fill.style.left = `${pct(minIdx)}%`;
+          fill.style.right = '0%';
+          fill.style.opacity = '';
+        } else {
+          fill.style.left = '0%';
+          fill.style.right = `${100 - pct(maxIdx)}%`;
+          fill.style.opacity = '';
+        }
+      }
+
+      const text = formatSizeFilterLabel();
+      if (label) label.textContent = text;
+      minSlider.setAttribute('aria-valuetext', currentMinSizeFilter > 0 ? `${currentMinSizeFilter}px` : 'No minimum');
+      maxSlider.setAttribute('aria-valuetext', currentMaxSizeFilter > 0 ? `${currentMaxSizeFilter}px` : 'No maximum');
+    }
+
+    function loadSizeFilterFromStorage() {
+      try {
+        const raw = localStorage.getItem(SIZE_FILTER_STORAGE_KEY);
+        if (!raw) {
+          currentMinSizeFilter = DEFAULT_SIZE_FILTER_MIN;
+          currentMaxSizeFilter = DEFAULT_SIZE_FILTER_MAX;
+          return;
+        }
+        const data = JSON.parse(raw);
+        currentMinSizeFilter = normalizeSizeFilterValue(data?.min);
+        currentMaxSizeFilter = normalizeSizeFilterValue(data?.max);
+        if (currentMinSizeFilter > 0 && currentMaxSizeFilter > 0 && currentMinSizeFilter > currentMaxSizeFilter) {
+          currentMaxSizeFilter = 0;
+        }
+      } catch {
+        currentMinSizeFilter = DEFAULT_SIZE_FILTER_MIN;
+        currentMaxSizeFilter = DEFAULT_SIZE_FILTER_MAX;
+      }
+    }
+
+    function onSizeFilterSliderInput(which) {
+      const minSlider = document.getElementById('size-filter-min');
+      const maxSlider = document.getElementById('size-filter-max');
+      if (!minSlider || !maxSlider) return;
+
+      let minIdx = parseInt(minSlider.value, 10) || 0;
+      let maxIdx = parseInt(maxSlider.value, 10) || 0;
+
+      if (which === 'min') {
+        if (minIdx > 0 && maxIdx > 0 && minIdx > maxIdx) {
+          maxIdx = minIdx;
+          maxSlider.value = String(maxIdx);
+        }
+      } else if (maxIdx > 0 && minIdx > 0 && maxIdx < minIdx) {
+        minIdx = maxIdx;
+        minSlider.value = String(minIdx);
+      }
+
+      currentMinSizeFilter = sizeFilterValueFromIndex(minIdx);
+      currentMaxSizeFilter = sizeFilterValueFromIndex(maxIdx);
+      if (currentMinSizeFilter > 0 && currentMaxSizeFilter > 0 && currentMinSizeFilter > currentMaxSizeFilter) {
+        currentMaxSizeFilter = 0;
+        maxSlider.value = '0';
+      }
+      saveSizeFilterToStorage();
+      syncSizeFilterSliders();
+      syncCatalogProvidersToSizeFilter();
+      syncScraperToSizeFilter();
+      syncNativeCardsToSizeFilter();
+      applySizeFilter();
+    }
+
+    function initSizeFilterSliders() {
+      const minSlider = document.getElementById('size-filter-min');
+      const maxSlider = document.getElementById('size-filter-max');
+      if (!minSlider || !maxSlider) return;
+
+      const maxIndex = SIZE_FILTER_INDEX_VALUES.length - 1;
+      minSlider.max = String(maxIndex);
+      maxSlider.max = String(maxIndex);
+      minSlider.addEventListener('input', () => onSizeFilterSliderInput('min'));
+      maxSlider.addEventListener('input', () => onSizeFilterSliderInput('max'));
+
+      loadSizeFilterFromStorage();
+      syncSizeFilterSliders();
+    }
+
+    function isSizeFilterActive() {
+      return currentMinSizeFilter > 0 || currentMaxSizeFilter > 0;
+    }
+
+    function isVectorCard(card) {
+      if (!card) return false;
+      const providerId = getCardProviderId(card);
+      if (providerId && getCatalogFormat(providerId) === 'svg') return true;
+      if (card.dataset.iconVector === 'true') return true;
+      const display = card.querySelector('.favicon-display');
+      const img = card.querySelector('img[id$="-img"]');
+      return isVectorIconUrl(display?.dataset.proxyUrl, display?.dataset.copyUrl, img?.src);
+    }
+
+    function catalogQualifiesForMinSvgFilter(providerId) {
+      return CATALOG_SVG_PROVIDERS.has(providerId)
+        && catalogProviderIsActive(providerId)
+        && currentMinSizeFilter > 0;
+    }
+
+    function switchCatalogToSvg(providerId) {
+      if (!catalogProviderIsActive(providerId)) return false;
+      switch (providerId) {
+        case 'selfhst':
+          if (currentSelfhstFormat === 'svg') return false;
+          currentSelfhstFormat = 'svg';
+          setActiveFormat('selfhst-format', 'svg');
+          updateCatalogFormatControls('selfhst', 'svg');
+          return true;
+        case 'dashboardicons':
+          if (currentDashboardIconsFormat === 'svg') return false;
+          currentDashboardIconsFormat = 'svg';
+          setActiveFormat('dashboardicons-format', 'svg');
+          updateCatalogFormatControls('dashboardicons', 'svg');
+          return true;
+        case 'lobehub':
+          if (currentLobehubFormat === 'svg') return false;
+          currentLobehubFormat = 'svg';
+          setActiveFormat('lobehub-format', 'svg');
+          updateCatalogFormatControls('lobehub', 'svg');
+          return true;
+        case 'svgl':
+          if (currentSvglFormat === 'svg') return false;
+          currentSvglFormat = 'svg';
+          setActiveFormat('svgl-format', 'svg');
+          updateCatalogFormatControls('svgl', 'svg');
+          return true;
+        default:
+          return false;
+      }
+    }
+
+    function pickCatalogRasterSize(min, max, providerId) {
+      const steps = providerId === 'svgl' ? SVGL_RASTER_SIZES : CATALOG_RASTER_SIZES;
+      let best = null;
+      for (const step of steps) {
+        if (max > 0 && step > max) break;
+        if (min <= 0 || step >= min) best = step;
+      }
+      return best;
+    }
+
+    function switchCatalogToPngSize(providerId, size) {
+      switch (providerId) {
+        case 'selfhst':
+          if (!currentSelfhstSlug) return false;
+          if (currentSelfhstFormat !== 'png') switchSelfhstFormat('png');
+          if (currentSelfhstSize !== size) switchSelfhstSize(size);
+          return true;
+        case 'dashboardicons':
+          if (!currentDashboardIconsSlug) return false;
+          if (currentDashboardIconsFormat !== 'png') switchDashboardIconsFormat('png');
+          if (currentDashboardIconsSize !== size) switchDashboardIconsSize(size);
+          return true;
+        case 'lobehub':
+          if (!currentLobehubSlug) return false;
+          if (currentLobehubFormat !== 'png') switchLobehubFormat('png');
+          if (currentLobehubSize !== size) switchLobehubSize(size);
+          return true;
+        case 'svgl':
+          if (!currentSvglSlug) return false;
+          if (currentSvglFormat !== 'png') switchSvglFormat('png');
+          if (currentSvglSize !== size) switchSvglSize(size);
+          return true;
+        default:
+          return false;
+      }
+    }
+
+    function ensureCatalogSvgForSizeFilter(providerId) {
+      if (!CATALOG_SVG_PROVIDERS.has(providerId) || currentMinSizeFilter <= 0) {
+        return false;
+      }
+      return switchCatalogToSvg(providerId);
+    }
+
+    function reloadCatalogProvider(providerId) {
+      switch (providerId) {
+        case 'selfhst':
+          if (currentSelfhstSlug) {
+            loadSelfhst(currentSelfhstSlug, currentSelfhstVariant, { hideOnError: false });
+          }
+          break;
+        case 'dashboardicons':
+          if (currentDashboardIconsSlug) {
+            loadDashboardIcons(currentDashboardIconsSlug, currentDashboardIconsVariant, { hideOnError: false });
+          }
+          break;
+        case 'lobehub':
+          if (currentLobehubSlug) {
+            loadLobehub(currentLobehubSlug, currentLobehubVariant, { hideOnError: false });
+          }
+          break;
+        case 'svgl':
+          if (currentSvglSlug) {
+            loadSvgl(currentSvglSlug, currentSvglVariant, { hideOnError: false });
+          }
+          break;
+        default:
+          break;
+      }
+    }
+
+    function syncCatalogProvidersToSizeFilter() {
+      if (!isSizeFilterActive()) return;
+      for (const providerId of CATALOG_SVG_PROVIDERS) {
+        if (!catalogProviderIsActive(providerId)) continue;
+        prepareCatalogForSizeFilter(providerId);
+        reloadCatalogProvider(providerId);
+      }
+    }
+
+    function ensureCatalogFitsSizeFilter(providerId) {
+      if (!CATALOG_SVG_PROVIDERS.has(providerId) || !catalogProviderIsActive(providerId)) return false;
+
+      const min = currentMinSizeFilter;
+      const max = currentMaxSizeFilter;
+
+      if (max > 0) {
+        const targetSize = pickCatalogRasterSize(min, max, providerId);
+        if (!targetSize) {
+          return min > 0 ? ensureCatalogSvgForSizeFilter(providerId) : false;
+        }
+        const card = document.getElementById(`${providerId}-card`);
+        const iconSize = parseInt(card?.dataset.iconSize, 10) || 0;
+        const format = {
+          selfhst: currentSelfhstFormat,
+          dashboardicons: currentDashboardIconsFormat,
+          lobehub: currentLobehubFormat,
+          svgl: currentSvglFormat,
+        }[providerId];
+        if (
+          format === 'png'
+          && iconSize === targetSize
+          && iconSize >= (min || 0)
+          && iconSize <= max
+        ) return false;
+        return switchCatalogToPngSize(providerId, targetSize);
+      }
+
+      return ensureCatalogSvgForSizeFilter(providerId);
+    }
+
+    function catalogNeedsSizeFilterSync(providerId) {
+      if (!CATALOG_SVG_PROVIDERS.has(providerId) || !catalogProviderIsActive(providerId) || !isSizeFilterActive()) {
+        return false;
+      }
+      if (catalogQualifiesForMinSvgFilter(providerId) && getCatalogFormat(providerId) !== 'svg') {
+        return true;
+      }
+      const card = document.getElementById(`${providerId}-card`);
+      return card ? !cardPassesSizeFilter(card) : false;
+    }
+
+    function cardPassesSizeFilter(card) {
+      if (!card || !isSizeFilterActive()) return true;
+
+      const providerId = getCardProviderId(card);
+      if (providerId && catalogQualifiesForMinSvgFilter(providerId)) return true;
+
+      if (isVectorCard(card)) {
+        if (currentMaxSizeFilter > 0) return false;
+        if (currentMinSizeFilter > 0) return true;
+        return true;
+      }
+
+      const iconSize = parseInt(card.dataset.iconSize, 10) || 0;
+      if (currentMinSizeFilter > 0 && iconSize < currentMinSizeFilter) return false;
+      if (currentMaxSizeFilter > 0 && iconSize > currentMaxSizeFilter) return false;
+      return true;
+    }
+
+    function applySizeFilter() {
+      const min = currentMinSizeFilter;
+      const max = currentMaxSizeFilter;
+      const results = document.getElementById('results');
+      if (results) {
+        if (min > 0) results.dataset.minSizeFilter = String(min);
+        else delete results.dataset.minSizeFilter;
+        if (max > 0) results.dataset.maxSizeFilter = String(max);
+        else delete results.dataset.maxSizeFilter;
+      }
+      if (isSizeFilterActive() && currentMode === 'domain') {
+        ensureScraperFitsSizeFilter();
+      }
+      document.querySelectorAll('#results .card[data-card-type]').forEach((card) => {
+        const spinner = card.querySelector('.spinner');
+        const img = card.querySelector('img[id$="-img"]');
+        const isLoading = spinner && spinner.style.display !== 'none';
+        const hasImage = img && img.style.display !== 'none';
+        const providerId = getCardProviderId(card);
+
+        if (!isSizeFilterActive() || card.style.display === 'none') {
+          card.classList.remove('size-filter-hidden');
+          return;
+        }
+
+        if (providerId && catalogNeedsSizeFilterSync(providerId)) {
+          ensureCatalogFitsSizeFilter(providerId);
+        }
+
+        if (isLoading || !hasImage) {
+          card.classList.remove('size-filter-hidden');
+          return;
+        }
+
+        if (!cardPassesSizeFilter(card)) {
+          card.classList.add('size-filter-hidden');
+          return;
+        }
+        card.classList.remove('size-filter-hidden');
+      });
+      updateServiceIconsDivider();
+      scheduleNoIconNoticeCheck();
+    }
+
+    function resetSizeFilter() {
+      currentMinSizeFilter = 0;
+      currentMaxSizeFilter = 0;
+      saveSizeFilterToStorage();
+      syncSizeFilterSliders();
+      applySizeFilter();
     }
 
     const input = document.getElementById('domain-input');
@@ -3360,7 +4025,7 @@
     }
 
     function getCardDownloadInfo(card, providerId) {
-      if (!card || card.style.display === 'none') return null;
+      if (!card || card.style.display === 'none' || card.classList.contains('size-filter-hidden')) return null;
       const img = document.getElementById(`${providerId}-img`);
       const spinner = document.getElementById(`${providerId}-spinner`);
       if (!img || img.style.display === 'none' || spinner?.style.display !== 'none') return null;
@@ -3842,7 +4507,8 @@
         resetSelfhstVariantButtons();
         resetSelfhstFormatControls();
         setActiveVariant('selfhst-variants', 'color');
-        setActiveSize('selfhst-sizes', 128);
+        prepareCatalogForSizeFilter('selfhst');
+        if (currentSelfhstFormat === 'png') setActiveSize('selfhst-sizes', currentSelfhstSize);
         loadSelfhst(searchQuery, 'color', { hideOnError, activeSlug: currentSelfhstSlug });
         probeAndShowSelfhstVariants(currentSelfhstSlug);
         renderServiceCandidates('selfhst', selfhstData.candidates, currentSelfhstSlug);
@@ -3858,7 +4524,8 @@
         resetDashboardIconsVariantButtons();
         resetDashboardIconsFormatControls();
         setActiveVariant('dashboardicons-variants', 'color');
-        setActiveSize('dashboardicons-sizes', 128);
+        prepareCatalogForSizeFilter('dashboardicons');
+        if (currentDashboardIconsFormat === 'png') setActiveSize('dashboardicons-sizes', currentDashboardIconsSize);
         loadDashboardIcons(searchQuery, 'color', { hideOnError, activeSlug: currentDashboardIconsSlug });
         probeAndShowDashboardIconsVariants(currentDashboardIconsSlug);
         renderServiceCandidates('dashboardicons', dashboardData.candidates, currentDashboardIconsSlug);
@@ -3874,7 +4541,8 @@
         resetLobehubVariantButtons();
         resetLobehubFormatControls();
         setActiveVariant('lobehub-variants', 'color');
-        setActiveSize('lobehub-sizes', 128);
+        prepareCatalogForSizeFilter('lobehub');
+        if (currentLobehubFormat === 'png') setActiveSize('lobehub-sizes', currentLobehubSize);
         loadLobehub(searchQuery, 'color', { hideOnError, activeSlug: currentLobehubSlug });
         probeAndShowLobehubVariants(currentLobehubSlug);
         renderServiceCandidates('lobehub', lobehubData.candidates, currentLobehubSlug);
@@ -3890,7 +4558,8 @@
         resetSvglVariantButtons();
         resetSvglFormatControls();
         setActiveVariant('svgl-variants', 'color');
-        setActiveSize('svgl-sizes', 128);
+        prepareCatalogForSizeFilter('svgl');
+        if (currentSvglFormat === 'png') setActiveSize('svgl-sizes', currentSvglSize);
         loadSvgl(searchQuery, 'color', { hideOnError, activeSlug: currentSvglSlug });
         probeAndShowSvglVariants(currentSvglSlug);
         renderServiceCandidates('svgl', svglData.candidates, currentSvglSlug);
@@ -3898,6 +4567,7 @@
         hideServiceProviderCard('svgl');
       }
       updateServiceIconsDivider();
+      applySizeFilter();
       scheduleNoIconNoticeCheck();
     }
 
@@ -3917,7 +4587,7 @@
     function serviceCategoryHasResults() {
       return SERVICE_ICON_PROVIDERS.some((provider) => {
         const card = document.getElementById(`${provider}-card`);
-        if (!card || card.style.display === 'none') return false;
+        if (!card || card.style.display === 'none' || card.classList.contains('size-filter-hidden')) return false;
         const img = document.getElementById(`${provider}-img`);
         const spinner = document.getElementById(`${provider}-spinner`);
         if (spinner?.style.display !== 'none') return false;
@@ -3957,10 +4627,11 @@
       });
     }
 
-    function faviconCategoryHasResults(providers) {
+    function faviconCategoryHasResults(providers, ignoreSizeFilter = false) {
       return providers.some((provider) => {
         const card = getProviderCard(provider);
         if (!card || card.style.display === 'none') return false;
+        if (!ignoreSizeFilter && card.classList.contains('size-filter-hidden')) return false;
         const img = document.getElementById(`${provider}-img`);
         const spinner = document.getElementById(`${provider}-spinner`);
         if (spinner?.style.display !== 'none') return false;
@@ -3968,12 +4639,12 @@
       });
     }
 
-    function hasAnyFaviconResults() {
+    function hasAnyFaviconResults(ignoreSizeFilter = false) {
       if (currentMode === 'service') {
-        return faviconCategoryHasResults(SERVICE_ICON_PROVIDERS);
+        return faviconCategoryHasResults(SERVICE_ICON_PROVIDERS, ignoreSizeFilter);
       }
-      if (faviconCategoryHasResults(DOMAIN_FAVICON_PROVIDERS)) return true;
-      if (selfhstToggle.checked && faviconCategoryHasResults(SERVICE_ICON_PROVIDERS)) return true;
+      if (faviconCategoryHasResults(DOMAIN_FAVICON_PROVIDERS, ignoreSizeFilter)) return true;
+      if (selfhstToggle.checked && faviconCategoryHasResults(SERVICE_ICON_PROVIDERS, ignoreSizeFilter)) return true;
       return false;
     }
 
@@ -4009,6 +4680,24 @@
       const urlEl = document.getElementById('no-icon-notice-url');
       const imgEl = document.getElementById('no-icon-notice-img');
       const placeholderWrap = document.getElementById('no-icon-notice-placeholder');
+      const filterActive = isSizeFilterActive();
+      const hasUnfilteredResults = filterActive && hasAnyFaviconResults(true);
+
+      if (filterActive && hasUnfilteredResults) {
+        if (textEl) {
+          const min = currentMinSizeFilter;
+          const max = currentMaxSizeFilter;
+          if (min > 0 && max > 0) {
+            textEl.textContent = `No icons between ${min}px and ${max}px. Adjust the min/max size filters.`;
+          } else if (min > 0) {
+            textEl.textContent = `No icons are at least ${min}px. Try a lower minimum size.`;
+          } else {
+            textEl.textContent = `No icons are at most ${max}px. Try a higher maximum size.`;
+          }
+        }
+        if (placeholderWrap) placeholderWrap.hidden = true;
+        return;
+      }
 
       if (currentMode === 'domain' && target) {
         if (textEl) textEl.textContent = `No favicon could be found for ${target}.`;
@@ -4293,6 +4982,7 @@
         sourceUrl: `${location.origin}${proxy}`,
         forceProxy: true,
         hideDimensions: !BRANDFETCH_RASTER_FORMATS.has(currentBrandfetchResolvedFormat),
+        isVector: currentBrandfetchResolvedFormat === 'svg',
       });
     }
 
@@ -4415,9 +5105,10 @@
       const cfg = NATIVE_SIZE_CARDS[id];
       if (!cfg) return;
       resetSizeButtons(cfg.group);
-      cfg.setCurrent(cfg.preferred);
-      setActiveSize(cfg.group, cfg.preferred);
-      cfg.load(domain, cfg.preferred);
+      const size = preferredSizeForCard(cfg);
+      cfg.setCurrent(size);
+      setActiveSize(cfg.group, size);
+      cfg.load(domain, size);
       detectNativeMax(id, domain);
     }
 
@@ -4586,6 +5277,7 @@
           proxyUrl,
           sourceUrl,
           hideDimensions: format === 'svg',
+          isVector: format === 'svg',
         });
         updateServiceIconsDivider();
       };
@@ -4736,6 +5428,7 @@
           proxyUrl,
           sourceUrl,
           hideDimensions: format === 'svg',
+          isVector: format === 'svg',
         });
         updateServiceIconsDivider();
       };
@@ -4876,6 +5569,7 @@
           proxyUrl,
           sourceUrl,
           hideDimensions: format === 'svg',
+          isVector: format === 'svg',
         });
         updateServiceIconsDivider();
       };
@@ -5043,6 +5737,7 @@
           proxyUrl,
           sourceUrl: sourceUrl || null,
           hideDimensions: format === 'svg',
+          isVector: format === 'svg',
         });
         updateServiceIconsDivider();
       };
@@ -5144,6 +5839,129 @@
     let currentScraperSelection = 0;
     let currentScraperProxySize = 128;
     let scraperLoadToken = 0;
+    const SCRAPER_PROXY_SIZE_STEPS = [16, 32, 64, 128, 256, 512];
+
+    function scraperUsesProxySizes() {
+      const el = document.getElementById('scraper-proxy-sizes');
+      return !!(el && el.style.display !== 'none');
+    }
+
+    function getScraperProxySizeSteps() {
+      const fromJson = Object.keys(scraperAvailableSizes || {})
+        .map((s) => parseInt(s, 10))
+        .filter((n) => n > 0)
+        .sort((a, b) => a - b);
+      return fromJson.length ? fromJson : SCRAPER_PROXY_SIZE_STEPS;
+    }
+
+    function pickScraperProxySize(min, max) {
+      let best = null;
+      for (const step of getScraperProxySizeSteps()) {
+        if (max > 0 && step > max) break;
+        if (min <= 0 || step >= min) best = step;
+      }
+      return best;
+    }
+
+    function scraperIconPixelSize(icon) {
+      return Math.max(icon?.width || 0, icon?.height || icon?.width || 0);
+    }
+
+    function pickScraperIconIndex(min, max) {
+      if (!scraperIcons.length) return 0;
+      let bestIdx = 0;
+      let bestSize = -1;
+      scraperIcons.forEach((icon, idx) => {
+        const size = scraperIconPixelSize(icon);
+        if (max > 0 && size > max) return;
+        if (min > 0 && size < min) return;
+        if (size > bestSize) {
+          bestSize = size;
+          bestIdx = idx;
+        }
+      });
+      return bestIdx;
+    }
+
+    function pickNativeCardSize(sizes, min, max) {
+      let best = null;
+      for (const step of sizes) {
+        if (max > 0 && step > max) continue;
+        if (min <= 0 || step >= min) {
+          if (!best || step > best) best = step;
+        }
+      }
+      return best;
+    }
+
+    function preferredSizeForCard(cfg) {
+      if (!isSizeFilterActive()) return cfg.preferred;
+      return pickNativeCardSize(cfg.sizes, currentMinSizeFilter, currentMaxSizeFilter) || cfg.preferred;
+    }
+
+    function defaultScraperProxySize() {
+      if (!isSizeFilterActive()) return 128;
+      return pickScraperProxySize(currentMinSizeFilter, currentMaxSizeFilter) || 128;
+    }
+
+    function defaultScraperIconIndex() {
+      if (!isSizeFilterActive()) return 0;
+      return pickScraperIconIndex(currentMinSizeFilter, currentMaxSizeFilter);
+    }
+
+    function scraperUsesDiscoveredIcons() {
+      return scraperIcons.length > 0 && !scraperUsesProxySizes();
+    }
+
+    function syncNativeCardsToSizeFilter() {
+      if (!currentDomain || currentMode !== 'domain' || !isSizeFilterActive()) return;
+      for (const [id, cfg] of Object.entries(NATIVE_SIZE_CARDS)) {
+        const card = getProviderCard(id);
+        if (!card || card.style.display === 'none' || cardPassesSizeFilter(card)) continue;
+        const target = pickNativeCardSize(cfg.sizes, currentMinSizeFilter, currentMaxSizeFilter);
+        if (!target) continue;
+        const active = getActiveSize(cfg.group);
+        if (active === target) continue;
+        cfg.setCurrent(target);
+        setActiveSize(cfg.group, target);
+        cfg.load(currentDomain, target, { hideCardOnError: false });
+      }
+    }
+
+    function syncScraperToSizeFilter() {
+      if (!currentDomain) return;
+      if (scraperUsesProxySizes()) {
+        const target = defaultScraperProxySize();
+        if (target !== currentScraperProxySize) switchScraperProxySize(target);
+        return;
+      }
+      if (scraperUsesDiscoveredIcons()) {
+        const idx = defaultScraperIconIndex();
+        if (idx !== currentScraperSelection) switchScraperSize(idx);
+      }
+    }
+
+    function ensureScraperFitsSizeFilter() {
+      if (!currentDomain) return false;
+      const card = document.getElementById('scraper-card');
+      if (!card || card.style.display === 'none' || cardPassesSizeFilter(card)) return false;
+
+      if (scraperUsesProxySizes()) {
+        const target = pickScraperProxySize(currentMinSizeFilter, currentMaxSizeFilter);
+        if (!target || target === currentScraperProxySize) return false;
+        switchScraperProxySize(target);
+        return true;
+      }
+
+      if (scraperUsesDiscoveredIcons()) {
+        const idx = pickScraperIconIndex(currentMinSizeFilter, currentMaxSizeFilter);
+        if (idx === currentScraperSelection) return false;
+        switchScraperSize(idx);
+        return true;
+      }
+
+      return false;
+    }
 
     function scraperEmbedUrl() {
       return `${location.origin}/${currentDomain}`;
@@ -5200,6 +6018,14 @@
       const spinner = document.getElementById('scraper-spinner');
       const meta = document.getElementById('scraper-meta');
       const wwwNotice = document.getElementById('scraper-www-fallback');
+      const display = document.getElementById('scraper-display');
+      const card = document.getElementById('scraper-card');
+      clearDisplayUrls(display);
+      if (card) {
+        delete card.dataset.iconSize;
+        delete card.dataset.iconVector;
+        card.classList.remove('size-filter-hidden');
+      }
       img.style.display = 'none';
       spinner.style.display = 'block';
       meta.textContent = '';
@@ -5284,8 +6110,9 @@
       if (sorted.length === 0) {
         const proxySizesEl = document.getElementById('scraper-proxy-sizes');
         proxySizesEl.style.display = '';
-        setActiveSize('scraper-proxy-sizes', 128);
-        loadScraperProxySize(128);
+        const size = defaultScraperProxySize();
+        setActiveSize('scraper-proxy-sizes', size);
+        loadScraperProxySize(size);
         loadScraperFallback(domain, refresh);
         return;
       }
@@ -5298,9 +6125,10 @@
         setActiveScraperButton('proxy');
         loadScraperProxyVariant();
       } else {
-        currentScraperSelection = 0;
-        setActiveScraperButton(0);
-        loadScraperVariant(0);
+        const idx = defaultScraperIconIndex();
+        currentScraperSelection = idx;
+        setActiveScraperButton(idx);
+        loadScraperVariant(idx);
       }
     }
 
@@ -5779,6 +6607,7 @@
       }
     }
 
+    initSizeFilterSliders();
     initCardDownloadButtons();
     initCtaAttention();
     if (!new URLSearchParams(location.search).get('q')?.trim()) {
