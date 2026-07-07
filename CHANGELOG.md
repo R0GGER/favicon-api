@@ -14,6 +14,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Web UI — table Download column** — download buttons are **centered** in the column.
+- **Web UI — placeholder results grid once per browser** — the skeleton preview is remembered in **`localStorage`** (`faviconapi-placeholder-seen`) instead of `sessionStorage`, so reopening a closed tab or refreshing no longer shows the skeleton again. Legacy `sessionStorage` flags are migrated on first load.
+
+### Fixed
+
+- **Web UI — placeholder on tab restore** — restoring a closed tab from the back-forward cache no longer leaves the skeleton grid visible when the preview was already shown; a `pageshow` handler clears stale placeholder state.
+- **Web UI — placeholder vanishing on first load** — the skeleton preview disappeared as soon as `GET /providers` finished because the follow-up refresh treated the grid as stale; the second `showPlaceholderResults()` call now only updates provider visibility instead of hiding the grid.
 
 ## [2.8.8] — 2026-07-07
 
