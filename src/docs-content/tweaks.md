@@ -228,7 +228,9 @@ path/to/list.txt` to use your own list instead (one domain per line).
 
 #### Usage
 
-Run the script inside the `favicon-api` container (the service listens on port **3000** inside Docker):
+Run the script inside the running FaviconAPI container (the service listens on port **3000** inside Docker).
+
+**Via Docker Compose** (from the directory that contains `docker-compose.yml`):
 
 ```bash
 # Default: top 500, concurrency 4
@@ -239,10 +241,21 @@ docker compose exec favicon-api node scripts/preload-top-sites.js \
   --base-url http://127.0.0.1:3000 --limit 500 --concurrency 4
 ```
 
+**Via Docker CLI** (when the container is already running — no compose file needed). Use the container name from `docker ps` (e.g. `favicon-api`):
+
+```bash
+docker exec favicon-api node scripts/preload-top-sites.js \
+  --base-url http://127.0.0.1:3000 --limit 500 --concurrency 4
+```
+
 When `API_REQUIRE_KEY=true`, pass a key for the v1 calls:
 
 ```bash
 docker compose exec favicon-api node scripts/preload-top-sites.js \
+  --base-url http://127.0.0.1:3000 --api-key fa_your_key_here
+
+# Or with docker exec:
+docker exec favicon-api node scripts/preload-top-sites.js \
   --base-url http://127.0.0.1:3000 --api-key fa_your_key_here
 ```
 
@@ -250,6 +263,10 @@ Preview which domains would be fetched without calling the API:
 
 ```bash
 docker compose exec favicon-api node scripts/preload-top-sites.js \
+  --base-url http://127.0.0.1:3000 --dry-run --limit 10
+
+# Or with docker exec:
+docker exec favicon-api node scripts/preload-top-sites.js \
   --base-url http://127.0.0.1:3000 --dry-run --limit 10
 ```
 
