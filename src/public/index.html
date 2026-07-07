@@ -3391,7 +3391,7 @@
     function markInitialPlaceholderConsumed() {
       initialPlaceholderPending = false;
       try {
-        sessionStorage.setItem(PLACEHOLDER_SEEN_KEY, '1');
+        localStorage.setItem(PLACEHOLDER_SEEN_KEY, '1');
       } catch {
         /* storage blocked */
       }
@@ -3515,7 +3515,13 @@
     let currentMode = '';
     let initialPlaceholderPending = (() => {
       try {
-        return !sessionStorage.getItem(PLACEHOLDER_SEEN_KEY);
+        if (localStorage.getItem(PLACEHOLDER_SEEN_KEY)) return false;
+        // Migrate legacy per-tab flag from an earlier build.
+        if (sessionStorage.getItem(PLACEHOLDER_SEEN_KEY)) {
+          localStorage.setItem(PLACEHOLDER_SEEN_KEY, '1');
+          return false;
+        }
+        return true;
       } catch {
         return true;
       }
@@ -4274,6 +4280,15 @@
       updateServiceIconsDivider();
       updateResetButton();
       scheduleResultsTableSync();
+    }
+
+    function dismissStalePlaceholderState() {
+      if (initialPlaceholderPending) return;
+      const results = document.getElementById('results');
+      if (!results?.classList.contains('placeholder')) return;
+      if (currentDomain || currentService) return;
+      exitPlaceholderMode();
+      hideResultsGrid();
     }
 
     function showPlaceholderResults() {
@@ -7265,6 +7280,10 @@
         /* clipboard API not available */
       }
     }
+
+    window.addEventListener('pageshow', (event) => {
+      if (event.persisted) dismissStalePlaceholderState();
+    });
 
     initSizeFilterSliders();
     initResultsViewToggle();
