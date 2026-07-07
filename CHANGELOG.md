@@ -5,6 +5,12 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.13] — 2026-07-08
+
+### Fixed
+
+- **Web UI — size filter disabled out-of-range size buttons** — with an active size filter (e.g. the default **16–256px**), clicking a provider size button **outside** the range (e.g. **512** on the HTML Scraper, or **64** when the minimum is **128**) loaded that size and the card was hidden by the filter (`size-filter-hidden`), which looked like the preview frame jumping away or vanishing. Size buttons on **HTML Scraper** (proxy and discovered sizes), **Google**, **FaviconKit**, **favicon.run**, **Twenty-icons**, **Brandfetch**, and app-icon catalogs (**selfh.st**, **dashboardicons.com**, **LobeHub**, **SVGL**) are now **disabled** when they fall outside the active min/max; `switch*Size` handlers ignore those sizes as a safeguard. Buttons re-enable when the slider range includes them again.
+
 ## [2.8.12] — 2026-07-07
 
 ### Fixed
