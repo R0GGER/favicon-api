@@ -5,6 +5,20 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.8] — 2026-07-07
+
+### Added
+
+- **Web UI — size filter** — filter the results grid by icon dimensions with a **dual-range slider** (left thumb = minimum, right thumb = maximum; snap to 16–512px). **SVG icons always pass the minimum** (vector, unlimited resolution) but are **hidden when a maximum is set**. App-icon catalogs that offer SVG (selfh.st, dashboardicons.com, LobeHub, SVGL) **load as SVG when only a minimum is set**, or **as PNG at the largest fitting size when a maximum applies**; the filter also re-applies if a catalog initially loads the wrong format. Filter choices are **remembered in `localStorage`** for the next visit. Download-all, the no-icon notice, and the app-icons divider respect the active filter.
+
+### Changed
+
+- **Web UI — size filter default** — the dual-range slider now starts at **16–256px** on first visit (no saved preference in `localStorage`).
+
+### Fixed
+
+- **Web UI — size filter hid SVG catalog providers** — selfh.st, dashboardicons.com, LobeHub, and **SVGL** could disappear when a size filter was active: minimum-only filters left catalogs on 128px PNG instead of SVG; maximum filters (e.g. ≤512px) requested unsupported 512px PNG (HTTP 400) or kept SVGL on SVG (hidden because SVG exceeds any max); **min+max ranges above native PNG size** (e.g. 512–512px) left catalogs on too-small PNG with no SVG fallback. Catalog cards now **re-sync format and reload when the slider changes**, **switch to SVG when a minimum is set** (including combined min+max when no native raster fits), **switch to PNG at the largest native raster size when only a maximum applies**, and no longer re-apply the PNG size control after preparing SVG on a fresh search. **HTML Scraper** and **native-sized provider cards** (Google, FaviconKit, etc.) now **auto-select the largest size that fits the active filter** instead of always defaulting to 128px — including scraper-discovered icons (e.g. GitHub's 512px app icon) and SVG-only sites rasterized via proxy sizes.
+
 ## [2.8.7] — 2026-07-06
 
 ### Added
