@@ -5,6 +5,12 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.12] — 2026-07-07
+
+### Fixed
+
+- **Best-pick — stale `best` cache ignored `DEFAULT_PROVIDER`** — after upgrading to 2.8.11, `GET /{domain}` could keep serving an old CDN fallback (e.g. DuckDuckGo's generic Google **G** for `calendar.google.com`) while `GET /scraper/{domain}` showed the correct product icon. The `best` cache layer stores whichever provider won an earlier race; CDN icons are valid raster/ICO responses, so they were not invalidated by placeholder detection. When `DEFAULT_PROVIDER` is set, a cached `best` entry from a **different** provider is now discarded and the default provider is fetched again. Fixes the frontend vs `/{domain}` mismatch when the HTML Scraper card preview (scraper) and the short embed URL (best-pick) diverged.
+
 ## [2.8.11] — 2026-07-07
 
 ### Changed
