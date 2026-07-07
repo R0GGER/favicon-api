@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Web UI — download toolbar on small screens** — the **size filter** (dual-range slider and label) is **desktop-only** (hidden below 1210px, smartphones and tablets). On **smartphones** (≤700px), the **grid/table toggle**, **Build custom URL** button, and the left toolbar cluster are hidden; results always use **grid view** on that breakpoint (table preference in `localStorage` is kept for wider screens).
 - **Web UI — table Download column** — download buttons are **centered** in the column.
 - **Web UI — placeholder results grid once per browser** — the skeleton preview is remembered in **`localStorage`** (`faviconapi-placeholder-seen`) instead of `sessionStorage`, so reopening a closed tab or refreshing no longer shows the skeleton again. Legacy `sessionStorage` flags are migrated on first load.
 
