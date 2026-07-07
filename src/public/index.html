@@ -1370,6 +1370,31 @@
       color: #fff;
     }
 
+    .size-btn:disabled {
+      opacity: 0.38;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
+    .size-btn:disabled:hover,
+    .size-btn:disabled.active {
+      background: transparent;
+      color: #5b2e7e;
+    }
+
+    .size-btn.size-btn-proxy:disabled {
+      background: rgba(200, 168, 207, 0.12);
+      color: #5b3d63;
+      border-color: #d8c4dc;
+    }
+
+    .size-btn.size-btn-proxy:disabled:hover,
+    .size-btn.size-btn-proxy:disabled.active {
+      background: rgba(200, 168, 207, 0.12);
+      color: #5b3d63;
+      border-color: #d8c4dc;
+    }
+
     .size-btn.size-btn-proxy {
       position: relative;
       overflow: visible;
@@ -4006,6 +4031,59 @@
       return currentMinSizeFilter > 0 || currentMaxSizeFilter > 0;
     }
 
+    function sizePassesSizeFilter(size) {
+      if (!isSizeFilterActive()) return true;
+      const n = parseInt(size, 10) || 0;
+      if (n <= 0) return true;
+      if (currentMinSizeFilter > 0 && n < currentMinSizeFilter) return false;
+      if (currentMaxSizeFilter > 0 && n > currentMaxSizeFilter) return false;
+      return true;
+    }
+
+    const PROVIDER_SIZE_GROUPS = [
+      'google-sizes',
+      'faviconkit-sizes',
+      'faviconrun-sizes',
+      'twentyicons-sizes',
+      'brandfetch-sizes',
+      'selfhst-sizes',
+      'dashboardicons-sizes',
+      'lobehub-sizes',
+      'svgl-sizes',
+    ];
+
+    function parseSizeButtonValue(btn) {
+      const text = (btn.textContent || '').trim();
+      const wxh = text.match(/^(\d+)\s*[×x]\s*(\d+)/i);
+      if (wxh) return Math.max(parseInt(wxh[1], 10), parseInt(wxh[2], 10));
+      const leading = text.match(/^(\d+)/);
+      return leading ? parseInt(leading[1], 10) : 0;
+    }
+
+    function syncSizeButtonGroupToFilter(groupId, sizeResolver) {
+      const group = document.getElementById(groupId);
+      if (!group || group.style.display === 'none') return;
+      group.querySelectorAll('.size-btn').forEach((btn) => {
+        if (btn.style.display === 'none') {
+          btn.disabled = false;
+          return;
+        }
+        const size = sizeResolver ? sizeResolver(btn) : parseSizeButtonValue(btn);
+        btn.disabled = size > 0 && !sizePassesSizeFilter(size);
+      });
+    }
+
+    function syncProviderSizeButtonsToFilter() {
+      for (const groupId of PROVIDER_SIZE_GROUPS) {
+        syncSizeButtonGroupToFilter(groupId);
+      }
+    }
+
+    function syncAllSizeButtonsToFilter() {
+      syncProviderSizeButtonsToFilter();
+      syncScraperSizeButtonsToFilter();
+    }
+
     function isVectorCard(card) {
       if (!card) return false;
       const providerId = getCardProviderId(card);
@@ -4237,6 +4315,7 @@
       updateServiceIconsDivider();
       scheduleNoIconNoticeCheck();
       scheduleResultsTableSync();
+      syncAllSizeButtonsToFilter();
     }
 
     function resetSizeFilter() {
@@ -5029,6 +5108,7 @@
     function updateCatalogFormatControls(provider, format) {
       const sizesEl = document.getElementById(`${provider}-sizes`);
       if (sizesEl) sizesEl.style.display = format === 'png' ? '' : 'none';
+      syncAllSizeButtonsToFilter();
     }
 
     function resetCatalogFormatControls(provider) {
@@ -5877,6 +5957,7 @@
       cfg.setCurrent(target);
       setActiveSize(cfg.group, target);
       cfg.load(domain, target, { hideCardOnError: false });
+      syncAllSizeButtonsToFilter();
     }
 
     function ensureSizeUnavailableEl(display) {
@@ -6010,7 +6091,7 @@
     }
 
     function switchSelfhstSize(size) {
-      if (!currentSelfhstSlug || currentSelfhstFormat !== 'png') return;
+      if (!currentSelfhstSlug || currentSelfhstFormat !== 'png' || !sizePassesSizeFilter(size)) return;
       currentSelfhstSize = size;
       setActiveSize('selfhst-sizes', size);
       loadSelfhst(currentSelfhstSlug, currentSelfhstVariant, { hideOnError: false, size });
@@ -6161,7 +6242,7 @@
     }
 
     function switchDashboardIconsSize(size) {
-      if (!currentDashboardIconsSlug || currentDashboardIconsFormat !== 'png') return;
+      if (!currentDashboardIconsSlug || currentDashboardIconsFormat !== 'png' || !sizePassesSizeFilter(size)) return;
       currentDashboardIconsSize = size;
       setActiveSize('dashboardicons-sizes', size);
       loadDashboardIcons(currentDashboardIconsSlug, currentDashboardIconsVariant, { hideOnError: false, size });
@@ -6300,7 +6381,7 @@
     }
 
     function switchLobehubSize(size) {
-      if (!currentLobehubSlug || currentLobehubFormat !== 'png') return;
+      if (!currentLobehubSlug || currentLobehubFormat !== 'png' || !sizePassesSizeFilter(size)) return;
       currentLobehubSize = size;
       setActiveSize('lobehub-sizes', size);
       loadLobehub(currentLobehubSlug, currentLobehubVariant, { hideOnError: false, size });
@@ -6459,7 +6540,7 @@
     }
 
     function switchSvglSize(size) {
-      if (!currentSvglSlug || currentSvglFormat !== 'png') return;
+      if (!currentSvglSlug || currentSvglFormat !== 'png' || !sizePassesSizeFilter(size)) return;
       currentSvglSize = size;
       setActiveSize('svgl-sizes', size);
       loadSvgl(currentSvglSlug, currentSvglVariant, { hideOnError: false, size });
@@ -6526,6 +6607,20 @@
     function scraperUsesProxySizes() {
       const el = document.getElementById('scraper-proxy-sizes');
       return !!(el && el.style.display !== 'none');
+    }
+
+    function syncScraperSizeButtonsToFilter() {
+      syncSizeButtonGroupToFilter('scraper-proxy-sizes');
+      syncSizeButtonGroupToFilter('scraper-sizes', (btn) => {
+        if (btn.dataset.scraperProxySize !== undefined) {
+          return parseInt(btn.dataset.scraperProxySize, 10) || 0;
+        }
+        if (btn.dataset.scraperSource === 'proxy') return scraperMaxIconSize;
+        if (btn.dataset.scraperIdx !== undefined) {
+          return scraperIconPixelSize(scraperIcons[parseInt(btn.dataset.scraperIdx, 10)]);
+        }
+        return parseSizeButtonValue(btn);
+      });
     }
 
     function getScraperProxySizeSteps() {
@@ -6794,6 +6889,7 @@
         proxySizesEl.style.display = '';
         const size = defaultScraperProxySize();
         setActiveSize('scraper-proxy-sizes', size);
+        syncAllSizeButtonsToFilter();
         loadScraperProxySize(size);
         loadScraperFallback(domain, refresh);
         return;
@@ -6898,6 +6994,7 @@
           btn.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
+            if (!sizePassesSizeFilter(size)) return;
             currentScraperSelection = `proxySize-${size}`;
             setActiveScraperButton(currentScraperSelection);
             loadScraperProxySize(size);
@@ -6931,10 +7028,12 @@
         frag.appendChild(btn);
       }
       sizesEl.appendChild(frag);
+      syncAllSizeButtonsToFilter();
     }
 
     function switchScraperProxy() {
       if (!currentDomain || scraperMaxIconSize <= 0) return;
+      if (!sizePassesSizeFilter(scraperMaxIconSize)) return;
       currentScraperSelection = 'proxy';
       setActiveScraperButton('proxy');
       loadScraperProxyVariant();
@@ -6943,6 +7042,7 @@
     function switchScraperSize(idx) {
       if (!currentDomain) return;
       if (idx < 0 || idx >= scraperIcons.length) return;
+      if (!sizePassesSizeFilter(scraperIconPixelSize(scraperIcons[idx]))) return;
       currentScraperSelection = idx;
       setActiveScraperButton(idx);
       loadScraperVariant(idx);
@@ -7038,7 +7138,7 @@
     }
 
     function switchScraperProxySize(size) {
-      if (!currentDomain) return;
+      if (!currentDomain || !sizePassesSizeFilter(size)) return;
       currentScraperProxySize = size;
       setActiveSize('scraper-proxy-sizes', size);
       loadScraperProxySize(size);
@@ -7173,35 +7273,35 @@
     }
 
     function switchGoogleSize(size) {
-      if (!currentDomain) return;
+      if (!currentDomain || !sizePassesSizeFilter(size)) return;
       currentGoogleSize = size;
       setActiveSize('google-sizes', size);
       loadGoogle(currentDomain, size, { hideCardOnError: false });
     }
 
     function switchFaviconkitSize(size) {
-      if (!currentDomain) return;
+      if (!currentDomain || !sizePassesSizeFilter(size)) return;
       currentFaviconkitSize = size;
       setActiveSize('faviconkit-sizes', size);
       loadFaviconkit(currentDomain, size, { hideCardOnError: false });
     }
 
     function switchFaviconrunSize(size) {
-      if (!currentDomain) return;
+      if (!currentDomain || !sizePassesSizeFilter(size)) return;
       currentFaviconrunSize = size;
       setActiveSize('faviconrun-sizes', size);
       loadFaviconrun(currentDomain, size, { hideCardOnError: false });
     }
 
     function switchTwentyiconsSize(size) {
-      if (!currentDomain) return;
+      if (!currentDomain || !sizePassesSizeFilter(size)) return;
       currentTwentyiconsSize = size;
       setActiveSize('twentyicons-sizes', size);
       loadTwentyicons(currentDomain, size, { hideCardOnError: false });
     }
 
     function switchBrandfetchSize(size) {
-      if (!currentDomain || !BRANDFETCH_RASTER_FORMATS.has(currentBrandfetchResolvedFormat)) return;
+      if (!currentDomain || !BRANDFETCH_RASTER_FORMATS.has(currentBrandfetchResolvedFormat) || !sizePassesSizeFilter(size)) return;
       currentBrandfetchSize = size;
       setActiveSize('brandfetch-sizes', size);
       loadBrandfetch(currentDomain, size);
