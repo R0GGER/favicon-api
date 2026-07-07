@@ -758,6 +758,297 @@
       margin-right: 0;
     }
 
+    .results.visible.view-table {
+      display: block;
+    }
+
+    .results.view-table .card,
+    .results.view-table .results-section-divider {
+      display: none !important;
+    }
+
+    .results.view-grid .results-table-wrap {
+      display: none;
+    }
+
+    .results.view-table .results-table-wrap {
+      display: block;
+      grid-column: 1 / -1;
+      margin-bottom: 0.5rem;
+    }
+
+    .results.view-table .download-toolbar {
+      margin-bottom: 0.85rem;
+    }
+
+    .results-view-toggle {
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-self: center;
+    }
+
+    .results-view-toggle.btn-group {
+      display: inline-flex;
+      flex-wrap: nowrap;
+      gap: 2px;
+      padding: 2px;
+      background: #faf6f1;
+      border: none;
+      border-radius: 6px;
+    }
+
+    .results-view-toggle.btn-group .results-view-btn {
+      margin-left: 0;
+      border-radius: 4px;
+      border: none;
+    }
+
+    .results-view-toggle.btn-group .results-view-btn:first-child,
+    .results-view-toggle.btn-group .results-view-btn:last-child {
+      border-radius: 4px;
+    }
+
+    .download-toolbar .results-view-toggle .results-view-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.35rem 0.5rem;
+      min-width: 0;
+      background: transparent;
+      color: #8a8480;
+      font-size: 1.2rem;
+      font-weight: 500;
+      line-height: 1;
+      box-sizing: border-box;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+    }
+
+    .download-toolbar .results-view-toggle .results-view-btn:hover:not(.active) {
+      background: rgba(45, 42, 38, 0.06);
+      color: #6b6560;
+    }
+
+    .download-toolbar .results-view-toggle .results-view-btn.active,
+    .download-toolbar .results-view-toggle .results-view-btn.active:hover {
+      background: #5b2e7e;
+      color: #fff;
+      box-shadow: 0 1px 2px rgba(45, 42, 38, 0.12);
+    }
+
+    .download-toolbar .results-view-toggle .results-view-btn iconify-icon {
+      width: 1.375rem;
+      height: 1.375rem;
+      display: block;
+      flex: 0 0 auto;
+    }
+
+    .results-table-wrap {
+      overflow: visible;
+      border: 1px solid #e0dbd5;
+      border-radius: 10px;
+      background: #fff;
+    }
+
+    .results-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+      table-layout: auto;
+    }
+
+    .results-table th,
+    .results-table td {
+      padding: 0.55rem 0.7rem;
+      border-bottom: 1px solid #ece8e2;
+      text-align: left;
+      vertical-align: middle;
+    }
+
+    .results-table th {
+      font-weight: 600;
+      color: #6b6560;
+      background: #faf8f5;
+      white-space: nowrap;
+    }
+
+    .results-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .results-table-section td {
+      padding-top: 0.85rem;
+      padding-bottom: 0.35rem;
+      border-bottom: none;
+      color: #b0aaa4;
+      font-size: 0.76rem;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      background: #faf8f5;
+    }
+
+    .results-table-icon {
+      width: 2rem;
+      text-align: center;
+    }
+
+    .results-table-icon-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      border-radius: 4px;
+      transition: background 0.15s;
+    }
+
+    .results-table-icon-btn:hover {
+      background: rgba(91, 46, 126, 0.08);
+    }
+
+    .results-table-icon-btn.copied {
+      background: rgba(46, 125, 50, 0.1);
+    }
+
+    .results-table-icon-btn img {
+      display: block;
+      width: 16px;
+      height: 16px;
+      object-fit: contain;
+      pointer-events: none;
+    }
+
+    .results-table-link {
+      max-width: 16rem;
+      min-width: 6rem;
+    }
+
+    .results-table-link-cell {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      min-width: 0;
+    }
+
+    .results-table-copy-btn {
+      flex: 0 0 auto;
+      background: transparent;
+      border: none;
+      padding: 2px 4px;
+      cursor: pointer;
+      color: #8a8480;
+      border-radius: 3px;
+      transition: background 0.15s, color 0.15s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .results-table-copy-btn:hover {
+      background: rgba(91, 46, 126, 0.1);
+      color: #5b2e7e;
+    }
+
+    .results-table-copy-btn.copied {
+      color: #2e7d32;
+    }
+
+    .results-table-copy-btn svg {
+      width: 12px;
+      height: 12px;
+      fill: currentColor;
+    }
+
+    .results-table-link a {
+      display: block;
+      flex: 1 1 auto;
+      min-width: 0;
+      color: #8a8480;
+      text-decoration: none;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .results-table-link a:hover {
+      color: #5b2e7e;
+      text-decoration: underline;
+    }
+
+    .results-table-size-btn,
+    .results-table-source-btn {
+      background: transparent;
+      border: none;
+      padding: 0;
+      font: inherit;
+      color: #6b6560;
+      cursor: pointer;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      border-radius: 3px;
+      transition: color 0.15s, background 0.15s;
+    }
+
+    .results-table-size-btn:hover,
+    .results-table-source-btn:hover {
+      color: #5b2e7e;
+      background: rgba(91, 46, 126, 0.08);
+    }
+
+    .results-table-size-btn.copied,
+    .results-table-source-btn.copied {
+      color: #2e7d32;
+    }
+
+    .results-table-ext-toggle {
+      display: inline-flex;
+      flex-wrap: nowrap;
+      gap: 0;
+      margin-bottom: 0;
+    }
+
+    .results-table-ext-toggle .results-table-ext-btn {
+      min-width: 2.35rem;
+      padding: 0.2rem 0.45rem;
+      font-size: 0.68rem;
+      line-height: 1.2;
+    }
+
+    .results-table-dl-btn {
+      margin: 0;
+    }
+
+    .results-table th:last-child,
+    .results-table td:last-child {
+      text-align: center;
+    }
+
+    .results-table-skel {
+      display: inline-block;
+      height: 0.72rem;
+      width: 2.5rem;
+      border-radius: 3px;
+      background: #ece8e2;
+      vertical-align: middle;
+    }
+
+    .results-table-skel--icon {
+      width: 16px;
+      height: 16px;
+      border-radius: 4px;
+    }
+
+    .results-table-skel--wide {
+      width: min(12rem, 32vw);
+    }
+
+    .results.placeholder .results-table-row--placeholder .results-table-skel {
+      animation: placeholder-pulse 2.8s ease-in-out infinite;
+    }
+
     .no-icon-notice {
       grid-column: 1 / -1;
       display: none;
@@ -1369,6 +1660,7 @@
       margin-bottom: -0.2rem;
       overflow: visible;
       flex-wrap: wrap;
+      --toolbar-control-height: 2.125rem;
     }
 
     .download-toolbar.visible {
@@ -1380,6 +1672,51 @@
       align-items: center;
       gap: 0.5rem;
       margin-left: auto;
+    }
+
+    .download-toolbar-left {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      min-width: 0;
+    }
+
+    .download-toolbar-divider {
+      width: 1px;
+      align-self: stretch;
+      min-height: var(--toolbar-control-height);
+      background: #e0dbd5;
+      flex: 0 0 auto;
+    }
+
+    .download-toolbar .size-buttons {
+      margin-bottom: 0;
+    }
+
+    .download-toolbar .size-filter-panel,
+    .download-toolbar .download-toolbar-actions,
+    .download-toolbar .download-toolbar-left,
+    .download-toolbar .results-view-toggle {
+      align-items: center;
+    }
+
+    .download-toolbar .size-range-slider {
+      height: var(--toolbar-control-height);
+      display: flex;
+      align-items: center;
+    }
+
+    .download-toolbar .size-range-slider input[type="range"] {
+      height: var(--toolbar-control-height);
+      top: 0;
+    }
+
+    .download-toolbar .size-filter-heading,
+    .download-toolbar .size-filter-value {
+      display: inline-flex;
+      align-items: center;
+      min-height: var(--toolbar-control-height);
     }
 
     .size-filter-group {
@@ -1940,7 +2277,7 @@
     }
 
     @media (max-width: 1050px) {
-      .results.visible { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .results.visible.view-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
 
     @media (max-width: 700px) {
@@ -1949,7 +2286,7 @@
         max-width: none;
       }
 
-      .results.visible { grid-template-columns: minmax(0, 1fr); }
+      .results.visible.view-grid { grid-template-columns: minmax(0, 1fr); }
       h1 { font-size: 1.8rem; }
       .top-nav {
         position: static;
@@ -2166,19 +2503,30 @@
       </div>
     </div>
 
-    <div class="results" id="results">
+    <div class="results view-grid" id="results">
       <div class="download-toolbar" id="download-toolbar">
-        <div class="size-filter-group">
-          <div class="size-filter-panel">
-            <span class="size-filter-heading">Size</span>
-            <div class="size-range-slider" id="size-range-slider">
-              <div class="size-range-track" aria-hidden="true">
-                <div class="size-range-fill" id="size-range-fill"></div>
+        <div class="download-toolbar-left">
+          <div class="results-view-toggle btn-group" role="group" aria-label="Results view">
+            <button type="button" class="results-view-btn active" data-view="grid" aria-pressed="true" aria-label="Grid view">
+              <iconify-icon icon="material-symbols-light:grid-on" aria-hidden="true"></iconify-icon>
+            </button>
+            <button type="button" class="results-view-btn" data-view="table" aria-pressed="false" aria-label="Table view">
+              <iconify-icon icon="material-symbols-light:table-rows" aria-hidden="true"></iconify-icon>
+            </button>
+          </div>
+          <div class="download-toolbar-divider" aria-hidden="true"></div>
+          <div class="size-filter-group">
+            <div class="size-filter-panel">
+              <span class="size-filter-heading">Size</span>
+              <div class="size-range-slider" id="size-range-slider">
+                <div class="size-range-track" aria-hidden="true">
+                  <div class="size-range-fill" id="size-range-fill"></div>
+                </div>
+                <input type="range" id="size-filter-min" min="0" max="7" step="1" value="1" aria-label="Minimum icon size">
+                <input type="range" id="size-filter-max" min="0" max="7" step="1" value="6" aria-label="Maximum icon size">
               </div>
-              <input type="range" id="size-filter-min" min="0" max="7" step="1" value="1" aria-label="Minimum icon size">
-              <input type="range" id="size-filter-max" min="0" max="7" step="1" value="6" aria-label="Maximum icon size">
+              <span class="size-filter-value" id="size-filter-label" aria-live="polite">All sizes</span>
             </div>
-            <span class="size-filter-value" id="size-filter-label" aria-live="polite">All sizes</span>
           </div>
         </div>
         <div class="download-toolbar-actions">
@@ -2192,6 +2540,22 @@
             Download all
           </button>
         </div>
+      </div>
+      <div class="results-table-wrap" id="results-table-wrap" hidden>
+        <table class="results-table" id="results-table">
+          <thead>
+            <tr>
+              <th scope="col">Icon</th>
+              <th scope="col">Provider</th>
+              <th scope="col">Extension</th>
+              <th scope="col">Size</th>
+              <th scope="col">Link</th>
+              <th scope="col">Source</th>
+              <th scope="col">Download</th>
+            </tr>
+          </thead>
+          <tbody id="results-table-body"></tbody>
+        </table>
       </div>
       <div class="no-icon-notice" id="no-icon-notice" role="status" aria-live="polite">
         <strong>No icon found.</strong>
@@ -3195,6 +3559,7 @@
     const SVGL_RASTER_SIZES = [64, 128, 256];
     const SIZE_FILTER_INDEX_VALUES = [0, ...SIZE_FILTER_STEPS];
     const SIZE_FILTER_STORAGE_KEY = 'faviconapi-size-filter';
+    const RESULTS_VIEW_STORAGE_KEY = 'faviconapi-results-view';
     const SIZE_FILTER_ALLOWED = new Set([0, ...SIZE_FILTER_STEPS]);
     const svglCatalogCache = new Map();
     const SERVICE_ICON_PROVIDERS = ['selfhst', 'dashboardicons', 'lobehub', 'svgl'];
@@ -3225,6 +3590,8 @@
     const COPY_ICON_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/><path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/></svg>';
     const DOWNLOAD_ICON_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>';
     let jsZipLoadPromise = null;
+    let currentResultsView = 'grid';
+    let resultsTableSyncRaf = null;
 
     function resolveCardUrl(proxyUrl, sourceUrl, opts = {}) {
       const fullProxy = proxyUrl.startsWith('http') ? proxyUrl : `${location.origin}${proxyUrl}`;
@@ -3278,6 +3645,7 @@
         link.setAttribute('data-tip', title);
         link.setAttribute('aria-label', title);
       });
+      scheduleResultsTableSync();
     }
 
     // Resize routes never upscale: /yandex/64/… still serves a 16×16 upstream icon.
@@ -3850,6 +4218,7 @@
       });
       updateServiceIconsDivider();
       scheduleNoIconNoticeCheck();
+      scheduleResultsTableSync();
     }
 
     function resetSizeFilter() {
@@ -3886,6 +4255,7 @@
       results.classList.remove('visible', 'placeholder');
       setDownloadToolbarVisible(false);
       updateResetButton();
+      scheduleResultsTableSync();
     }
 
     function applyPlaceholderVisibility() {
@@ -3903,6 +4273,7 @@
       setServiceCardsVisible(selfhstToggle.checked);
       updateServiceIconsDivider();
       updateResetButton();
+      scheduleResultsTableSync();
     }
 
     function showPlaceholderResults() {
@@ -3925,6 +4296,7 @@
       const downloadAllBtn = document.getElementById('download-all-btn');
       if (downloadAllBtn) downloadAllBtn.disabled = true;
       applyPlaceholderVisibility();
+      scheduleResultsTableSync();
     }
 
     function exitPlaceholderMode() {
@@ -4132,6 +4504,282 @@
       }
     }
 
+    function truncateDisplayUrl(url, max = 48) {
+      if (!url) return '';
+      if (url.length <= max) return url;
+      return `${url.slice(0, max - 1)}…`;
+    }
+
+    function loadResultsViewFromStorage() {
+      try {
+        const stored = localStorage.getItem(RESULTS_VIEW_STORAGE_KEY);
+        if (stored === 'table' || stored === 'grid') currentResultsView = stored;
+      } catch {
+        /* ignore quota / private mode */
+      }
+    }
+
+    function scheduleResultsTableSync() {
+      if (resultsTableSyncRaf) cancelAnimationFrame(resultsTableSyncRaf);
+      resultsTableSyncRaf = requestAnimationFrame(() => {
+        resultsTableSyncRaf = null;
+        syncResultsTable();
+      });
+    }
+
+    function setResultsView(mode) {
+      if (mode !== 'grid' && mode !== 'table') return;
+      currentResultsView = mode;
+      try {
+        localStorage.setItem(RESULTS_VIEW_STORAGE_KEY, mode);
+      } catch {
+        /* ignore quota / private mode */
+      }
+      const results = document.getElementById('results');
+      if (results) {
+        results.classList.toggle('view-grid', mode === 'grid');
+        results.classList.toggle('view-table', mode === 'table');
+      }
+      document.querySelectorAll('.results-view-btn').forEach((btn) => {
+        const active = btn.dataset.view === mode;
+        btn.classList.toggle('active', active);
+        btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+      });
+      scheduleResultsTableSync();
+    }
+
+    function initResultsViewToggle() {
+      loadResultsViewFromStorage();
+      const results = document.getElementById('results');
+      if (results) {
+        results.classList.toggle('view-grid', currentResultsView === 'grid');
+        results.classList.toggle('view-table', currentResultsView === 'table');
+      }
+      document.querySelectorAll('.results-view-btn').forEach((btn) => {
+        btn.addEventListener('click', () => setResultsView(btn.dataset.view));
+        const active = btn.dataset.view === currentResultsView;
+        btn.classList.toggle('active', active);
+        btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+      });
+      const tbody = document.getElementById('results-table-body');
+      if (tbody && !tbody.dataset.bound) {
+        tbody.dataset.bound = '1';
+        tbody.addEventListener('click', onResultsTableClick);
+      }
+      scheduleResultsTableSync();
+    }
+
+    function getCardProviderLabel(card) {
+      if (!card) return '';
+      const h3 = card.querySelector('.card-header h3');
+      return h3 ? h3.textContent.trim() : '';
+    }
+
+    function getCardTableRowData(providerId) {
+      const card = getProviderCard(providerId);
+      if (!card || card.style.display === 'none') return null;
+      if (card.classList.contains('size-filter-hidden')) return null;
+
+      const img = document.getElementById(`${providerId}-img`);
+      const spinner = document.getElementById(`${providerId}-spinner`);
+      const display = card.querySelector('.favicon-display');
+      const results = document.getElementById('results');
+      const isPlaceholder = results?.classList.contains('placeholder');
+      const isLoading = spinner && spinner.style.display !== 'none';
+      const hasImage = img && img.style.display !== 'none' && img.src;
+
+      if (isPlaceholder) {
+        return {
+          providerId,
+          provider: getCardProviderLabel(card),
+          placeholder: true,
+        };
+      }
+
+      if (!isLoading && !hasImage) return null;
+
+      if (isLoading) {
+        return {
+          providerId,
+          provider: getCardProviderLabel(card),
+          placeholder: true,
+          loading: true,
+        };
+      }
+
+      const copyUrl = display?.dataset.copyUrl || display?.dataset.proxyUrl || '';
+      const sourceUrl = display?.dataset.altCopyUrl || '';
+      const isVector = card.dataset.iconVector === 'true' || display?.dataset.iconVector === 'true';
+      const w = parseInt(display?.dataset.iconWidth, 10) || 0;
+      const h = parseInt(display?.dataset.iconHeight, 10) || 0;
+      let extension = extensionFromUrl(copyUrl || display?.dataset.proxyUrl || '');
+      if (isVector && (!extension || extension === 'png')) extension = 'svg';
+      if (!extension) {
+        const catalogFmt = getCatalogFormat(providerId);
+        if (catalogFmt) extension = catalogFmt;
+      }
+
+      let sizeLabel = '—';
+      if (isVector && (!w || !h)) sizeLabel = 'SVG';
+      else if (w > 0 && h > 0) sizeLabel = `${w}×${h}`;
+
+      const extensionChoices = providerSupportsExtensionChoice(providerId)
+        ? { current: getCatalogFormat(providerId), formats: ['png', 'svg'] }
+        : null;
+
+      return {
+        providerId,
+        provider: getCardProviderLabel(card),
+        iconSrc: img.src,
+        extension: extension || '—',
+        extensionChoices,
+        sizeLabel,
+        copyUrl,
+        sourceUrl,
+        sourceLabel: alternateUrlLabel(),
+        placeholder: false,
+      };
+    }
+
+    function shouldShowAppIconsTableSection() {
+      const divider = document.getElementById('service-icons-divider');
+      return divider?.classList.contains('visible') ?? false;
+    }
+
+    function providerSupportsExtensionChoice(providerId) {
+      return CATALOG_SVG_PROVIDERS.has(providerId) && catalogProviderIsActive(providerId);
+    }
+
+    function switchTableExtension(providerId, format) {
+      switch (providerId) {
+        case 'selfhst':
+          switchSelfhstFormat(format);
+          break;
+        case 'dashboardicons':
+          switchDashboardIconsFormat(format);
+          break;
+        case 'lobehub':
+          switchLobehubFormat(format);
+          break;
+        case 'svgl':
+          switchSvglFormat(format);
+          break;
+        default:
+          break;
+      }
+    }
+
+    function renderExtensionCell(data) {
+      if (data.extensionChoices) {
+        const { current, formats } = data.extensionChoices;
+        const buttons = formats.map((fmt) => {
+          const active = fmt === current;
+          return `<button type="button" class="size-btn results-table-ext-btn${active ? ' active' : ''}" data-action="extension" data-provider="${escapeHtml(data.providerId)}" data-format="${escapeHtml(fmt)}" aria-pressed="${active ? 'true' : 'false'}">${escapeHtml(fmt.toUpperCase())}</button>`;
+        }).join('');
+        return `<div class="results-table-ext-toggle btn-group size-buttons" role="group" aria-label="Extension">${buttons}</div>`;
+      }
+      return escapeHtml(data.extension);
+    }
+
+    function renderResultsTableRow(data) {
+      if (data.placeholder) {
+        return `<tr data-provider="${escapeHtml(data.providerId)}" class="results-table-row results-table-row--placeholder">
+          <td><span class="results-table-skel results-table-skel--icon" aria-hidden="true"></span></td>
+          <td>${escapeHtml(data.provider)}</td>
+          <td><span class="results-table-skel" aria-hidden="true"></span></td>
+          <td><span class="results-table-skel" aria-hidden="true"></span></td>
+          <td><span class="results-table-skel results-table-skel--wide" aria-hidden="true"></span></td>
+          <td></td>
+          <td></td>
+        </tr>`;
+      }
+
+      const linkText = truncateDisplayUrl(data.copyUrl);
+      const sourceCell = data.sourceUrl
+        ? `<button type="button" class="results-table-source-btn" data-action="source" data-url="${escapeHtml(data.sourceUrl)}" data-tip="Copy ${escapeHtml(data.sourceLabel)} URL" aria-label="Copy ${escapeHtml(data.sourceLabel)} URL">${escapeHtml(data.sourceLabel)}</button>`
+        : '—';
+
+      return `<tr data-provider="${escapeHtml(data.providerId)}" class="results-table-row">
+        <td class="results-table-icon">
+          <button type="button" class="results-table-icon-btn" data-action="copy-url" data-url="${escapeHtml(data.copyUrl)}" data-tip="Copy URL" aria-label="Copy URL">
+            <img src="${escapeHtml(data.iconSrc)}" width="16" height="16" alt="">
+          </button>
+        </td>
+        <td>${escapeHtml(data.provider)}</td>
+        <td>${renderExtensionCell(data)}</td>
+        <td><button type="button" class="results-table-size-btn" data-action="size" data-url="${escapeHtml(data.copyUrl)}" data-tip="Copy URL" aria-label="Copy URL">${escapeHtml(data.sizeLabel)}</button></td>
+        <td class="results-table-link">
+          <div class="results-table-link-cell">
+            <button type="button" class="results-table-copy-btn" data-action="copy-url" data-url="${escapeHtml(data.copyUrl)}" data-tip="Copy URL" aria-label="Copy URL">${COPY_ICON_SVG}</button>
+            <a href="${escapeHtml(data.copyUrl)}" target="_blank" rel="noopener" title="${escapeHtml(data.copyUrl)}">${escapeHtml(linkText)}</a>
+          </div>
+        </td>
+        <td>${sourceCell}</td>
+        <td><button type="button" class="results-table-dl-btn refresh-btn card-download-btn" data-action="download" data-provider="${escapeHtml(data.providerId)}" aria-label="Download icon">${DOWNLOAD_ICON_SVG}</button></td>
+      </tr>`;
+    }
+
+    function syncResultsTable() {
+      const results = document.getElementById('results');
+      const wrap = document.getElementById('results-table-wrap');
+      const tbody = document.getElementById('results-table-body');
+      if (!results || !wrap || !tbody) return;
+
+      const showTable = currentResultsView === 'table' && results.classList.contains('visible');
+      wrap.hidden = !showTable;
+      if (!showTable) return;
+
+      const providers = activeFaviconProviders();
+      const showAppSection = shouldShowAppIconsTableSection();
+      const serviceSet = new Set(SERVICE_ICON_PROVIDERS);
+      let insertedAppSection = false;
+      const rows = [];
+
+      for (const providerId of providers) {
+        if (showAppSection && !insertedAppSection && serviceSet.has(providerId)) {
+          rows.push('<tr class="results-table-section"><td colspan="7">App Icons</td></tr>');
+          insertedAppSection = true;
+        }
+        const data = getCardTableRowData(providerId);
+        if (data) rows.push(renderResultsTableRow(data));
+      }
+
+      tbody.innerHTML = rows.join('');
+    }
+
+    async function onResultsTableClick(e) {
+      const btn = e.target.closest('[data-action]');
+      if (!btn) return;
+      const action = btn.dataset.action;
+      if (action === 'size' || action === 'source' || action === 'copy-url') {
+        const url = btn.dataset.url;
+        if (!url) return;
+        e.preventDefault();
+        try {
+          await navigator.clipboard.writeText(url);
+          btn.classList.add('copied');
+          setTimeout(() => btn.classList.remove('copied'), 1200);
+          showGlobalToast(url);
+        } catch {
+          /* clipboard API not available */
+        }
+        return;
+      }
+      if (action === 'extension') {
+        e.preventDefault();
+        e.stopPropagation();
+        const providerId = btn.dataset.provider;
+        const format = btn.dataset.format;
+        if (providerId && format) switchTableExtension(providerId, format);
+        return;
+      }
+      if (action === 'download') {
+        e.preventDefault();
+        const providerId = btn.dataset.provider;
+        if (providerId) downloadCard(providerId, btn);
+      }
+    }
+
     function resetFaviconCard(id) {
       const img = document.getElementById(`${id}-img`);
       const spinner = document.getElementById(`${id}-spinner`);
@@ -4158,6 +4806,7 @@
       } else {
         card.style.display = '';
       }
+      scheduleResultsTableSync();
     }
 
     function resetSearch() {
@@ -4607,6 +5256,7 @@
           && serviceCategoryHasResults());
       divider.classList.toggle('visible', show);
       divider.setAttribute('aria-hidden', show ? 'false' : 'true');
+      scheduleResultsTableSync();
     }
 
     let noIconNoticeTimer = null;
@@ -4828,6 +5478,7 @@
         setServiceCardsVisible(false);
       }
       scheduleNoIconNoticeCheck();
+      scheduleResultsTableSync();
     }
 
     async function runServiceSearch(rawSlug) {
@@ -4861,6 +5512,7 @@
       setServiceCardsVisible(true);
       startServiceIconLoads(resolveData, true);
       scheduleNoIconNoticeCheck();
+      scheduleResultsTableSync();
     }
 
     function loadGoogle(domain, size, opts) {
@@ -6418,6 +7070,7 @@
       spinner.style.display = 'block';
       meta.textContent = '';
       clearDisplayUrls(display);
+      scheduleResultsTableSync();
 
       const imgEl = new Image();
       imgEl.crossOrigin = 'anonymous';
@@ -6426,6 +7079,7 @@
           spinner.style.display = 'none';
           if (card) card.style.display = 'none';
           scheduleNoIconNoticeCheck();
+          scheduleResultsTableSync();
           return;
         }
         img.src = imgEl.src;
@@ -6436,6 +7090,7 @@
         if (opts?.onMeta) opts.onMeta(imgEl);
         else showFaviconMeta(id, imgEl, proxyUrl, sourceUrl, opts);
         scheduleNoIconNoticeCheck();
+        scheduleResultsTableSync();
       };
       imgEl.onerror = () => {
         spinner.style.display = 'none';
@@ -6444,11 +7099,13 @@
           setSizeUnavailable(display, true);
           if (card) card.style.display = '';
           scheduleNoIconNoticeCheck();
+          scheduleResultsTableSync();
           return;
         }
         img.removeAttribute('src');
         if (card) card.style.display = 'none';
         scheduleNoIconNoticeCheck();
+        scheduleResultsTableSync();
       };
       if (opts?.objectUrl) {
         const objectUrl = opts.objectUrl;
@@ -6458,6 +7115,7 @@
             spinner.style.display = 'none';
             if (card) card.style.display = 'none';
             revokeObjectUrl();
+            scheduleResultsTableSync();
             return;
           }
           img.style.display = 'block';
@@ -6472,6 +7130,7 @@
           spinner.style.display = 'none';
           if (card) card.style.display = 'none';
           revokeObjectUrl();
+          scheduleResultsTableSync();
         };
         img.src = objectUrl;
         return;
@@ -6608,6 +7267,7 @@
     }
 
     initSizeFilterSliders();
+    initResultsViewToggle();
     initCardDownloadButtons();
     initCtaAttention();
     if (!new URLSearchParams(location.search).get('q')?.trim()) {
