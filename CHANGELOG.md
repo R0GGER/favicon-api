@@ -5,6 +5,14 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.10] — 2026-07-07
+
+### Added
+
+- **Preload CLI — Tranco top sites** — `scripts/preload-top-sites.js` warms the favicon cache for the world's most visited websites. By default it downloads the latest [Tranco](https://tranco-list.eu/) top **500** and, per domain, calls **`GET /{domain}`** (best-pick provider cache) and **`GET /api/v1/favicon?url=…`** (normalized 128×128 PNG under `API_CACHE_DIR`). Options: `--limit`, `--concurrency`, `--api-key`, `--domains-file`, `--skip-standard`, `--skip-v1`, `--timeout`, `--dry-run`. Exposed as `npm run preload:top-sites` (script is included in the Docker image under `scripts/`).
+
+- **Selfhosted docs — preload guide** — [Tweaks §10 Preload popular sites after deploy](/docs/tweaks#10-preload-popular-sites-after-deploy): Tranco source, Docker-only usage (`docker compose exec favicon-api …`), options table, and expectations (duration, failures, load). [API v1](/docs/api-v1) CDN section links to the same guide.
+
 ## [2.8.9] — 2026-07-07
 
 ### Added
