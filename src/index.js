@@ -1168,8 +1168,8 @@ async function scraperHandler(req, res) {
     if (!entry) return res.status(502).json({ error: 'Could not scrape favicon.' });
 
     if (sizeParam) {
-      const buf = await resizeIcon(entry.buffer, sizeParam);
-      return sendFavicon(res, { ...entry, buffer: buf, contentType: 'image/png' });
+      const rendered = await renderScraperEntryToSize(entry, domain, sizeParam);
+      return sendFavicon(res, rendered);
     }
 
     // Enforce SCRAPER_MAX_ICON_SIZE at serve time too, not just when the icon is
@@ -1186,6 +1186,34 @@ async function scraperHandler(req, res) {
 app.get(['/scraper/:size/:ext/:domain', '/s/:size/:ext/:domain'], scraperHandler);
 app.get(['/scraper/:size/:domain', '/s/:size/:domain'], scraperHandler);
 app.get(['/scraper/:domain', '/s/:domain'], scraperHandler);
+
+async function renderScraperEntryToSize(entry, domain, size) {
+  const url = (entry?.url || '').toLowerCase();
+  const referer = `https://${domain}/`;
+
+  if (entry?.originalSvgBuffer?.length) {
+    try {
+      const buffer = await rasterizeSvgToSize(entry.originalSvgBuffer, size);
+      return { ...entry, buffer, contentType: 'image/png' };
+    } catch {
+      /* fall through */
+    }
+  }
+
+  if (url.endsWith('.svg')) {
+    try {
+      const fetched = await fetchScraperAsset(entry.url, referer);
+      if (fetched?.buffer && looksLikeSvg(fetched.buffer)) {
+        const buffer = await rasterizeSvgToSize(fetched.buffer, size);
+        return { ...entry, buffer, contentType: 'image/png' };
+      }
+    } catch {
+      /* fall through */
+    }
+  }
+
+  return renderIconToSize(entry, size);
+}
 
 async function serveSizedScraperIcon(domain, size) {
   let allIcons;
@@ -1223,6 +1251,20 @@ async function serveSizedScraperIcon(domain, size) {
   const fullRes = await fetchWithCache('asset-v2', hash, null, async () => {
     const fetched = await fetchScraperAsset(iconUrl, referer);
     if (!fetched) return null;
+
+    const isSvg =
+      bestIcon.format === 'svg' ||
+      looksLikeSvg(fetched.buffer) ||
+      (fetched.contentType || '').toLowerCase().includes('svg') ||
+      iconUrl.toLowerCase().endsWith('.svg');
+    if (isSvg) {
+      return {
+        ...fetched,
+        provider: 'scraper',
+        isSvg: true,
+      };
+    }
+
     try {
       const displayed = await toDisplayPng(fetched.buffer, {
         contentType: fetched.contentType,
@@ -1241,8 +1283,22 @@ async function serveSizedScraperIcon(domain, size) {
 
   if (!fullRes) return null;
 
-  const buf = await resizeIcon(fullRes.buffer, size);
-  return { buffer: buf, contentType: 'image/png', provider: 'scraper', url: iconUrl };
+  if (fullRes.isSvg || looksLikeSvg(fullRes.buffer) || iconUrl.toLowerCase().endsWith('.svg')) {
+    const buf = await rasterizeSvgToSize(fullRes.buffer, size);
+    return { buffer: buf, contentType: 'image/png', provider: 'scraper', url: iconUrl };
+  }
+
+  const dims = await readImageDimensions(fullRes.buffer, {
+    contentType: fullRes.contentType,
+    url: iconUrl,
+  });
+  const side = dims ? Math.min(dims.width || 0, dims.height || dims.width || 0) : 0;
+  if (side > size) {
+    const buf = await resizeIcon(fullRes.buffer, size);
+    return { buffer: buf, contentType: 'image/png', provider: 'scraper', url: iconUrl };
+  }
+
+  return { buffer: fullRes.buffer, contentType: fullRes.contentType || 'image/png', provider: 'scraper', url: iconUrl };
 }
 
 // Explicit domain → icon-tag table (see src/domainIconTags.js)

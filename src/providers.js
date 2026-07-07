@@ -1,7 +1,17 @@
 const crypto = require('crypto');
 const cheerio = require('cheerio');
 const sharp = require('sharp');
-const { rasterizeSvgToSize, readImageDimensions, toDisplayPng, looksLikeSvg, isBlankFavicon, isUnusableIcon, MIN_SOURCE_SIZE, resizeIcon } = require('./imageNormalize');
+const {
+  rasterizeSvgToSize,
+  readImageDimensions,
+  toDisplayPng,
+  looksLikeSvg,
+  isBlankFavicon,
+  isUnusableIcon,
+  MIN_SOURCE_SIZE,
+  SVG_DISPLAY_SIZE,
+  resizeIcon,
+} = require('./imageNormalize');
 const { LRUCache } = require('lru-cache');
 const { upstreamFetch, ipv4Dispatcher, ipv4Http1Dispatcher } = require('./upstreamFetch');
 const scraperDiskCache = require('./scraperDiskCache');
@@ -1432,11 +1442,23 @@ async function probeIconMetadata(href, referer) {
     return null;
   }
 
+  const format = dims.format ? String(dims.format).toLowerCase() : null;
+  const isSvg =
+    format === 'svg' ||
+    looksLikeSvg(result.buffer) ||
+    (result.contentType || '').toLowerCase().includes('svg');
+  let width = dims.width;
+  let height = dims.height;
+  if (isSvg) {
+    width = Math.max(width, SVG_DISPLAY_SIZE);
+    height = Math.max(height, SVG_DISPLAY_SIZE);
+  }
+
   const meta = {
     url: href,
-    width: dims.width,
-    height: dims.height,
-    format: dims.format ? String(dims.format).toLowerCase() : null,
+    width,
+    height,
+    format: isSvg ? 'svg' : format,
     bytes: result.buffer.length,
   };
   probeMetadataCache.set(href, meta);
@@ -1450,10 +1472,10 @@ async function probeIconMetadata(href, referer) {
 // /:domain/json icons array shown as the size-button strip on the UI.
 async function fetchScraperAllIcons(domain) {
   const cached = scraperIconsCache.get(domain);
-  if (cached) return cached;
+  if (Array.isArray(cached) && cached.length > 0) return cached;
 
   const diskIcons = await scraperDiskCache.getIcons(domain);
-  if (diskIcons !== undefined) {
+  if (Array.isArray(diskIcons) && diskIcons.length > 0) {
     scraperIconsCache.set(domain, diskIcons);
     return diskIcons;
   }
@@ -1469,12 +1491,30 @@ async function fetchScraperAllIcons(domain) {
   }
 
   const iconCandidates = [...byUrl.keys()].map((href) => ({ href }));
+  const pageLinkCandidates = [];
   if (html) {
     try {
       const parsed = parseIconCandidatesFromHtml(html, finalBaseUrl || referer);
       iconCandidates.push(...parsed.primaryCandidates);
+      for (const candidate of parsed.primaryCandidates) {
+        pageLinkCandidates.push(candidate);
+        for (const variant of expandSizedVariants(candidate.href)) {
+          pageLinkCandidates.push({ ...candidate, ...variant });
+        }
+      }
     } catch {
       /* ignore */
+    }
+  }
+
+  if (pageLinkCandidates.length > 0) {
+    const probed = await runInBatches(
+      dedupeCandidates(pageLinkCandidates),
+      SCRAPER_PROBE_BATCH_SIZE,
+      (c) => probeIconMetadata(c.href, referer)
+    );
+    for (const p of probed) {
+      if (p && p.url && !byUrl.has(p.url)) byUrl.set(p.url, p);
     }
   }
 
@@ -1516,7 +1556,11 @@ async function fetchScraperAllIcons(domain) {
   });
 
   scraperIconsCache.set(domain, sorted);
-  scraperDiskCache.setIcons(domain, sorted);
+  if (sorted.length > 0) {
+    scraperDiskCache.setIcons(domain, sorted);
+  } else {
+    scraperDiskCache.invalidateDomain(domain).catch(() => {});
+  }
   return sorted;
 }
 

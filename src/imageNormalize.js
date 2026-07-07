@@ -414,4 +414,5 @@ module.exports = {
   rasterizeSvgToSize,
   TARGET_SIZE,
   MIN_SOURCE_SIZE,
+  SVG_DISPLAY_SIZE,
 };

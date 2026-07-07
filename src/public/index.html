@@ -2603,7 +2603,7 @@
         </div>
       </div>
       <!-- Scraper -->
-      <div class="card" data-card-type="domain">
+      <div class="card" id="scraper-card" data-card-type="domain">
         <div class="card-header">
           <h3><a href="/" target="_blank" rel="noopener noreferrer">HTML Scraper</a></h3>
           <button class="refresh-btn" id="scraper-refresh-btn" onclick="refreshScraper()" data-tip="Refresh icon (bypass cache)" aria-label="Refresh icon (bypass cache)">
@@ -3817,7 +3817,8 @@
       const fullProxy = adjustedProxy.startsWith('http')
         ? adjustedProxy
         : `${location.origin}${adjustedProxy}`;
-      const vector = isVector || isVectorIconUrl(adjustedProxy, sourceUrl, fullProxy, url);
+      const vector = isVector === true
+        || (isVector !== false && isVectorIconUrl(adjustedProxy, sourceUrl, fullProxy, url));
       if (display) {
         display.dataset.proxyUrl = fullProxy;
         display.dataset.copyUrl = url;
@@ -4086,6 +4087,7 @@
 
     function isVectorCard(card) {
       if (!card) return false;
+      if (card.querySelector('#scraper-img')) return false;
       const providerId = getCardProviderId(card);
       if (providerId && getCatalogFormat(providerId) === 'svg') return true;
       if (card.dataset.iconVector === 'true') return true;
@@ -4299,6 +4301,15 @@
 
         if (providerId && catalogNeedsSizeFilterSync(providerId)) {
           ensureCatalogFitsSizeFilter(providerId);
+        }
+
+        if (card.id === 'scraper-card' || card.querySelector('#scraper-img')) {
+          card.classList.remove('size-filter-hidden');
+          card.style.display = '';
+          if (isSizeFilterActive() && hasImage && !isLoading && !cardPassesSizeFilter(card)) {
+            ensureScraperFitsSizeFilter();
+          }
+          return;
         }
 
         if (isLoading || !hasImage) {
@@ -6592,6 +6603,7 @@
         proxyUrl,
         sourceUrl,
         forceProxy,
+        isVector: opts.isVector,
       });
     }
 
@@ -6621,6 +6633,10 @@
         }
         return parseSizeButtonValue(btn);
       });
+      // Fast proxy (/{domain}) is always offered when rendered — never grey out.
+      document.querySelectorAll('#scraper-sizes [data-scraper-source="proxy"]').forEach((btn) => {
+        btn.disabled = false;
+      });
     }
 
     function getScraperProxySizeSteps() {
@@ -6645,8 +6661,8 @@
     }
 
     function pickScraperIconIndex(min, max) {
-      if (!scraperIcons.length) return 0;
-      let bestIdx = 0;
+      if (!scraperIcons.length) return -1;
+      let bestIdx = -1;
       let bestSize = -1;
       scraperIcons.forEach((icon, idx) => {
         const size = scraperIconPixelSize(icon);
@@ -6683,7 +6699,8 @@
 
     function defaultScraperIconIndex() {
       if (!isSizeFilterActive()) return 0;
-      return pickScraperIconIndex(currentMinSizeFilter, currentMaxSizeFilter);
+      const idx = pickScraperIconIndex(currentMinSizeFilter, currentMaxSizeFilter);
+      return idx >= 0 ? idx : -1;
     }
 
     function scraperUsesDiscoveredIcons() {
@@ -6705,6 +6722,31 @@
       }
     }
 
+    function isScraperProxySelection(selection) {
+      return selection === 'proxy' || (typeof selection === 'string' && selection.startsWith('proxySize-'));
+    }
+
+    function scraperSelectionPixelSize(selection) {
+      if (selection === 'proxy') return scraperMaxIconSize;
+      if (typeof selection === 'string' && selection.startsWith('proxySize-')) {
+        return parseInt(selection.slice(10), 10) || 0;
+      }
+      if (typeof selection === 'number' && selection >= 0 && selection < scraperIcons.length) {
+        return scraperIconPixelSize(scraperIcons[selection]);
+      }
+      return 0;
+    }
+
+    function scraperSelectionFitsSizeFilter(selection) {
+      const size = scraperSelectionPixelSize(selection);
+      return size > 0 && sizePassesSizeFilter(size);
+    }
+
+    function scraperIsLoading() {
+      const spinner = document.getElementById('scraper-spinner');
+      return !!(spinner && spinner.style.display !== 'none');
+    }
+
     function syncScraperToSizeFilter() {
       if (!currentDomain) return;
       if (scraperUsesProxySizes()) {
@@ -6712,15 +6754,25 @@
         if (target !== currentScraperProxySize) switchScraperProxySize(target);
         return;
       }
+      if (isScraperProxySelection(currentScraperSelection) && scraperSelectionFitsSizeFilter(currentScraperSelection)) {
+        return;
+      }
       if (scraperUsesDiscoveredIcons()) {
-        const idx = defaultScraperIconIndex();
-        if (idx !== currentScraperSelection) switchScraperSize(idx);
+        const idx = pickScraperIconIndex(currentMinSizeFilter, currentMaxSizeFilter);
+        if (idx >= 0 && sizePassesSizeFilter(scraperIconPixelSize(scraperIcons[idx]))) {
+          if (idx !== currentScraperSelection) switchScraperSize(idx);
+          return;
+        }
+        const proxySize = pickScraperProxySize(currentMinSizeFilter, currentMaxSizeFilter);
+        if (proxySize && sizePassesSizeFilter(proxySize)) {
+          if (proxySize !== currentScraperProxySize) loadScraperProxyOrSize(proxySize);
+        }
       }
     }
 
     function ensureScraperFitsSizeFilter() {
-      if (!currentDomain) return false;
-      const card = document.getElementById('scraper-card');
+      if (!currentDomain || scraperIsLoading()) return false;
+      const card = getProviderCard('scraper');
       if (!card || card.style.display === 'none' || cardPassesSizeFilter(card)) return false;
 
       if (scraperUsesProxySizes()) {
@@ -6730,11 +6782,31 @@
         return true;
       }
 
+      if (isScraperProxySelection(currentScraperSelection) && scraperSelectionFitsSizeFilter(currentScraperSelection)) {
+        return false;
+      }
+
       if (scraperUsesDiscoveredIcons()) {
         const idx = pickScraperIconIndex(currentMinSizeFilter, currentMaxSizeFilter);
-        if (idx === currentScraperSelection) return false;
-        switchScraperSize(idx);
-        return true;
+        if (idx >= 0 && sizePassesSizeFilter(scraperIconPixelSize(scraperIcons[idx]))) {
+          if (currentScraperSelection === idx) return false;
+          switchScraperSize(idx);
+          return true;
+        }
+        const proxySize = pickScraperProxySize(currentMinSizeFilter, currentMaxSizeFilter);
+        if (proxySize && sizePassesSizeFilter(proxySize)) {
+          if (proxySize === scraperMaxIconSize && scraperMaxIconSize > 0) {
+            if (currentScraperSelection === 'proxy') return false;
+            switchScraperProxy();
+            return true;
+          }
+          const sel = `proxySize-${proxySize}`;
+          if (currentScraperSelection === sel && currentScraperProxySize === proxySize) return false;
+          currentScraperSelection = sel;
+          setActiveScraperButton(sel);
+          loadScraperProxySize(proxySize);
+          return true;
+        }
       }
 
       return false;
@@ -6769,12 +6841,66 @@
       img.style.maxHeight = '';
       img.style.maxWidth = '';
       img.style.imageRendering = '';
-      if (display) display.style.minHeight = '';
+      if (display) {
+        display.style.minHeight = '';
+        clearDisplayUrls(display);
+      }
+    }
+
+    function scraperWriteMeta(meta, display, opts) {
+      // Scraper cards always show a raster PNG from the proxy, even when the
+      // upstream source is SVG — do not treat them as vector for size filtering.
+      writeCardMeta(meta, display, { ...opts, isVector: false });
+    }
+
+    function loadScraperProxyOrSize(size) {
+      if (size === scraperMaxIconSize && scraperMaxIconSize > 0) {
+        switchScraperProxy();
+        return;
+      }
+      switchScraperProxySize(size);
+    }
+
+    function loadInitialScraperSelection(domain, refresh) {
+      if (scraperMaxIconSize > 0 && sizePassesSizeFilter(scraperMaxIconSize)) {
+        currentScraperSelection = 'proxy';
+        setActiveScraperButton('proxy');
+        loadScraperProxyVariant();
+        return;
+      }
+
+      const idx = defaultScraperIconIndex();
+      const iconSize = idx >= 0 ? scraperIconPixelSize(scraperIcons[idx]) : 0;
+      if (idx >= 0 && scraperIcons.length > 0 && sizePassesSizeFilter(iconSize)) {
+        currentScraperSelection = idx;
+        setActiveScraperButton(idx);
+        loadScraperVariant(idx);
+        return;
+      }
+
+      const proxySize = pickScraperProxySize(
+        currentMinSizeFilter > 0 ? currentMinSizeFilter : 16,
+        currentMaxSizeFilter > 0 ? currentMaxSizeFilter : 512
+      );
+      if (proxySize && sizePassesSizeFilter(proxySize)) {
+        if (proxySize === scraperMaxIconSize && scraperMaxIconSize > 0) {
+          currentScraperSelection = 'proxy';
+          setActiveScraperButton('proxy');
+          loadScraperProxyVariant();
+        } else {
+          currentScraperSelection = `proxySize-${proxySize}`;
+          setActiveScraperButton(currentScraperSelection);
+          loadScraperProxySize(proxySize);
+        }
+        return;
+      }
+
+      loadScraperFallback(domain, refresh);
     }
 
     function loadScraperFallback(domain, refresh) {
       const proxyUrl = refresh ? `/scraper/${domain}?refresh=1` : `/scraper/${domain}`;
-      loadFavicon('scraper', proxyUrl, scraperJsonSource);
+      loadFavicon('scraper', proxyUrl, scraperJsonSource, { isVector: false });
     }
 
     function loadScraperFavicon(domain, refresh) {
@@ -6796,7 +6922,7 @@
       const meta = document.getElementById('scraper-meta');
       const wwwNotice = document.getElementById('scraper-www-fallback');
       const display = document.getElementById('scraper-display');
-      const card = document.getElementById('scraper-card');
+      const card = getProviderCard('scraper');
       clearDisplayUrls(display);
       if (card) {
         delete card.dataset.iconSize;
@@ -6885,6 +7011,14 @@
       }
 
       if (sorted.length === 0) {
+        scraperIcons = [];
+        document.getElementById('scraper-proxy-sizes').style.display = 'none';
+        if (scraperMaxIconSize > 0) {
+          renderScraperSizes();
+          sizesEl.style.display = '';
+          loadInitialScraperSelection(domain, refresh);
+          return;
+        }
         const proxySizesEl = document.getElementById('scraper-proxy-sizes');
         proxySizesEl.style.display = '';
         const size = defaultScraperProxySize();
@@ -6898,16 +7032,7 @@
       scraperIcons = sorted;
       renderScraperSizes();
       sizesEl.style.display = '';
-      if (scraperMaxIconSize > 0) {
-        currentScraperSelection = 'proxy';
-        setActiveScraperButton('proxy');
-        loadScraperProxyVariant();
-      } else {
-        const idx = defaultScraperIconIndex();
-        currentScraperSelection = idx;
-        setActiveScraperButton(idx);
-        loadScraperVariant(idx);
-      }
+      loadInitialScraperSelection(domain, refresh);
     }
 
     function buildScraperSizeEntries() {
@@ -7033,7 +7158,6 @@
 
     function switchScraperProxy() {
       if (!currentDomain || scraperMaxIconSize <= 0) return;
-      if (!sizePassesSizeFilter(scraperMaxIconSize)) return;
       currentScraperSelection = 'proxy';
       setActiveScraperButton('proxy');
       loadScraperProxyVariant();
@@ -7075,21 +7199,23 @@
         img.src = imgEl.src;
         img.style.display = 'block';
         spinner.style.display = 'none';
-        writeCardMeta(meta, display, {
+        scraperWriteMeta(meta, display, {
           w: scraperMaxIconSize,
           h: scraperMaxIconSize,
           proxyUrl: embedUrl,
           sourceUrl: scraperJsonSource,
+          forceProxy: true,
         });
       };
       imgEl.onerror = () => {
         if (scraperLoadToken !== token || currentScraperSelection !== 'proxy') return;
         spinner.style.display = 'none';
-        writeCardMeta(meta, display, {
+        scraperWriteMeta(meta, display, {
           w: scraperMaxIconSize,
           h: scraperMaxIconSize,
           proxyUrl: embedUrl,
           sourceUrl: scraperJsonSource,
+          forceProxy: true,
         });
       };
       imgEl.src = `${proxyUrl}?_=${Date.now()}`;
@@ -7117,7 +7243,7 @@
         img.src = imgEl.src;
         img.style.display = 'block';
         spinner.style.display = 'none';
-        writeCardMeta(meta, display, {
+        scraperWriteMeta(meta, display, {
           w: imgEl.naturalWidth || icon.width || 0,
           h: imgEl.naturalHeight || icon.height || 0,
           proxyUrl: displayProxyUrl,
@@ -7127,7 +7253,7 @@
       imgEl.onerror = () => {
         if (scraperLoadToken !== token || currentScraperSelection !== idx) return;
         spinner.style.display = 'none';
-        writeCardMeta(meta, display, {
+        scraperWriteMeta(meta, display, {
           w: icon.width || 0,
           h: icon.height || 0,
           proxyUrl: displayProxyUrl,
@@ -7164,7 +7290,7 @@
         img.src = imgEl.src;
         img.style.display = 'block';
         spinner.style.display = 'none';
-        writeCardMeta(meta, display, {
+        scraperWriteMeta(meta, display, {
           w: size,
           h: size,
           proxyUrl: embedUrl,
@@ -7175,7 +7301,7 @@
       imgEl.onerror = () => {
         if (scraperLoadToken !== token) return;
         spinner.style.display = 'none';
-        writeCardMeta(meta, display, {
+        scraperWriteMeta(meta, display, {
           w: size,
           h: size,
           proxyUrl: embedUrl,
