@@ -387,13 +387,34 @@ Weekly preload plus the [recommended `.env`](#recommended-env-for-weekly-preload
 above keeps standard, scraper, and v1 caches warm through the week without daily
 upstream traffic.
 
-### Optional code change: align browser cache with `DISK_CACHE_TTL`
+### Browser cache vs `DISK_CACHE_TTL`
 
-The browser `Cache-Control` max-age on scraper/asset image routes is currently
-hardcoded to `86400` (1 day) in `src/index.js` (`CACHE_CONTROL`). If you raise
-`DISK_CACHE_TTL` to 7 days but want browsers/CDNs to cache that long too, the
-hardcoded value must be changed to derive from `DISK_CACHE_TTL`. This is a small
-code change, not just configuration — ask if you want it applied.
+Raising `DISK_CACHE_TTL` to 7 days keeps icon bytes on the **server disk** that
+long — repeat requests to FaviconAPI itself stay fast. What does **not** follow
+automatically is how long **browsers and reverse proxies** may cache scraper and
+asset responses.
+
+Those image routes send a fixed header today:
+
+```366:366:src/index.js
+const CACHE_CONTROL = 'public, max-age=86400';
+```
+
+So clients see **1 day** (`86400` seconds), even when `DISK_CACHE_TTL=604800`.
+The v1 CDN route (`/cdn/favicons/`) already uses `API_CACHE_TTL` and can cache
+for the full 7 days.
+
+| Route | Server disk TTL | Browser/proxy `Cache-Control` |
+|---|---|---|
+| `/scraper/…`, `/s-asset`, provider image routes | `DISK_CACHE_TTL` | Hardcoded **1 day** |
+| `/cdn/favicons/{domain}.png` | `API_CACHE_TTL` | Matches `API_CACHE_TTL` |
+
+For most self-hosted setups this is fine: the server-side cache does the heavy
+lifting; browsers revalidate after a day while the origin still serves from disk.
+If you front the service with a CDN and want edge caches to hold scraper icons
+for the full `DISK_CACHE_TTL`, `CACHE_CONTROL` in `src/index.js` would need to
+derive from `DISK_CACHE_TTL` instead of the fixed `86400` — that is a code
+change, not an env var.
 
 ---
 
