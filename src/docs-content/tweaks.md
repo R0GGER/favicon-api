@@ -197,6 +197,91 @@ send `Cache-Control: public, max-age=86400`; the v1 CDN route sends
 serve repeat requests without ever hitting Node, which is the cheapest possible
 hit.
 
+### 10. Preload popular sites after deploy
+
+After a fresh install or cache wipe, the first request for each domain is slow
+because discovery and upstream fetches run on demand. The CLI at
+`scripts/preload-top-sites.js` warms both cache layers in one pass by requesting
+favicons for the world's most visited websites.
+
+For each domain it calls:
+
+| Step | Endpoint | What gets cached |
+|---|---|---|
+| Standard API | `GET /{domain}` | Best-pick provider cache (memory + disk) — same as the homepage API example |
+| API v1 | `GET /api/v1/favicon?url=https://{domain}` | Normalized 128×128 PNG under `API_CACHE_DIR`, served via `/cdn/favicons/{domain}.png` |
+
+See [API v1](api-v1.md) for authentication and quota rules on the v1 endpoint.
+
+#### Domain source (Tranco)
+
+By default the script downloads domains from the [Tranco](https://tranco-list.eu/)
+research ranking — an aggregate of Cisco Umbrella, Majestic, CrUX, Cloudflare
+Radar, and related lists, updated daily.
+
+1. Resolve the latest list ID via `https://tranco-list.eu/latest_list` (redirect).
+2. Download the top *N* entries as CSV from
+   `https://tranco-list.eu/download/{listId}/{limit}` (default **500**).
+
+Each CSV line is `rank,domain` (e.g. `1,google.com`). Pass `--domains-file
+path/to/list.txt` to use your own list instead (one domain per line).
+
+#### Usage
+
+Run the script inside the `favicon-api` container (the service listens on port **3000** inside Docker):
+
+```bash
+# Default: top 500, concurrency 4
+docker compose exec favicon-api node scripts/preload-top-sites.js --base-url http://127.0.0.1:3000
+
+# With options
+docker compose exec favicon-api node scripts/preload-top-sites.js \
+  --base-url http://127.0.0.1:3000 --limit 500 --concurrency 4
+```
+
+When `API_REQUIRE_KEY=true`, pass a key for the v1 calls:
+
+```bash
+docker compose exec favicon-api node scripts/preload-top-sites.js \
+  --base-url http://127.0.0.1:3000 --api-key fa_your_key_here
+```
+
+Preview which domains would be fetched without calling the API:
+
+```bash
+docker compose exec favicon-api node scripts/preload-top-sites.js \
+  --base-url http://127.0.0.1:3000 --dry-run --limit 10
+```
+
+#### Options
+
+| Option | Default | Description |
+|---|---|---|
+| `--base-url` | `http://127.0.0.1:3000` (inside container) | FaviconAPI base URL |
+| `--limit` | `500` | Number of domains from Tranco |
+| `--concurrency` | `4` | Parallel domain workers |
+| `--api-key` | `PRELOAD_API_KEY` / `API_KEY` env | Bearer key for `/api/v1/favicon` |
+| `--domains-file` | — | Local domain list instead of Tranco |
+| `--skip-standard` | — | Skip `GET /{domain}` |
+| `--skip-v1` | — | Skip `/api/v1/favicon` |
+| `--timeout` | `30000` | Per-request timeout (ms) |
+| `--dry-run` | — | Print domains only |
+
+#### Expectations
+
+- **Duration.** The full top 500 typically takes **30–60 minutes**, depending on
+  concurrency, upstream latency, and scraper settings. Start with `--limit 50` to
+  validate before running the full list.
+- **Failures.** Some Tranco entries are infrastructure domains (e.g.
+  `gtld-servers.net`) with no usable favicon. The standard API may still return
+  a fallback icon; API v1 may respond with `422 favicon_not_found` — that is
+  normal and does not stop the script.
+- **Load.** Each domain triggers upstream fetches on a cold cache. Run during
+  off-peak hours or lower `--concurrency` if upstreams rate-limit you.
+- **Persistence.** Preloaded data is written to the same `CACHE_DIR` /
+  `API_CACHE_DIR` volume as normal requests — ensure it is mounted persistently
+  (see [Persist all caches](#1-persist-all-caches-on-a-durable-volume) above).
+
 ### Optional code change: align browser cache with `DISK_CACHE_TTL`
 
 The browser `Cache-Control` max-age on scraper/asset image routes is currently

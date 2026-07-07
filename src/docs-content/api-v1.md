@@ -131,6 +131,8 @@ HTTP intermediaries (or a CDN in front of this service) can cache the PNG for th
 
 Returns **404** when no PNG has been generated for that domain yet — safe to expose publicly. Callers must hit `/api/v1/favicon` first to populate the cache (with a valid key when `API_REQUIRE_KEY=true`, or without when public mode is enabled).
 
+To warm the v1 cache for hundreds of popular domains in one run, use the preload CLI described in [Tweaks — Preload popular sites](/docs/tweaks#10-preload-popular-sites-after-deploy) (`scripts/preload-top-sites.js`).
+
 ## Managing API keys
 
 The CLI at `scripts/manage-keys.js` reads/writes `API_KEYS_DB` (default `/cache/api-keys.sqlite`, shared with the cache volume).
