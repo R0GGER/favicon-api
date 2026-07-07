@@ -2103,10 +2103,14 @@
       font-size: 0.88rem;
     }
 
-    /* Docs vs About: below 1210px (smartphones and tablets) */
+    /* Docs vs About; size filter slider: below 1210px (smartphones and tablets) */
     @media (max-width: 1209px) {
       .nav-desktop-only { display: none !important; }
       .nav-mobile-only:not([hidden]) { display: inline-flex !important; }
+      .download-toolbar-left > .download-toolbar-divider,
+      .size-filter-group {
+        display: none !important;
+      }
     }
 
     .top-nav-btn {
@@ -2300,6 +2304,14 @@
 
       .quick-links a.quick-hide-mobile {
         display: none;
+      }
+
+      .download-toolbar-left {
+        display: none !important;
+      }
+
+      #profile-builder-btn {
+        display: none !important;
       }
 
       /* Hide Tip box on mobile */
@@ -4542,46 +4554,49 @@
       });
     }
 
-    function setResultsView(mode) {
-      if (mode !== 'grid' && mode !== 'table') return;
-      currentResultsView = mode;
-      try {
-        localStorage.setItem(RESULTS_VIEW_STORAGE_KEY, mode);
-      } catch {
-        /* ignore quota / private mode */
-      }
+    function getEffectiveResultsView() {
+      return isMobileViewport() ? 'grid' : currentResultsView;
+    }
+
+    function applyResultsViewClasses() {
+      const mode = getEffectiveResultsView();
       const results = document.getElementById('results');
       if (results) {
         results.classList.toggle('view-grid', mode === 'grid');
         results.classList.toggle('view-table', mode === 'table');
       }
       document.querySelectorAll('.results-view-btn').forEach((btn) => {
-        const active = btn.dataset.view === mode;
+        const active = btn.dataset.view === currentResultsView;
         btn.classList.toggle('active', active);
         btn.setAttribute('aria-pressed', active ? 'true' : 'false');
       });
       scheduleResultsTableSync();
     }
 
+    function setResultsView(mode) {
+      if (mode !== 'grid' && mode !== 'table') return;
+      if (isMobileViewport()) return;
+      currentResultsView = mode;
+      try {
+        localStorage.setItem(RESULTS_VIEW_STORAGE_KEY, mode);
+      } catch {
+        /* ignore quota / private mode */
+      }
+      applyResultsViewClasses();
+    }
+
     function initResultsViewToggle() {
       loadResultsViewFromStorage();
-      const results = document.getElementById('results');
-      if (results) {
-        results.classList.toggle('view-grid', currentResultsView === 'grid');
-        results.classList.toggle('view-table', currentResultsView === 'table');
-      }
+      applyResultsViewClasses();
       document.querySelectorAll('.results-view-btn').forEach((btn) => {
         btn.addEventListener('click', () => setResultsView(btn.dataset.view));
-        const active = btn.dataset.view === currentResultsView;
-        btn.classList.toggle('active', active);
-        btn.setAttribute('aria-pressed', active ? 'true' : 'false');
       });
       const tbody = document.getElementById('results-table-body');
       if (tbody && !tbody.dataset.bound) {
         tbody.dataset.bound = '1';
         tbody.addEventListener('click', onResultsTableClick);
       }
-      scheduleResultsTableSync();
+      window.matchMedia('(max-width: 700px)').addEventListener('change', applyResultsViewClasses);
     }
 
     function getCardProviderLabel(card) {
@@ -4740,7 +4755,7 @@
       const tbody = document.getElementById('results-table-body');
       if (!results || !wrap || !tbody) return;
 
-      const showTable = currentResultsView === 'table' && results.classList.contains('visible');
+      const showTable = getEffectiveResultsView() === 'table' && results.classList.contains('visible');
       wrap.hidden = !showTable;
       if (!showTable) return;
 
