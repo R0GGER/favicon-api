@@ -1311,6 +1311,88 @@
       overflow: visible;
     }
 
+    .scraper-sizes-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.4rem;
+      margin-bottom: 0.6rem;
+    }
+
+    .scraper-sizes-toolbar .size-buttons {
+      margin-bottom: 0;
+    }
+
+    .scraper-sizes-toolbar .scraper-sizes-loading {
+      margin-bottom: 0;
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+
+    .scraper-sizes-loading {
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+      margin-bottom: 0.6rem;
+    }
+
+    .scraper-sizes-toolbar .scraper-sizes-loading {
+      flex-direction: row;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .scraper-sizes-toolbar .scraper-sizes-skeleton {
+      flex: 0 0 auto;
+    }
+
+    .scraper-sizes-loading-inner {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .scraper-sizes-spinner {
+      width: 16px;
+      height: 16px;
+      border-width: 2px;
+      flex-shrink: 0;
+    }
+
+    .scraper-sizes-loading-text {
+      font-size: 0.78rem;
+      color: #8a8278;
+      line-height: 1.3;
+    }
+
+    .scraper-sizes-skeleton {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+    }
+
+    .scraper-sizes-skeleton .skeleton-pill {
+      display: inline-block;
+      height: 28px;
+      border-radius: 4px;
+      background: linear-gradient(90deg, #ece7e1 25%, #f5f2ee 50%, #ece7e1 75%);
+      background-size: 200% 100%;
+      animation: scraper-sizes-shimmer 1.2s ease-in-out infinite;
+    }
+
+    .scraper-sizes-skeleton .skeleton-pill:nth-child(1) { width: 42px; animation-delay: 0s; }
+    .scraper-sizes-skeleton .skeleton-pill:nth-child(2) { width: 38px; animation-delay: 0.1s; }
+    .scraper-sizes-skeleton .skeleton-pill:nth-child(3) { width: 36px; animation-delay: 0.2s; }
+    .scraper-sizes-skeleton .skeleton-pill:nth-child(4) { width: 34px; animation-delay: 0.15s; }
+    .scraper-sizes-skeleton .skeleton-pill:nth-child(5) { width: 32px; animation-delay: 0.25s; }
+    .scraper-sizes-skeleton .skeleton-pill:nth-child(6) { width: 30px; animation-delay: 0.05s; }
+
+    @keyframes scraper-sizes-shimmer {
+      0% { background-position: 100% 0; }
+      100% { background-position: -100% 0; }
+    }
+
     .size-buttons-toolbar {
       display: flex;
       flex-wrap: nowrap;
@@ -2618,6 +2700,22 @@
           <span class="copied-toast">URL copied!</span>
         </div>
         <div class="www-fallback-notice" id="scraper-www-fallback" style="display:none"></div>
+        <div class="scraper-sizes-toolbar" id="scraper-sizes-toolbar" style="display:none">
+          <div class="size-buttons" id="scraper-sizes"></div>
+          <div class="scraper-sizes-loading" id="scraper-sizes-loading" style="display:none" aria-live="polite" aria-busy="false">
+            <div class="scraper-sizes-loading-inner">
+              <div class="spinner scraper-sizes-spinner" aria-hidden="true"></div>
+              <span class="scraper-sizes-loading-text">Discovering other icon sizes…</span>
+            </div>
+            <div class="scraper-sizes-skeleton" aria-hidden="true">
+              <span class="skeleton-pill"></span>
+              <span class="skeleton-pill"></span>
+              <span class="skeleton-pill"></span>
+              <span class="skeleton-pill"></span>
+              <span class="skeleton-pill"></span>
+            </div>
+          </div>
+        </div>
         <div class="size-buttons" id="scraper-proxy-sizes" style="display:none">
           <button class="size-btn" onclick="switchScraperProxySize(512)">512</button>
           <button class="size-btn" onclick="switchScraperProxySize(256)">256</button>
@@ -2626,7 +2724,6 @@
           <button class="size-btn" onclick="switchScraperProxySize(32)">32</button>
           <button class="size-btn" onclick="switchScraperProxySize(16)">16</button>
         </div>
-        <div class="size-buttons" id="scraper-sizes" style="display:none"></div>
         <div class="meta" id="scraper-meta"></div>
       </div>
 
@@ -3613,7 +3710,7 @@
       'scraper', 'google', 'ddg', 'yandex', 'faviconso', 'vemetric', 'favicondev', 'faviconkit', 'faviconrun', 'twentyicons', 'ryanjc', 'logodev', 'brandfetch',
     ];
     const SERVICE_PROXY_PREFIX = { selfhst: '/selfhst', dashboardicons: '/dashboardicons', lobehub: '/lobehub', svgl: '/svgl' };
-    let providersConfig = { logoDev: false, logoDevToken: null, brandfetch: false, includeAppIcons: true, urlMode: 'proxy' };
+    let providersConfig = { logoDev: false, logoDevToken: null, brandfetch: false, includeAppIcons: true, urlMode: 'proxy', scraperMaxIconSize: 0 };
     let providersReadyResolve;
     const providersReady = new Promise((resolve) => {
       providersReadyResolve = resolve;
@@ -4977,14 +5074,16 @@
 
       const scraperSizes = document.getElementById('scraper-sizes');
       if (scraperSizes) {
-        scraperSizes.style.display = 'none';
         scraperSizes.innerHTML = '';
       }
+      const scraperToolbar = document.getElementById('scraper-sizes-toolbar');
+      if (scraperToolbar) scraperToolbar.style.display = 'none';
       const scraperProxySizes = document.getElementById('scraper-proxy-sizes');
       if (scraperProxySizes) {
         scraperProxySizes.style.display = 'none';
         setActiveSize('scraper-proxy-sizes', 128);
       }
+      setScraperSizesLoading(false);
 
       clearServiceCandidates();
       setActiveSize('google-sizes', 128);
@@ -6616,7 +6715,91 @@
     let currentScraperSelection = 0;
     let currentScraperProxySize = 128;
     let scraperLoadToken = 0;
+    let scraperRefresh = false;
+    let scraperSizesPending = false;
     const SCRAPER_PROXY_SIZE_STEPS = [16, 32, 64, 128, 256, 512];
+
+    function scraperImageSrc(proxyUrl, refresh = scraperRefresh) {
+      if (!refresh) return proxyUrl;
+      const sep = proxyUrl.includes('?') ? '&' : '?';
+      return `${proxyUrl}${sep}_=${Date.now()}`;
+    }
+
+    function scraperImageMatchesLoaded(proxyUrl, refresh = scraperRefresh) {
+      const img = document.getElementById('scraper-img');
+      if (!img || img.style.display === 'none' || !(img.naturalWidth > 0)) return false;
+      try {
+        const want = new URL(scraperImageSrc(proxyUrl, refresh), location.origin);
+        const have = new URL(img.currentSrc || img.src, location.origin);
+        want.searchParams.delete('_');
+        have.searchParams.delete('_');
+        return want.pathname === have.pathname && want.search === have.search;
+      } catch {
+        return false;
+      }
+    }
+
+    function loadScraperParallelPreview(domain, refresh) {
+      const proxyUrl = refresh ? `/scraper/${domain}?refresh=1` : `/scraper/${domain}`;
+      currentScraperSelection = 'proxy';
+      loadFavicon('scraper', proxyUrl, null, { isVector: false, refresh, softLoad: !refresh });
+    }
+
+    function scraperRevealLoadedImage() {
+      const img = document.getElementById('scraper-img');
+      const spinner = document.getElementById('scraper-spinner');
+      if (!img || !(img.naturalWidth > 0)) return;
+      img.style.display = 'block';
+      if (spinner) spinner.style.display = 'none';
+    }
+
+    function setScraperSizesLoading(visible) {
+      const el = document.getElementById('scraper-sizes-loading');
+      const toolbar = document.getElementById('scraper-sizes-toolbar');
+      const sizesEl = document.getElementById('scraper-sizes');
+      if (!el) return;
+      el.style.display = visible ? '' : 'none';
+      el.setAttribute('aria-busy', visible ? 'true' : 'false');
+      if (toolbar) {
+        const hasButtons = !!(sizesEl && sizesEl.children.length > 0);
+        toolbar.style.display = visible || hasButtons ? '' : 'none';
+      }
+    }
+
+    function configuredScraperProxySize() {
+      const n = Number(providersConfig.scraperMaxIconSize) || 0;
+      return n > 0 ? n : 0;
+    }
+
+    function createScraperProxyButton(active) {
+      const proxyBtn = document.createElement('button');
+      proxyBtn.type = 'button';
+      proxyBtn.dataset.scraperSource = 'proxy';
+      proxyBtn.className =
+        'size-btn size-btn-proxy' + (active ? ' active' : '');
+      attachScraperProxyTooltip(proxyBtn, scraperMaxIconSize, scraperEmbedUrl());
+      proxyBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        switchScraperProxy();
+      });
+      return proxyBtn;
+    }
+
+    function renderScraperEarlySizes(domain) {
+      const proxySize = configuredScraperProxySize();
+      if (!proxySize) return;
+
+      scraperMaxIconSize = proxySize;
+      currentScraperSelection = 'proxy';
+
+      const sizesEl = document.getElementById('scraper-sizes');
+      sizesEl.innerHTML = '';
+      sizesEl.appendChild(createScraperProxyButton(true));
+
+      const toolbar = document.getElementById('scraper-sizes-toolbar');
+      if (toolbar) toolbar.style.display = '';
+    }
 
     function scraperUsesProxySizes() {
       const el = document.getElementById('scraper-proxy-sizes');
@@ -6667,8 +6850,10 @@
       return scraperIcons.reduce((max, icon) => Math.max(max, scraperIconPixelSize(icon)), 0);
     }
 
-    // Fast proxy sizes require a source icon at least that large — downscale only.
+    // Fast proxy at scraperMaxIconSize uses /scraper/{domain} server-side downscale.
+    // Other proxy sizes need a large enough discovered source.
     function scraperCanDownscaleTo(size) {
+      if (size > 0 && scraperMaxIconSize > 0 && size === scraperMaxIconSize) return true;
       return size > 0 && scraperLargestDiscoveredSize() >= size;
     }
 
@@ -6917,10 +7102,12 @@
 
     function loadScraperFallback(domain, refresh) {
       const proxyUrl = refresh ? `/scraper/${domain}?refresh=1` : `/scraper/${domain}`;
-      loadFavicon('scraper', proxyUrl, scraperJsonSource, { isVector: false });
+      loadFavicon('scraper', proxyUrl, scraperJsonSource, { isVector: false, refresh });
     }
 
     function loadScraperFavicon(domain, refresh) {
+      scraperRefresh = !!refresh;
+      scraperSizesPending = true;
       scraperIcons = [];
       scraperMaxIconSize = 0;
       scraperAvailableSizes = {};
@@ -6928,8 +7115,10 @@
       currentScraperSelection = 0;
       currentScraperProxySize = 128;
       const sizesEl = document.getElementById('scraper-sizes');
-      sizesEl.style.display = 'none';
       sizesEl.innerHTML = '';
+
+      const toolbar = document.getElementById('scraper-sizes-toolbar');
+      if (toolbar) toolbar.style.display = 'none';
 
       const proxySizesEl = document.getElementById('scraper-proxy-sizes');
       proxySizesEl.style.display = 'none';
@@ -6946,12 +7135,20 @@
         delete card.dataset.iconVector;
         card.classList.remove('size-filter-hidden');
       }
-      img.style.display = 'none';
-      spinner.style.display = 'block';
+      if (refresh) {
+        img.style.display = 'none';
+        spinner.style.display = 'block';
+      } else {
+        img.style.display = 'none';
+        spinner.style.display = 'none';
+      }
       meta.textContent = '';
       wwwNotice.style.display = 'none';
       wwwNotice.innerHTML = '';
 
+      renderScraperEarlySizes(domain);
+      setScraperSizesLoading(true);
+      loadScraperParallelPreview(domain, refresh);
       loadScraperSizes(domain, refresh);
     }
 
@@ -6994,6 +7191,11 @@
         }
       } catch {
         // fall through to proxy fallback
+      } finally {
+        if (currentDomain === requestedFor) {
+          scraperSizesPending = false;
+          setScraperSizesLoading(false);
+        }
       }
 
       if (currentDomain !== requestedFor) return;
@@ -7032,13 +7234,13 @@
         document.getElementById('scraper-proxy-sizes').style.display = 'none';
         if (scraperMaxIconSize > 0 && scraperCanDownscaleTo(scraperMaxIconSize)) {
           renderScraperSizes();
-          sizesEl.style.display = '';
           loadInitialScraperSelection(domain, refresh);
           return;
         }
         if (scraperMaxIconSize > 0) {
-          sizesEl.style.display = 'none';
           sizesEl.innerHTML = '';
+          const toolbar = document.getElementById('scraper-sizes-toolbar');
+          if (toolbar) toolbar.style.display = 'none';
           loadScraperFallback(domain, refresh);
           return;
         }
@@ -7054,7 +7256,6 @@
 
       scraperIcons = sorted;
       renderScraperSizes();
-      sizesEl.style.display = '';
       loadInitialScraperSelection(domain, refresh);
     }
 
@@ -7117,19 +7318,7 @@
 
       for (const entry of buildScraperSizeEntries()) {
         if (entry.type === 'proxy') {
-          const proxyBtn = document.createElement('button');
-          proxyBtn.type = 'button';
-          proxyBtn.dataset.scraperSource = 'proxy';
-          proxyBtn.className =
-            'size-btn size-btn-proxy' +
-            (currentScraperSelection === 'proxy' ? ' active' : '');
-          const embedUrl = scraperEmbedUrl();
-          attachScraperProxyTooltip(proxyBtn, scraperMaxIconSize, embedUrl);
-          proxyBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            switchScraperProxy();
-          });
+          const proxyBtn = createScraperProxyButton(currentScraperSelection === 'proxy');
           frag.appendChild(proxyBtn);
           continue;
         }
@@ -7181,6 +7370,8 @@
         frag.appendChild(btn);
       }
       sizesEl.appendChild(frag);
+      const toolbar = document.getElementById('scraper-sizes-toolbar');
+      if (toolbar) toolbar.style.display = '';
       syncAllSizeButtonsToFilter();
     }
 
@@ -7210,6 +7401,19 @@
       const spinner = document.getElementById('scraper-spinner');
       const meta = document.getElementById('scraper-meta');
       const display = img.closest('.favicon-display');
+
+      if (scraperImageMatchesLoaded(proxyUrl)) {
+        scraperRevealLoadedImage();
+        scraperWriteMeta(meta, display, {
+          w: scraperMaxIconSize || img.naturalWidth || 0,
+          h: scraperMaxIconSize || img.naturalHeight || 0,
+          proxyUrl: embedUrl,
+          sourceUrl: scraperJsonSource,
+          forceProxy: true,
+        });
+        return;
+      }
+
       resetScraperDisplay(img, spinner, meta, display);
 
       const imgEl = new Image();
@@ -7246,7 +7450,7 @@
           forceProxy: true,
         });
       };
-      imgEl.src = `${proxyUrl}?_=${Date.now()}`;
+      imgEl.src = scraperImageSrc(proxyUrl);
     }
 
     function loadScraperVariant(idx) {
@@ -7262,6 +7466,18 @@
       const spinner = document.getElementById('scraper-spinner');
       const meta = document.getElementById('scraper-meta');
       const display = img.closest('.favicon-display');
+
+      if (scraperImageMatchesLoaded(proxyUrl)) {
+        scraperRevealLoadedImage();
+        scraperWriteMeta(meta, display, {
+          w: img.naturalWidth || icon.width || 0,
+          h: img.naturalHeight || icon.height || 0,
+          proxyUrl: displayProxyUrl,
+          sourceUrl: icon.url || null,
+        });
+        return;
+      }
+
       resetScraperDisplay(img, spinner, meta, display);
 
       const imgEl = new Image();
@@ -7288,7 +7504,7 @@
           sourceUrl: icon.url || null,
         });
       };
-      imgEl.src = `${proxyUrl}?_=${Date.now()}`;
+      imgEl.src = scraperImageSrc(proxyUrl);
     }
 
     function switchScraperProxySize(size) {
@@ -7309,6 +7525,18 @@
       const spinner = document.getElementById('scraper-spinner');
       const meta = document.getElementById('scraper-meta');
       const display = img.closest('.favicon-display');
+
+      if (scraperImageMatchesLoaded(proxyUrl)) {
+        scraperWriteMeta(meta, display, {
+          w: size,
+          h: size,
+          proxyUrl: embedUrl,
+          sourceUrl: sizeSource,
+        });
+        scheduleNoIconNoticeCheck();
+        return;
+      }
+
       resetScraperDisplay(img, spinner, meta, display);
 
       const imgEl = new Image();
@@ -7337,7 +7565,7 @@
         });
         scheduleNoIconNoticeCheck();
       };
-      imgEl.src = `${proxyUrl}?_=${Date.now()}`;
+      imgEl.src = scraperImageSrc(proxyUrl);
     }
 
     function loadFavicon(id, proxyUrl, sourceUrl, opts) {
@@ -7350,10 +7578,15 @@
 
       if (card && id !== 'brandfetch') card.style.display = '';
       setSizeUnavailable(display, false);
-      img.style.display = 'none';
-      spinner.style.display = 'block';
-      meta.textContent = '';
-      clearDisplayUrls(display);
+      const softLoad = id === 'scraper' && opts?.softLoad;
+      if (!softLoad) {
+        img.style.display = 'none';
+        spinner.style.display = 'block';
+        meta.textContent = '';
+        clearDisplayUrls(display);
+      } else if (spinner) {
+        spinner.style.display = 'none';
+      }
       scheduleResultsTableSync();
 
       const imgEl = new Image();
@@ -7419,7 +7652,11 @@
         img.src = objectUrl;
         return;
       }
-      imgEl.src = `${proxyUrl}${proxyUrl.includes('?') ? '&' : '?'}_=${Date.now()}`;
+      if (id === 'scraper') {
+        imgEl.src = scraperImageSrc(proxyUrl, !!opts?.refresh);
+      } else {
+        imgEl.src = `${proxyUrl}${proxyUrl.includes('?') ? '&' : '?'}_=${Date.now()}`;
+      }
     }
 
     function loadDavicon(id, proxyUrl, sourceUrl) {

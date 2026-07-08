@@ -1618,6 +1618,7 @@ app.get('/providers', (req, res) => {
     includeAppIcons: UI_INCLUDE_APP_ICONS,
     urlMode: UI_CARD_URL,
     docsEnabled: UI_ENABLE_DOCS,
+    scraperMaxIconSize: getScraperMaxIconSize(),
     upstreamIpv4: true,
     api: {
       requireKey: API_REQUIRE_KEY,
