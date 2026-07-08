@@ -6165,7 +6165,6 @@
       clearDisplayUrls(display);
 
       const imgEl = new Image();
-      imgEl.crossOrigin = 'anonymous';
       imgEl.onload = () => {
         if (
           currentSelfhstSlug !== activeSlug
@@ -6316,7 +6315,6 @@
       clearDisplayUrls(display);
 
       const imgEl = new Image();
-      imgEl.crossOrigin = 'anonymous';
       imgEl.onload = () => {
         if (
           currentDashboardIconsSlug !== activeSlug
@@ -6457,7 +6455,6 @@
       clearDisplayUrls(display);
 
       const imgEl = new Image();
-      imgEl.crossOrigin = 'anonymous';
       imgEl.onload = () => {
         if (
           currentLobehubSlug !== activeSlug
@@ -6616,7 +6613,6 @@
       clearDisplayUrls(display);
 
       const imgEl = new Image();
-      imgEl.crossOrigin = 'anonymous';
       imgEl.onload = async () => {
         if (
           currentSvglSlug !== activeSlug
@@ -6699,26 +6695,14 @@
       });
     }
 
-    function probeSvglVariant(slug, variant) {
-      return new Promise((resolve) => {
-        const img = new Image();
-        img.onload = () => resolve(true);
-        img.onerror = () => resolve(false);
-        img.src = catalogImageSrc(svglProxyPath(slug, variant, 'png', 128));
-      });
-    }
-
     async function probeAndShowSvglVariants(slug) {
       const seq = ++svglProbeSeq;
-      const variants = ['light', 'dark'];
-      await Promise.all(
-        variants.map(async (variant) => {
-          const ok = await probeSvglVariant(slug, variant);
-          if (seq !== svglProbeSeq || currentSvglSlug !== slug) return;
-          const btn = document.querySelector(`#svgl-variants .size-btn[data-variant="${variant}"]`);
-          if (btn) btn.style.display = ok ? '' : 'none';
-        })
-      );
+      const catalog = await fetchSvglCatalog(slug);
+      if (seq !== svglProbeSeq || currentSvglSlug !== slug) return;
+      for (const variant of ['light', 'dark']) {
+        const btn = document.querySelector(`#svgl-variants .size-btn[data-variant="${variant}"]`);
+        if (btn) btn.style.display = catalog?.variants?.[variant] ? '' : 'none';
+      }
     }
 
     function showFaviconMeta(id, imgEl, proxyUrl, sourceUrl, opts = {}) {
@@ -6748,6 +6732,22 @@
     let scraperRefresh = false;
     let scraperSizesPending = false;
     const SCRAPER_PROXY_SIZE_STEPS = [16, 32, 64, 128, 256, 512];
+
+    // In-page cache of the /{domain}/json scraper discovery result, keyed by
+    // domain. Lets repeat searches for the same domain render instantly without
+    // re-running discovery (no "Discovering other icon sizes…" loader and no
+    // network round-trip). An explicit refresh bypasses and overwrites it.
+    const scraperDiscoveryCache = new Map();
+    const SCRAPER_DISCOVERY_CACHE_MAX = 100;
+
+    function cacheScraperDiscovery(domain, scraperEndpoint) {
+      if (!scraperEndpoint) return;
+      if (scraperDiscoveryCache.has(domain)) scraperDiscoveryCache.delete(domain);
+      scraperDiscoveryCache.set(domain, scraperEndpoint);
+      while (scraperDiscoveryCache.size > SCRAPER_DISCOVERY_CACHE_MAX) {
+        scraperDiscoveryCache.delete(scraperDiscoveryCache.keys().next().value);
+      }
+    }
 
     function scraperImageSrc(proxyUrl, refresh = scraperRefresh) {
       if (!refresh) return proxyUrl;
@@ -7204,20 +7204,24 @@
 
     async function loadScraperSizes(domain, refresh) {
       const requestedFor = domain;
-      const sizesEl = document.getElementById('scraper-sizes');
-      const wwwNotice = document.getElementById('scraper-www-fallback');
-      let icons = [];
-      let wwwFallback = null;
+
+      // Repeat search for a domain we already discovered: render straight from
+      // the in-page cache. No loader, no /{domain}/json round-trip. Refresh
+      // (refreshScraper / ?refresh=1) skips this and re-runs discovery below.
+      if (!refresh && scraperDiscoveryCache.has(domain)) {
+        scraperSizesPending = false;
+        setScraperSizesLoading(false);
+        applyScraperDiscovery(domain, refresh, scraperDiscoveryCache.get(domain));
+        return;
+      }
+
+      let scraperEndpoint = null;
       try {
         const url = `/${encodeURIComponent(domain)}/json${refresh ? '?_=' + Date.now() : ''}`;
         const res = await fetch(url, { headers: { Accept: 'application/json' } });
         if (res.ok) {
           const body = await res.json();
-          icons = body?.endpoints?.scraper?.icons || [];
-          scraperMaxIconSize = Number(body?.endpoints?.scraper?.maxIconSize) || 0;
-          scraperAvailableSizes = body?.endpoints?.scraper?.sizes || {};
-          scraperJsonSource = body?.endpoints?.scraper?.source || null;
-          wwwFallback = body?.endpoints?.scraper?.wwwFallback || null;
+          scraperEndpoint = body?.endpoints?.scraper || null;
         }
       } catch {
         // fall through to proxy fallback
@@ -7229,6 +7233,20 @@
       }
 
       if (currentDomain !== requestedFor) return;
+
+      if (scraperEndpoint) cacheScraperDiscovery(domain, scraperEndpoint);
+      applyScraperDiscovery(domain, refresh, scraperEndpoint);
+    }
+
+    function applyScraperDiscovery(domain, refresh, scraperEndpoint) {
+      const sizesEl = document.getElementById('scraper-sizes');
+      const wwwNotice = document.getElementById('scraper-www-fallback');
+
+      const icons = scraperEndpoint?.icons || [];
+      scraperMaxIconSize = Number(scraperEndpoint?.maxIconSize) || 0;
+      scraperAvailableSizes = scraperEndpoint?.sizes || {};
+      scraperJsonSource = scraperEndpoint?.source || null;
+      const wwwFallback = scraperEndpoint?.wwwFallback || null;
 
       let sorted = (Array.isArray(icons) ? icons : [])
         .filter((i) => i && typeof i.url === 'string' && (i.width || 0) > 0)
@@ -7447,7 +7465,6 @@
       resetScraperDisplay(img, spinner, meta, display);
 
       const imgEl = new Image();
-      imgEl.crossOrigin = 'anonymous';
       let retriedStale = false;
       imgEl.onload = () => {
         if (scraperLoadToken !== token || currentScraperSelection !== 'proxy') return;
@@ -7511,7 +7528,6 @@
       resetScraperDisplay(img, spinner, meta, display);
 
       const imgEl = new Image();
-      imgEl.crossOrigin = 'anonymous';
       imgEl.onload = () => {
         if (scraperLoadToken !== token || currentScraperSelection !== idx) return;
         img.src = imgEl.src;
@@ -7570,7 +7586,6 @@
       resetScraperDisplay(img, spinner, meta, display);
 
       const imgEl = new Image();
-      imgEl.crossOrigin = 'anonymous';
       imgEl.onload = () => {
         if (scraperLoadToken !== token) return;
         img.src = imgEl.src;
@@ -7620,7 +7635,6 @@
       scheduleResultsTableSync();
 
       const imgEl = new Image();
-      imgEl.crossOrigin = 'anonymous';
       imgEl.onload = () => {
         if (id === 'yandex' && imgEl.naturalWidth <= 1 && imgEl.naturalHeight <= 1) {
           spinner.style.display = 'none';
