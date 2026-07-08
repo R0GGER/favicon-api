@@ -5,6 +5,18 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.2] — 2026-07-08
+
+### Changed
+
+- **Web UI — HTML Scraper remembers discovery per domain** — the size-discovery result from `GET /{domain}/json` is now cached in-page (keyed by domain). Repeat searches for a domain already looked up in the same session render **instantly from memory**: no `GET /{domain}/json` round-trip and no "Discovering other icon sizes…" loader. The scraper **Refresh** button (and `?refresh=1`) bypasses the cache and re-runs discovery, overwriting the stored result.
+- **HTML Scraper — discovery disk cache on by default** — `SCRAPER_DISK_CACHE` now defaults to **true** (unset/empty enables it; only an explicit `false`/`0`/`no`/`off` disables it). Scraper discovery (homepage HTML, merged icon list, besticon JSON, manifest parses, icon-probe metadata) is persisted under `SCRAPER_DISK_CACHE_DIR` (`/cache/scraper-discovery`), so `GET /{domain}/json` and `GET /scraper/{domain}` read from disk instead of re-scraping on every request. The cache now **survives container restarts** and is **shared across cluster workers** (each worker previously re-scraped a domain the first time it saw it). Updated `.env.example`.
+- **Favicon `Cache-Control` gains `immutable`** — proxy favicon responses now send `public, max-age=86400, immutable` so browsers reuse the cached icon on repeat views without a revalidation round-trip.
+
+### Fixed
+
+- **Web UI — Firefox loaded every icon twice** — provider image loaders created a detached `new Image()` with `crossOrigin = 'anonymous'` and then copied its `src` onto the visible `<img>` (which had no `crossOrigin`). Firefox partitions its HTTP cache by CORS mode, so the visible `<img>` missed the bytes the loader had just fetched and **re-downloaded every icon** — roughly doubling scraper/provider requests (worse than Chrome, which reused them). `crossOrigin` was unnecessary here — all icons are served from the same-origin proxy, there is no `<canvas>` use, and downloads go through `fetch()` — so it was removed from all image loaders. Each icon is now fetched once and repeat searches reuse the browser cache.
+
 ## [2.9.1] — 2026-07-08
 
 ### Fixed
