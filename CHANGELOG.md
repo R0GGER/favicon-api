@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Web UI — size filter default** — the dual-range slider now starts at **16–512px** on first visit (no saved preference in `localStorage`).
+- **Web UI — size filter on tablets** — the dual-range slider and download-size buttons (`.download-toolbar-left`) are visible on **tablets** (≥800px). The left toolbar cluster is hidden at **≤799px** (was ≤700px); smartphones and narrow tablets no longer show the size filter or download-size strip.
 
 ### Fixed
 
