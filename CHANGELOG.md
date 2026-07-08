@@ -5,7 +5,16 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.8.15] — 2026-07-08
+## [2.9.0] — 2026-07-08
+
+### Added
+
+- **`scraperMaxIconSize` on `GET /providers`** — exposes `SCRAPER_MAX_ICON_SIZE` to the Web UI so the HTML Scraper fast-proxy size button (e.g. 128) can render before `/{domain}/json` finishes.
+
+### Changed
+
+- **Web UI — HTML Scraper parallel preview** — `GET /scraper/{domain}` starts alongside `/{domain}/json` instead of waiting for the discovery response. Repeat visits can use browser HTTP cache: scraper image URLs are stable on normal searches; `?_=timestamp` cache busting applies only on explicit refresh (`refreshScraper()` / `?refresh=1`).
+- **Web UI — HTML Scraper progressive size strip** — when `SCRAPER_MAX_ICON_SIZE` is set, the fast-proxy button appears immediately next to a “Discovering other icon sizes…” loader (spinner + skeleton pills) while JSON discovery runs. The preview uses soft-load so the capped proxy icon can appear without hiding it behind the main favicon spinner.
 
 ### Fixed
 
