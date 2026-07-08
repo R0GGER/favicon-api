@@ -14,6 +14,7 @@ const {
 } = require('./imageNormalize');
 const { LRUCache } = require('lru-cache');
 const { upstreamFetch, ipv4Dispatcher, ipv4Http1Dispatcher } = require('./upstreamFetch');
+const cache = require('./cache');
 const scraperDiskCache = require('./scraperDiskCache');
 const { serviceSlugFromDomain } = require('./serviceSlugFromDomain');
 
@@ -167,7 +168,11 @@ async function fetchUpstreamRaw(url, { redirect = false } = {}) {
   }
 }
 
-async function fetchScraperAsset(url, referer) {
+function assetCacheKey(url) {
+  return crypto.createHash('sha1').update(url).digest('hex');
+}
+
+async function fetchScraperAssetUncached(url, referer) {
   // Bare upstreamFetch first — required on VPS/datacenter hosts where extra headers break CDNs.
   const bare = await fetchUpstreamRaw(url);
   if (bare) return bare;
@@ -182,6 +187,27 @@ async function fetchScraperAsset(url, referer) {
   if (result) return result;
 
   return fetchFavicon(url, minimal);
+}
+
+async function fetchScraperAsset(url, referer) {
+  const key = assetCacheKey(url);
+
+  const raw = await cache.get('asset-raw', key, null);
+  if (raw?.buffer) {
+    return { buffer: raw.buffer, contentType: raw.contentType, url: raw.url || url };
+  }
+
+  // Reuse bytes already on disk from /s-asset or sized scraper routes.
+  const display = await cache.get('asset-v2', key, null);
+  if (display?.buffer) {
+    return { buffer: display.buffer, contentType: display.contentType, url: display.url || url };
+  }
+
+  const result = await fetchScraperAssetUncached(url, referer);
+  if (result?.buffer) {
+    await cache.set('asset-raw', key, null, { ...result, provider: 'asset-raw' });
+  }
+  return result;
 }
 
 function isDisplayFaviconCandidate(candidate) {

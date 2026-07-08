@@ -5,6 +5,12 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.15] — 2026-07-08
+
+### Fixed
+
+- **HTML Scraper — icon probes bypassed disk cache** — `fetchScraperAsset` (used when the scraper probes candidate icon URLs during discovery) always fetched from the internet, even when the same bytes were already on disk from `/s-asset`, sized scraper routes, or an earlier probe. It now reads `asset-raw_*` and `asset-v2_*` entries from `CACHE_DIR` before going upstream, and writes new fetches back as `asset-raw_*`. Repeat scrapes and container restarts with a persistent `/cache` volume no longer re-download every candidate icon.
+
 ## [2.8.14] — 2026-07-08
 
 ### Changed
