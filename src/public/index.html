@@ -2128,14 +2128,10 @@
       font-size: 0.88rem;
     }
 
-    /* Docs vs About; size filter slider: below 1210px (smartphones and tablets) */
+    /* Docs vs About: below 1210px (smartphones and tablets) */
     @media (max-width: 1209px) {
       .nav-desktop-only { display: none !important; }
       .nav-mobile-only:not([hidden]) { display: inline-flex !important; }
-      .download-toolbar-left > .download-toolbar-divider,
-      .size-filter-group {
-        display: none !important;
-      }
     }
 
     .top-nav-btn {
@@ -2307,6 +2303,12 @@
 
     @media (max-width: 1050px) {
       .results.visible.view-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 799px) {
+      .download-toolbar-left {
+        display: none !important;
+      }
     }
 
     @media (max-width: 700px) {
@@ -6633,9 +6635,8 @@
         }
         return parseSizeButtonValue(btn);
       });
-      // Fast proxy (/{domain}) is always offered when rendered — never grey out.
       document.querySelectorAll('#scraper-sizes [data-scraper-source="proxy"]').forEach((btn) => {
-        btn.disabled = false;
+        btn.disabled = !scraperCanDownscaleTo(scraperMaxIconSize);
       });
     }
 
@@ -6651,6 +6652,7 @@
       let best = null;
       for (const step of getScraperProxySizeSteps()) {
         if (max > 0 && step > max) break;
+        if (!scraperCanDownscaleTo(step)) continue;
         if (min <= 0 || step >= min) best = step;
       }
       return best;
@@ -6658,6 +6660,16 @@
 
     function scraperIconPixelSize(icon) {
       return Math.max(icon?.width || 0, icon?.height || icon?.width || 0);
+    }
+
+    function scraperLargestDiscoveredSize() {
+      if (!scraperIcons.length) return 0;
+      return scraperIcons.reduce((max, icon) => Math.max(max, scraperIconPixelSize(icon)), 0);
+    }
+
+    // Fast proxy sizes require a source icon at least that large — downscale only.
+    function scraperCanDownscaleTo(size) {
+      return size > 0 && scraperLargestDiscoveredSize() >= size;
     }
 
     function pickScraperIconIndex(min, max) {
@@ -6764,7 +6776,7 @@
           return;
         }
         const proxySize = pickScraperProxySize(currentMinSizeFilter, currentMaxSizeFilter);
-        if (proxySize && sizePassesSizeFilter(proxySize)) {
+        if (proxySize && scraperCanDownscaleTo(proxySize) && sizePassesSizeFilter(proxySize)) {
           if (proxySize !== currentScraperProxySize) loadScraperProxyOrSize(proxySize);
         }
       }
@@ -6794,7 +6806,7 @@
           return true;
         }
         const proxySize = pickScraperProxySize(currentMinSizeFilter, currentMaxSizeFilter);
-        if (proxySize && sizePassesSizeFilter(proxySize)) {
+        if (proxySize && scraperCanDownscaleTo(proxySize) && sizePassesSizeFilter(proxySize)) {
           if (proxySize === scraperMaxIconSize && scraperMaxIconSize > 0) {
             if (currentScraperSelection === 'proxy') return false;
             switchScraperProxy();
@@ -6854,6 +6866,7 @@
     }
 
     function loadScraperProxyOrSize(size) {
+      if (!scraperCanDownscaleTo(size)) return;
       if (size === scraperMaxIconSize && scraperMaxIconSize > 0) {
         switchScraperProxy();
         return;
@@ -6862,7 +6875,11 @@
     }
 
     function loadInitialScraperSelection(domain, refresh) {
-      if (scraperMaxIconSize > 0 && sizePassesSizeFilter(scraperMaxIconSize)) {
+      if (
+        scraperMaxIconSize > 0 &&
+        scraperCanDownscaleTo(scraperMaxIconSize) &&
+        sizePassesSizeFilter(scraperMaxIconSize)
+      ) {
         currentScraperSelection = 'proxy';
         setActiveScraperButton('proxy');
         loadScraperProxyVariant();
@@ -6882,7 +6899,7 @@
         currentMinSizeFilter > 0 ? currentMinSizeFilter : 16,
         currentMaxSizeFilter > 0 ? currentMaxSizeFilter : 512
       );
-      if (proxySize && sizePassesSizeFilter(proxySize)) {
+      if (proxySize && scraperCanDownscaleTo(proxySize) && sizePassesSizeFilter(proxySize)) {
         if (proxySize === scraperMaxIconSize && scraperMaxIconSize > 0) {
           currentScraperSelection = 'proxy';
           setActiveScraperButton('proxy');
@@ -7013,10 +7030,16 @@
       if (sorted.length === 0) {
         scraperIcons = [];
         document.getElementById('scraper-proxy-sizes').style.display = 'none';
-        if (scraperMaxIconSize > 0) {
+        if (scraperMaxIconSize > 0 && scraperCanDownscaleTo(scraperMaxIconSize)) {
           renderScraperSizes();
           sizesEl.style.display = '';
           loadInitialScraperSelection(domain, refresh);
+          return;
+        }
+        if (scraperMaxIconSize > 0) {
+          sizesEl.style.display = 'none';
+          sizesEl.innerHTML = '';
+          loadScraperFallback(domain, refresh);
           return;
         }
         const proxySizesEl = document.getElementById('scraper-proxy-sizes');
@@ -7041,14 +7064,19 @@
         idx,
         sortSize: Math.max(icon.width || 0, icon.height || icon.width || 0),
       }));
-      if (scraperMaxIconSize > 0) {
+      if (scraperMaxIconSize > 0 && scraperCanDownscaleTo(scraperMaxIconSize)) {
         entries.push({ type: 'proxy', sortSize: scraperMaxIconSize });
       }
       const existingSizes = new Set(entries.map((e) => e.sortSize));
       const maxSource = scraperMaxIconSize || Infinity;
       for (const sizeStr of Object.keys(scraperAvailableSizes)) {
         const size = Number(sizeStr);
-        if (size > 0 && size <= maxSource && !existingSizes.has(size)) {
+        if (
+          size > 0 &&
+          size <= maxSource &&
+          scraperCanDownscaleTo(size) &&
+          !existingSizes.has(size)
+        ) {
           entries.push({ type: 'proxySize', size, sortSize: size });
         }
       }
@@ -7119,7 +7147,7 @@
           btn.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
-            if (!sizePassesSizeFilter(size)) return;
+            if (!scraperCanDownscaleTo(size) || !sizePassesSizeFilter(size)) return;
             currentScraperSelection = `proxySize-${size}`;
             setActiveScraperButton(currentScraperSelection);
             loadScraperProxySize(size);
@@ -7157,7 +7185,7 @@
     }
 
     function switchScraperProxy() {
-      if (!currentDomain || scraperMaxIconSize <= 0) return;
+      if (!currentDomain || scraperMaxIconSize <= 0 || !scraperCanDownscaleTo(scraperMaxIconSize)) return;
       currentScraperSelection = 'proxy';
       setActiveScraperButton('proxy');
       loadScraperProxyVariant();
@@ -7173,7 +7201,7 @@
     }
 
     function loadScraperProxyVariant() {
-      if (!currentDomain || scraperMaxIconSize <= 0) return;
+      if (!currentDomain || scraperMaxIconSize <= 0 || !scraperCanDownscaleTo(scraperMaxIconSize)) return;
       const token = ++scraperLoadToken;
       const embedUrl = scraperEmbedUrl();
       const proxyUrl = `/scraper/${currentDomain}`;
@@ -7264,14 +7292,14 @@
     }
 
     function switchScraperProxySize(size) {
-      if (!currentDomain || !sizePassesSizeFilter(size)) return;
+      if (!currentDomain || !scraperCanDownscaleTo(size) || !sizePassesSizeFilter(size)) return;
       currentScraperProxySize = size;
       setActiveSize('scraper-proxy-sizes', size);
       loadScraperProxySize(size);
     }
 
     function loadScraperProxySize(size) {
-      if (!currentDomain) return;
+      if (!currentDomain || !scraperCanDownscaleTo(size)) return;
       const token = ++scraperLoadToken;
       const embedUrl = `${location.origin}${domainProxyPath('scraper', currentDomain, size)}`;
       const proxyUrl = domainProxyPath('scraper', currentDomain, size);
