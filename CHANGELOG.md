@@ -5,6 +5,16 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.1] — 2026-07-08
+
+### Fixed
+
+- **Web UI — app-icon catalog controls** — **SVGL** card format/variant buttons now share the same `size-buttons-toolbar` wrapper as the other service-icon cards, so PNG/SVG and Color stay on one row.
+- **Web UI — catalog size buttons ignored clicks** — with the default size filter active, `applySizeFilter()` reset catalog PNG sizes to the auto-picked raster step (e.g. 256) after every preview load, so manual 128/64/32/16 selections appeared dead. Manual sizes within the active filter are now preserved (`catalogHasStableRasterSize`).
+- **Light/dark service-icon variants** — API/UI variants again match the preview semantics (**Light** = pale icon on a dark background, **Dark** = dark icon on a light background). Corrected `pngVariantSuffix()` for **selfh.st** and **dashboardicons.com**, LobeHub theme folder mapping, and SVGL route selection. Web UI preview backgrounds were already correct; only the upstream asset choice was wrong.
+- **selfh.st light/dark PNG previews** — upstream `-light`/`-dark` PNGs often bake in mismatched circular backgrounds (e.g. `github-light.png`). Light/dark requests now prefer the monochrome **SVG** variant and rasterize server-side; variant availability probes and `/{service}/json` source URLs follow the SVG assets. Cache keys bumped (`light_v5` / `dark_v5`).
+- **Web UI — Light/Dark buttons missing on catalog cards** — variant probes appended `?probe=` to proxy URLs that already carried `?variant=…`, producing invalid URLs (HTTP 400) so Light/Dark toggles never appeared even when the API listed the variants. Probes and catalog image loads now append cache-busting params with `&` when a query string is already present.
+
 ## [2.9.0] — 2026-07-08
 
 ### Added
