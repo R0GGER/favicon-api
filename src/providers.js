@@ -471,11 +471,18 @@ async function probeScraperCandidates(candidates, referer, limit = 16) {
 }
 
 // Upstream PNG catalogs suffix files by icon tone (-light = pale icon, -dark = dark icon).
-// Our API variants name the target background theme (light = dark icon on light bg).
+// API/UI variants name the preview: light = pale icon on a dark background, dark = dark icon on a light background.
 function pngVariantSuffix(variant) {
-  if (variant === 'light') return '-dark';
-  if (variant === 'dark') return '-light';
+  if (variant === 'light') return '-light';
+  if (variant === 'dark') return '-dark';
   return '';
+}
+
+// LobeHub folders follow OS color-scheme naming (light/ = for light UI, dark/ = for dark UI).
+function lobehubThemeForVariant(variant) {
+  if (variant === 'light') return 'dark';
+  if (variant === 'dark') return 'light';
+  return variant;
 }
 
 const PROVIDERS = {
@@ -517,10 +524,10 @@ const PROVIDERS = {
     return `${parts.join('')}?c=${encodeURIComponent(clientId || '')}`;
   },
   selfhst: (service, variant = 'color', format = 'png') => {
-    if (format === 'svg') {
-      return `https://cdn.jsdelivr.net/gh/selfhst/icons/svg/${encodeURIComponent(service)}.svg`;
-    }
     const suffix = pngVariantSuffix(variant);
+    if (format === 'svg') {
+      return `https://cdn.jsdelivr.net/gh/selfhst/icons/svg/${encodeURIComponent(service)}${suffix}.svg`;
+    }
     return `https://cdn.jsdelivr.net/gh/selfhst/icons/png/${encodeURIComponent(service)}${suffix}.png`;
   },
   dashboardIcons: (service, variant = 'color', format = 'png') => {
@@ -895,8 +902,9 @@ function svglRouteForVariant(entry, variant) {
   const route = entry?.route;
   if (!route) return null;
   if (typeof route === 'string') return route;
-  if (variant === 'light') return route.light || null;
-  if (variant === 'dark') return route.dark || null;
+  // SVGL asset names follow background theme (_light = for light UI, _dark = for dark UI).
+  if (variant === 'light') return route.dark || null;
+  if (variant === 'dark') return route.light || null;
   return route.light || route.dark || null;
 }
 
@@ -914,7 +922,18 @@ async function fetchServiceIcon(buildUrl, getCandidates, service, variant, provi
 }
 
 async function fetchSelfhstPng(slug, variant) {
-  const suffix = pngVariantSuffix(variant);
+  const { entries } = await ensureSelfhstIndex();
+  const entry = entries.find((e) => e.slug === slug);
+
+  // selfh.st PNG light/dark assets sometimes bake in mismatched backgrounds; prefer SVG.
+  if (variant !== 'color' && entry?.hasSvg) {
+    const svgUrl = PROVIDERS.selfhst(slug, variant, 'svg');
+    const svgResult = await fetchFavicon(svgUrl);
+    if (svgResult) {
+      return { ...svgResult, provider: 'selfhst', service: slug, variant };
+    }
+  }
+
   const url = PROVIDERS.selfhst(slug, variant, 'png');
   const result = await fetchFavicon(url);
   return result ? { ...result, provider: 'selfhst', service: slug, variant } : null;
@@ -926,16 +945,15 @@ async function fetchSelfhst(service, variant = 'color', { strict = false, format
   const entryBySlug = new Map(entries.map((entry) => [entry.slug, entry]));
 
   if (wantSvg) {
-    if (variant !== 'color') return null;
     const candidates = strict
       ? [resolveSelfhstSlugSync(service) || normalizeServiceAliasKey(service)].filter(Boolean)
       : await getSelfhstSlugCandidates(service, { strict });
     for (const slug of candidates) {
       if (!entryBySlug.get(slug)?.hasSvg) continue;
-      const url = PROVIDERS.selfhst(slug, 'color', 'svg');
+      const url = PROVIDERS.selfhst(slug, variant, 'svg');
       const result = await fetchFavicon(url);
       if (result) {
-        return { ...result, provider: 'selfhst', service: slug, variant: 'color', format: 'svg' };
+        return { ...result, provider: 'selfhst', service: slug, variant, format: 'svg' };
       }
     }
     return null;
@@ -1013,7 +1031,8 @@ async function lobehubThemePngAvailable(slug, theme) {
   return false;
 }
 
-async function fetchLobehubThemePng(slug, theme, size) {
+async function fetchLobehubThemePng(slug, uiVariant, size) {
+  const theme = lobehubThemeForVariant(uiVariant);
   for (const url of lobehubThemePngUrls(slug, theme)) {
     const result = await fetchFavicon(url);
     if (!result) continue;
@@ -1025,11 +1044,11 @@ async function fetchLobehubThemePng(slug, theme, size) {
         url: result.url,
         provider: 'lobehub',
         service: slug,
-        variant: theme,
+        variant: uiVariant,
         size,
       };
     } catch {
-      return { ...result, provider: 'lobehub', service: slug, variant: theme, size };
+      return { ...result, provider: 'lobehub', service: slug, variant: uiVariant, size };
     }
   }
   return null;
@@ -2045,12 +2064,36 @@ async function getSelfhstVariantAvailability(slug) {
   if (cached !== null) return cached;
 
   const { entries } = await ensureSelfhstIndex();
-  if (!entries.some((entry) => entry.slug === slug)) {
+  const entry = entries.find((e) => e.slug === slug);
+  if (!entry) {
     writeVariantAvailabilityCache(cacheKey, null);
     return null;
   }
 
-  return probePngVariantAvailability(cacheKey, (variant) => PROVIDERS.selfhst(slug, variant));
+  const color = await fetchFavicon(PROVIDERS.selfhst(slug, 'color', 'png'));
+  if (!color) {
+    writeVariantAvailabilityCache(cacheKey, null);
+    return null;
+  }
+
+  const urlForVariant = (variant) => (
+    entry.hasSvg
+      ? PROVIDERS.selfhst(slug, variant, 'svg')
+      : PROVIDERS.selfhst(slug, variant, 'png')
+  );
+
+  const [light, dark] = await Promise.all([
+    fetchFavicon(urlForVariant('light')),
+    fetchFavicon(urlForVariant('dark')),
+  ]);
+
+  const value = {
+    color: true,
+    light: !!light,
+    dark: !!dark,
+  };
+  writeVariantAvailabilityCache(cacheKey, value);
+  return value;
 }
 
 async function getDashboardIconsVariantAvailability(slug) {
@@ -2093,8 +2136,8 @@ async function getLobehubVariantAvailability(slug) {
   }
 
   const [light, dark] = await Promise.all([
-    lobehubThemePngAvailable(slug, 'light'),
     lobehubThemePngAvailable(slug, 'dark'),
+    lobehubThemePngAvailable(slug, 'light'),
   ]);
 
   const value = { color: true, light, dark };

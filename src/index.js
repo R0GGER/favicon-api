@@ -481,7 +481,7 @@ function resolveCatalogFormat(req) {
   return { format: format || 'png' };
 }
 
-function catalogCacheKey(variant, format, { size, lobehub } = {}) {
+function catalogCacheKey(variant, format, { size, lobehub, selfhst } = {}) {
   if (lobehub) {
     const v = variant === 'color' ? 'c' : variant;
     if (format === 'svg') return `${v}_svg_v4`;
@@ -490,7 +490,8 @@ function catalogCacheKey(variant, format, { size, lobehub } = {}) {
   const parts = [];
   if (variant !== 'color') parts.push(variant);
   if (format === 'svg') parts.push('svg');
-  return parts.length ? `${parts.join('_')}_v4` : null;
+  const version = selfhst && variant !== 'color' && format !== 'svg' ? 'v5' : 'v4';
+  return parts.length ? `${parts.join('_')}_${version}` : null;
 }
 
 function svglCacheKey(variant, format, size) {
@@ -587,7 +588,11 @@ async function buildServiceCatalogEndpoints(
     host,
     'selfhst',
     selfhstServiceSlug,
-    PROVIDERS.selfhst,
+    (slug, variant, format = 'png') => (
+      format === 'png' && variant !== 'color'
+        ? PROVIDERS.selfhst(slug, variant, 'svg')
+        : PROVIDERS.selfhst(slug, variant, format)
+    ),
     selfhstAvailability,
     CATALOG_SIZES_ARRAY,
     DEFAULT_CATALOG_SIZE
@@ -1344,7 +1349,7 @@ async function selfhstSizedHandler(req, res) {
   }
 
   try {
-    const cacheKey = catalogCacheKey(variant, format);
+    const cacheKey = catalogCacheKey(variant, format, { selfhst: true });
     const entry = await fetchWithCache('selfhst', service, cacheKey, () =>
       fetchSelfhst(service, variant, { format })
     );
@@ -1352,7 +1357,7 @@ async function selfhstSizedHandler(req, res) {
     if (format === 'svg') {
       sendFavicon(res, entry);
     } else {
-      sendFavicon(res, await downscaleEntryToSize(entry, size));
+      sendFavicon(res, await renderIconToSize(entry, size));
     }
   } catch (err) {
     console.error('selfhst proxy error:', err.message);
@@ -1376,7 +1381,7 @@ app.get('/sh/:service', async (req, res) => {
   const { format } = formatResult;
 
   try {
-    const cacheKey = catalogCacheKey(variant, format);
+    const cacheKey = catalogCacheKey(variant, format, { selfhst: true });
     const entry = await fetchWithCache('selfhst', service, cacheKey, () =>
       fetchSelfhst(service, variant, { format })
     );

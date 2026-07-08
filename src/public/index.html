@@ -3092,14 +3092,16 @@
           <span class="unavailable" id="svgl-unavailable" style="display:none">variant not available</span>
           <span class="copied-toast">URL copied!</span>
         </div>
-        <div class="size-buttons btn-group" id="svgl-format" role="group" aria-label="Extension">
-          <button class="size-btn" data-format="png" type="button" onclick="switchSvglFormat('png')">PNG</button>
-          <button class="size-btn active" data-format="svg" type="button" onclick="switchSvglFormat('svg')">SVG</button>
-        </div>
-        <div class="size-buttons btn-group" id="svgl-variants" role="group" aria-label="Color">
-          <button class="size-btn active" data-variant="color" onclick="switchSvglVariant('color')">Color</button>
-          <button class="size-btn" data-variant="light" style="display:none" onclick="switchSvglVariant('light')">Light</button>
-          <button class="size-btn" data-variant="dark" style="display:none" onclick="switchSvglVariant('dark')">Dark</button>
+        <div class="size-buttons-toolbar">
+          <div class="size-buttons btn-group" id="svgl-format" role="group" aria-label="Extension">
+            <button class="size-btn" data-format="png" type="button" onclick="switchSvglFormat('png')">PNG</button>
+            <button class="size-btn active" data-format="svg" type="button" onclick="switchSvglFormat('svg')">SVG</button>
+          </div>
+          <div class="size-buttons btn-group" id="svgl-variants" role="group" aria-label="Color">
+            <button class="size-btn active" data-variant="color" onclick="switchSvglVariant('color')">Color</button>
+            <button class="size-btn" data-variant="light" style="display:none" onclick="switchSvglVariant('light')">Light</button>
+            <button class="size-btn" data-variant="dark" style="display:none" onclick="switchSvglVariant('dark')">Dark</button>
+          </div>
         </div>
         <div class="size-buttons" id="svgl-sizes">
           <button class="size-btn" onclick="switchSvglSize(256)">256</button>
@@ -3858,6 +3860,24 @@
       }
     }
 
+    function getCatalogRasterSize(providerId) {
+      switch (providerId) {
+        case 'selfhst': return currentSelfhstSize;
+        case 'dashboardicons': return currentDashboardIconsSize;
+        case 'lobehub': return currentLobehubSize;
+        case 'svgl': return currentSvglSize;
+        default: return 0;
+      }
+    }
+
+    function catalogHasStableRasterSize(providerId) {
+      if (getCatalogFormat(providerId) !== 'png') return false;
+      const card = document.getElementById(`${providerId}-card`);
+      const iconSize = parseInt(card?.dataset.iconSize, 10) || 0;
+      if (iconSize <= 0 || !sizePassesSizeFilter(iconSize)) return false;
+      return getCatalogRasterSize(providerId) === iconSize;
+    }
+
     function prepareCatalogForSizeFilter(providerId) {
       if (!CATALOG_SVG_PROVIDERS.has(providerId) || !catalogProviderIsActive(providerId) || !isSizeFilterActive()) return;
 
@@ -4315,6 +4335,7 @@
 
     function ensureCatalogFitsSizeFilter(providerId) {
       if (!CATALOG_SVG_PROVIDERS.has(providerId) || !catalogProviderIsActive(providerId)) return false;
+      if (catalogHasStableRasterSize(providerId)) return false;
 
       const min = currentMinSizeFilter;
       const max = currentMaxSizeFilter;
@@ -4348,6 +4369,7 @@
       if (!CATALOG_SVG_PROVIDERS.has(providerId) || !catalogProviderIsActive(providerId) || !isSizeFilterActive()) {
         return false;
       }
+      if (catalogHasStableRasterSize(providerId)) return false;
       if (catalogQualifiesForMinSvgFilter(providerId) && getCatalogFormat(providerId) !== 'svg') {
         return true;
       }
@@ -5209,6 +5231,11 @@
       const base = `${SERVICE_PROXY_PREFIX[provider]}/${pathSize}/${format}/${encodeURIComponent(slug)}`;
       if (variant === 'color') return base;
       return `${base}?variant=${variant}`;
+    }
+
+    function catalogImageSrc(proxyUrl) {
+      const sep = proxyUrl.includes('?') ? '&' : '?';
+      return `${proxyUrl}${sep}_=${Date.now()}`;
     }
 
     function setActiveFormat(groupId, format) {
@@ -6095,16 +6122,19 @@
     }
 
     function pngVariantSuffix(variant) {
-      if (variant === 'light') return '-dark';
-      if (variant === 'dark') return '-light';
+      if (variant === 'light') return '-light';
+      if (variant === 'dark') return '-dark';
       return '';
     }
 
     function selfhstSourceUrl(slug, variant, format = currentSelfhstFormat) {
-      if (format === 'svg') {
-        return `https://cdn.jsdelivr.net/gh/selfhst/icons/svg/${slug}.svg`;
-      }
       const suffix = pngVariantSuffix(variant);
+      if (format === 'svg') {
+        return `https://cdn.jsdelivr.net/gh/selfhst/icons/svg/${slug}${suffix}.svg`;
+      }
+      if (variant !== 'color') {
+        return `https://cdn.jsdelivr.net/gh/selfhst/icons/svg/${slug}${suffix}.svg`;
+      }
       return `https://cdn.jsdelivr.net/gh/selfhst/icons/png/${slug}${suffix}.png`;
     }
 
@@ -6175,7 +6205,7 @@
         }
         updateServiceIconsDivider();
       };
-      imgEl.src = proxyUrl;
+      imgEl.src = catalogImageSrc(proxyUrl);
     }
 
     function switchSelfhstVariant(variant) {
@@ -6230,7 +6260,7 @@
         const img = new Image();
         img.onload = () => resolve(true);
         img.onerror = () => resolve(false);
-        img.src = `${selfhstSourceUrl(slug, variant)}?probe=${Date.now()}`;
+        img.src = catalogImageSrc(selfhstProxyPath(slug, variant, 'png', 128));
       });
     }
 
@@ -6326,7 +6356,7 @@
         }
         updateServiceIconsDivider();
       };
-      imgEl.src = proxyUrl;
+      imgEl.src = catalogImageSrc(proxyUrl);
     }
 
     function switchDashboardIconsVariant(variant) {
@@ -6375,7 +6405,7 @@
         const img = new Image();
         img.onload = () => resolve(true);
         img.onerror = () => resolve(false);
-        img.src = `${dashboardIconsSourceUrl(slug, variant)}?probe=${Date.now()}`;
+        img.src = catalogImageSrc(dashboardIconsSourceUrl(slug, variant));
       });
     }
 
@@ -6465,7 +6495,7 @@
         }
         updateServiceIconsDivider();
       };
-      imgEl.src = proxyUrl;
+      imgEl.src = catalogImageSrc(proxyUrl);
     }
 
     function switchLobehubVariant(variant) {
@@ -6514,7 +6544,7 @@
         const img = new Image();
         img.onload = () => resolve(true);
         img.onerror = () => resolve(false);
-        img.src = `${lobehubProxyPath(slug, variant, 'png', 128)}?probe=${Date.now()}`;
+        img.src = catalogImageSrc(lobehubProxyPath(slug, variant, 'png', 128));
       });
     }
 
@@ -6633,7 +6663,7 @@
         }
         updateServiceIconsDivider();
       };
-      imgEl.src = proxyUrl;
+      imgEl.src = catalogImageSrc(proxyUrl);
     }
 
     function switchSvglVariant(variant) {
@@ -6674,7 +6704,7 @@
         const img = new Image();
         img.onload = () => resolve(true);
         img.onerror = () => resolve(false);
-        img.src = `${svglProxyPath(slug, variant, 'png', 128)}?probe=${Date.now()}`;
+        img.src = catalogImageSrc(svglProxyPath(slug, variant, 'png', 128));
       });
     }
 
