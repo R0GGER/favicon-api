@@ -8,9 +8,13 @@ const SCRAPER_DISK_CACHE_DIR =
 const TTL_MS =
   parseInt(process.env.SCRAPER_ICONS_CACHE_TTL || '3600', 10) * 1000;
 
+// Default = on. Persisting scraper discovery on disk lets it survive restarts
+// and be shared across cluster workers, so an unset/empty value enables it;
+// only an explicit falsey value (false/0/no/off) turns it off.
 function parseEnabled(value) {
-  if (value === undefined || value === '') return false;
-  return ['1', 'true', 'yes', 'on'].includes(String(value).trim().toLowerCase());
+  const raw = String(value ?? '').trim().toLowerCase();
+  if (raw === '') return true;
+  return !['false', '0', 'no', 'off'].includes(raw);
 }
 
 const ENABLED = parseEnabled(process.env.SCRAPER_DISK_CACHE);

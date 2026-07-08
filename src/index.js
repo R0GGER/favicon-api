@@ -363,7 +363,7 @@ const DEFAULT_NATIVE_SIZE = 128;
 const DEFAULT_RESIZE_SIZE = 64;
 const DEFAULT_CATALOG_SIZE = 128;
 const SERVICE_SLUG_RE = /^[a-z0-9][a-z0-9._-]*$/;
-const CACHE_CONTROL = 'public, max-age=86400';
+const CACHE_CONTROL = 'public, max-age=86400, immutable';
 const NOT_FOUND_CACHE_CONTROL = 'no-store';
 const JSON_CACHE_CONTROL = 'no-cache';
 

@@ -901,7 +901,7 @@ function svglAssetUrl(routePath) {
 function svglRouteForVariant(entry, variant) {
   const route = entry?.route;
   if (!route) return null;
-  if (typeof route === 'string') return route;
+  if (typeof route === 'string') return variant === 'color' ? route : null;
   // SVGL asset names follow background theme (_light = for light UI, _dark = for dark UI).
   if (variant === 'light') return route.dark || null;
   if (variant === 'dark') return route.light || null;

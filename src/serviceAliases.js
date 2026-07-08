@@ -344,6 +344,12 @@ function stringSimilarity(a, b) {
   return 1 - dist / Math.max(a.length, b.length);
 }
 
+function containsWordPart(key, queryKey) {
+  if (!key || !queryKey) return false;
+  const re = new RegExp(`(^|-)${queryKey}(-|$)`);
+  return re.test(key);
+}
+
 function fuzzyPartScore(part, queryKey) {
   if (!part || !queryKey || part.length < 3) return 0;
 
@@ -354,7 +360,7 @@ function fuzzyPartScore(part, queryKey) {
     if (sim >= FUZZY_SIMILARITY_THRESHOLD) return Math.round(sim * 80);
   }
 
-  if (part.startsWith(queryKey) && part.length <= queryKey.length + 2) return 58;
+  if (queryKey.length >= 3 && part.startsWith(queryKey) && part.length <= queryKey.length + 2) return 58;
   if (queryKey.startsWith(`${part}-`) && part.length >= 4) return 42;
 
   return 0;
@@ -409,8 +415,8 @@ function scoreSelfhstEntry(entry, queryKey) {
   if (refKey === queryKey) score += 100;
   if (refKey.endsWith(`-${queryKey}`)) score += 80;
   if (nameKey === queryKey) score += 70;
-  if (nameKey.includes(queryKey)) score += 35;
-  if (tagsKey.includes(queryKey)) score += 15;
+  if (queryKey.length >= 3 && containsWordPart(nameKey, queryKey)) score += 35;
+  if (queryKey.length >= 3 && containsWordPart(tagsKey, queryKey)) score += 15;
 
   const refParts = refKey.split('-');
   for (let i = 0; i < refParts.length; i++) {
@@ -543,7 +549,7 @@ function scoreLobehubSlug(slugKey, entry, queryKey) {
 
   const labelKey = normalizeServiceAliasKey(entry?.label);
   if (labelKey === queryKey) score = Math.max(score, 90);
-  if (labelKey.includes(queryKey)) score = Math.max(score, 35);
+  if (queryKey.length >= 3 && containsWordPart(labelKey, queryKey)) score = Math.max(score, 35);
 
   const docsKey = normalizeServiceAliasKey(entry?.docsUrl);
   if (docsKey === queryKey) score = Math.max(score, 88);
@@ -612,7 +618,7 @@ function scoreSvglSlug(slugKey, entry, queryKey) {
 
   const labelKey = normalizeServiceAliasKey(entry?.label);
   if (labelKey === queryKey) score = Math.max(score, 90);
-  if (labelKey.includes(queryKey)) score = Math.max(score, 35);
+  if (queryKey.length >= 3 && containsWordPart(labelKey, queryKey)) score = Math.max(score, 35);
 
   return score;
 }
@@ -902,13 +908,18 @@ function getSvglVariantAvailability(slug) {
   const entry = getSvglEntrySync(slug);
   if (!entry) return null;
   const route = entry.route;
+  if (!route) return null;
   if (typeof route === 'string') {
     return { color: true, light: false, dark: false };
   }
+  const colorRoute = route.light || route.dark || null;
+  if (!colorRoute) return null;
+  const lightRoute = route.dark || null;
+  const darkRoute = route.light || null;
   return {
-    color: !!(route?.light || route?.dark),
-    light: !!route?.light,
-    dark: !!route?.dark,
+    color: true,
+    light: !!(lightRoute && lightRoute !== colorRoute),
+    dark: !!(darkRoute && darkRoute !== colorRoute),
   };
 }
 
