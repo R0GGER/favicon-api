@@ -207,8 +207,8 @@ SCRAPER_ICONS_CACHE_MAX=500
 # SCRAPER_DISK_CACHE_DIR: homepage HTML, icon lists, besticon JSON, manifest
 # parses and icon-probe metadata. Survives container restarts and is shared
 # across cluster workers. Uses SCRAPER_ICONS_CACHE_TTL for entry lifetime.
-# Default = false (in-memory only).
-SCRAPER_DISK_CACHE=false
+# Default = true (also persist on disk). Set to false for in-memory only.
+SCRAPER_DISK_CACHE=true
 
 # Directory for scraper discovery disk cache. Default = {CACHE_DIR}/scraper-discovery
 # (e.g. /cache/scraper-discovery in Docker). Only used when SCRAPER_DISK_CACHE=true.
