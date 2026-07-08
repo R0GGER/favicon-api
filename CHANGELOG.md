@@ -5,6 +5,12 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.3] — 2026-07-09
+
+### Added
+
+- **Web UI — size filter "Max" step** — the maximum-size slider now has a **Max** step beyond 512 px. Dragging the right handle all the way to the end removes the upper size limit entirely, showing all discovered icons regardless of how large they are. The label updates to e.g. `16px – Max` when a minimum is set, or `All sizes` when no lower bound is active either. The minimum-size slider still tops out at 512 px (a minimum of "Max" makes no sense).
+
 ## [2.9.2] — 2026-07-08
 
 ### Changed
