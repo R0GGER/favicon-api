@@ -116,6 +116,16 @@ const PORT = parseInt(process.env.PORT || '3000', 10);
 
 app.set('trust proxy', true);
 
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    return res.sendStatus(204);
+  }
+  next();
+});
+
 // SEO / templated index. The HTML template ships with `__BASE_URL__` tokens
 // in the <head> (canonical, Open Graph, Twitter Card, JSON-LD) so absolute
 // URLs resolve to whichever public origin the deployment is reached on,

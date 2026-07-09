@@ -46,6 +46,7 @@
   <meta name="twitter:image:alt" content="FaviconAPI logo">
 
   __ANALYTICS_SCRIPT__
+  <template id="analytics-tpl">__ANALYTICS_SCRIPT__</template>
 
   <script type="application/ld+json">
   __JSON_LD__
@@ -1432,6 +1433,18 @@
             FaviconAPI Copy
           </a>
         </div>
+
+        <div class="tool-card">
+          <div>
+            <strong><span class="icon">&#128190;</span> Offline search page</strong>
+            <p>Download a self-contained HTML file to look up favicons from your own computer &mdash; uses the provider chain configured above.</p>
+          </div>
+          <button type="button" class="bookmarklet-btn tool-action" onclick="downloadOfflineSearchPage()">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>
+            Download HTML
+          </button>
+        </div>
+
       </div>
     </aside>
   </div>
@@ -1883,6 +1896,279 @@
       alert('Drag this button to your bookmarks bar (the name will auto-fill as "FaviconAPI Copy"). Then click the saved bookmark on any website to copy that site\u2019s favicon URL.\n\nTip: if you copy-paste the URL into a manual "Add bookmark" dialog instead, browsers can\u2019t pre-fill the name for security reasons \u2014 you\u2019ll have to type it yourself.');
     }
 
+    function buildOfflineSearchHtml() {
+      const preferred = document.getElementById('tools-pref')?.value || 'scraper';
+      const fallbacks = [1, 2, 3, 4]
+        .map((i) => document.getElementById(`tools-fb-${i}`)?.value)
+        .filter(Boolean);
+      const size = parseInt(document.getElementById('tools-size')?.value, 10) || PROFILE_DEFAULT_SIZE;
+      const origin = location.origin;
+
+      const providerLabel = (v) => {
+        const opt = PROFILE_PROVIDER_OPTIONS.find((o) => o.value === v);
+        return opt ? opt.label : v;
+      };
+      const prefObj = { value: preferred, label: providerLabel(preferred) };
+      const fbObjs = fallbacks.map((v) => ({ value: v, label: providerLabel(v) }));
+      const chainDesc = [prefObj, ...fbObjs].map((p) => p.label).join(' - ');
+      const fbSize = Math.min(size, 64);
+      const analyticsTag = (document.getElementById('analytics-tpl')?.innerHTML || '').trim();
+
+      return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FaviconAPI \u2014 Offline Search</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica Neue,Arial,sans-serif;background:#f8f6fb;color:#1a1a2e;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:2rem 1rem}
+h1{font-size:1.5rem;color:#5b2e7e;margin-bottom:.25rem}
+.subtitle{font-size:.85rem;color:#666;margin-bottom:1.5rem;text-align:center}
+.search-form{display:flex;gap:.5rem;width:100%;max-width:560px;margin-bottom:1.5rem}
+.search-form input{flex:1;padding:.6rem .8rem;border:2px solid #d4c5e2;border-radius:8px;font-size:1rem;outline:none;transition:border-color .2s}
+.search-form input:focus{border-color:#5b2e7e}
+.search-form button{padding:.6rem 1.2rem;background:#5b2e7e;color:#fff;border:none;border-radius:8px;font-size:1rem;cursor:pointer;white-space:nowrap;transition:background .2s}
+.search-form button:hover{background:#472363}
+#output{display:none;width:100%;max-width:780px;flex-direction:column;gap:1.25rem;align-items:center}
+#output.visible{display:flex}
+.pref-card{background:#fff;border-radius:14px;padding:1.5rem;box-shadow:0 2px 16px rgba(91,46,126,.12);display:flex;flex-direction:column;align-items:center;gap:.75rem;width:100%;max-width:400px}
+.pref-card .badge{font-size:.8rem;font-weight:700;color:#5b2e7e;background:#f3eaf7;padding:.2rem .7rem;border-radius:5px}
+.pref-card img{max-width:${size}px;max-height:${size}px;object-fit:contain;border-radius:10px;background:#f3eaf7;padding:8px;image-rendering:auto}
+.pref-card .ph{width:${size}px;height:${size}px;min-height:${size}px;border-radius:10px;background:#f3eaf7;display:flex;align-items:center;justify-content:center;color:#c4b0d4;font-size:1.4rem}
+.pref-card .status{font-size:.78rem;color:#999}
+.links{display:flex;gap:.4rem;flex-wrap:wrap;justify-content:center}
+.link-btn{display:inline-flex;align-items:center;gap:.3rem;padding:.32rem .7rem;border:none;border-radius:5px;font-size:.74rem;cursor:pointer;text-decoration:none;transition:background .2s;white-space:nowrap}
+.link-server svg,.link-source svg{width:13px;height:13px;fill:currentColor;flex-shrink:0}
+.link-server{background:#5b2e7e;color:#fff}
+.link-server:hover{background:#472363}
+.link-server.copied{background:#2e7e3e}
+.link-dl{background:#e8ddf0;color:#5b2e7e}
+.link-dl:hover{background:#d4c5e2}
+.link-dl svg{width:14px;height:14px;fill:currentColor;flex-shrink:0}
+.link-source{background:#fff;color:#5b2e7e;border:1px solid #d4c5e2}
+.link-source:hover{background:#f3eaf7}
+.fb-label{font-size:.82rem;color:#888;margin-top:.5rem}
+.fb-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.75rem;width:100%}
+.fb-card{background:#fff;border-radius:12px;padding:1rem;box-shadow:0 1px 8px rgba(91,46,126,.08);display:flex;flex-direction:column;align-items:center;gap:.5rem;min-width:0}
+.fb-card .badge{font-size:.7rem;font-weight:600;color:#5b2e7e;background:#f3eaf7;padding:.15rem .5rem;border-radius:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.fb-card img{width:${fbSize}px;height:${fbSize}px;object-fit:contain;border-radius:8px;background:#f3eaf7;padding:4px}
+.fb-card .ph{width:${fbSize}px;height:${fbSize}px;border-radius:8px;background:#f3eaf7;display:flex;align-items:center;justify-content:center;color:#c4b0d4;font-size:1rem}
+.fb-card .status{font-size:.7rem;color:#999}
+.fb-card .links{gap:.3rem}
+.fb-card .link-btn{font-size:.68rem;padding:.25rem .5rem}
+.fb-card .link-dl svg{width:12px;height:12px}
+.size-bar{display:flex;gap:.3rem;justify-content:center;flex-wrap:wrap}
+.size-btn{padding:.2rem .55rem;border:1px solid #d4c5e2;border-radius:5px;background:#fff;color:#5b2e7e;font-size:.7rem;cursor:pointer;transition:background .2s,color .2s}
+.size-btn:hover{background:#f3eaf7}
+.size-btn.active{background:#5b2e7e;color:#fff;border-color:#5b2e7e}
+.img-dims{font-size:.68rem;color:#999;margin-top:-.25rem}
+.card-err{opacity:.45}
+.dl-all-wrap{margin-top:.25rem}
+.dl-all{display:inline-flex;align-items:center;gap:.4rem;padding:.5rem 1.2rem;background:#5b2e7e;color:#fff;border:none;border-radius:8px;font-size:.88rem;cursor:pointer;transition:background .2s}
+.dl-all:hover{background:#472363}
+.dl-all svg{width:16px;height:16px;fill:currentColor}
+.dl-all.done{background:#2e7e3e}
+.profile-info{margin-top:auto;padding-top:2rem;text-align:center;font-size:.75rem;color:#999}
+.profile-info a{color:#5b2e7e;text-decoration:none}
+.profile-info a:hover{text-decoration:underline}
+</style>
+${analyticsTag}
+</head>
+<body>
+<h1>FaviconAPI</h1>
+<p class="subtitle">Offline search - sources: ${chainDesc} @ ${size}px (preferred)</p>
+<form class="search-form" id="sf">
+  <input type="text" id="q" placeholder="domain.com or app name" autocomplete="off" autofocus>
+  <button type="submit">Search</button>
+</form>
+<div id="output">
+  <div class="pref-card" id="pref"></div>
+  <div class="fb-label" id="fb-label">Fallbacks</div>
+  <div class="fb-grid" id="fb-grid"></div>
+  <div class="dl-all-wrap" id="dl-all-wrap" style="display:none">
+    <button type="button" class="dl-all" id="dl-all-btn" onclick="downloadAll()">
+      <svg viewBox="0 0 16 16"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>
+      Download all
+    </button>
+  </div>
+</div>
+<div class="profile-info">
+  Powered by <a href="${origin}" target="_blank" rel="noopener noreferrer">FaviconAPI</a><br>
+  Server: <code>${origin}</code>
+</div>
+<script>
+var S='${origin}',SZ=${size},PREF=${JSON.stringify(prefObj)},FBS=${JSON.stringify(fbObjs)};
+var DL_SVG='<svg viewBox="0 0 16 16"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>';
+var CP_SVG='<svg viewBox="0 0 16 16"><path fill="currentColor" fill-rule="evenodd" d="M4 9.5H2.5v-7h7V4H11V2a1 1 0 0 0-1-1H2a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h2zm9.5 4h-7v-7h7zM5 6a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1z" clip-rule="evenodd"/></svg>';
+var lastQuery='';
+var SRC={
+  google:function(q){return'https://www.google.com/s2/favicons?domain='+encodeURIComponent(q)+'&sz='+SZ;},
+  googlev2:function(q){return'https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://'+encodeURIComponent(q)+'&size='+SZ;},
+  duckduckgo:function(q){return'https://icons.duckduckgo.com/ip3/'+encodeURIComponent(q)+'.ico';},
+  yandex:function(q){return'https://favicon.yandex.net/favicon/'+encodeURIComponent(q);},
+  faviconso:function(q){return'https://favicon.so/api/favicon?url='+encodeURIComponent(q);},
+  vemetric:function(q){return'https://favicon.vemetric.com/'+encodeURIComponent(q);},
+  favicondev:function(q){return'https://www.faviconextractor.com/favicon/'+encodeURIComponent(q);},
+  faviconkit:function(q){return'https://ico.faviconkit.net/favicon/'+encodeURIComponent(q)+'?sz='+SZ;},
+  faviconrun:function(q){return'https://favicon.run/favicon?domain='+encodeURIComponent(q)+'&sz='+SZ;},
+  twentyicons:function(q){return'https://twenty-icons.com/'+encodeURIComponent(q)+'/'+SZ;},
+  ryanjc:function(q){return'https://api.favicon.ryanjc.com/?url='+encodeURIComponent(q);},
+  logodev:function(q){return'https://img.logo.dev/'+encodeURIComponent(q)+'?fallback=404';},
+  brandfetch:function(q){return'https://cdn.brandfetch.io/'+encodeURIComponent(q);},
+  scraper:function(){return null;},
+  selfhst:function(){return null;},
+  dashboardicons:function(){return null;},
+  lobehub:function(){return null;},
+  svgl:function(){return null;}
+};
+var CATALOG={selfhst:1,dashboardicons:1,lobehub:1,svgl:1};
+function srvUrl(p,q){var t=q;if(CATALOG[p.value]&&q.indexOf('.')!==-1)t=q.split('.')[0];return S+'/'+p.value+'/'+SZ+'/png/'+encodeURIComponent(t);}
+function srcUrl(p,q){var fn=SRC[p.value];return fn?fn(q):null;}
+function dlOne(url,filename,btn){
+  var origHtml=btn.innerHTML;
+  btn.innerHTML='\u2026';
+  return fetch(url,{mode:'cors'}).then(function(r){if(!r.ok)throw 0;return r.blob();}).then(function(b){
+    var ext=b.type&&b.type.indexOf('svg')!==-1?'svg':'png';
+    triggerBlobDl(b,filename+'.'+ext);
+    btn.innerHTML=origHtml;return true;
+  }).catch(function(){
+    var img=new Image();img.crossOrigin='anonymous';
+    img.onload=function(){
+      var c=document.createElement('canvas');c.width=img.naturalWidth;c.height=img.naturalHeight;
+      c.getContext('2d').drawImage(img,0,0);
+      c.toBlob(function(b2){if(b2)triggerBlobDl(b2,filename+'.png');});
+      btn.innerHTML=origHtml;
+    };
+    img.onerror=function(){btn.innerHTML=origHtml;};
+    img.src=url;
+    return false;
+  });
+}
+function triggerBlobDl(blob,name){
+  var a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download=name;document.body.appendChild(a);a.click();
+  setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},100);
+}
+function makeLinks(url,p,q){
+  var d=document.createElement('div');d.className='links';
+  var cb=document.createElement('button');cb.type='button';
+  cb.className='link-btn link-server';cb.innerHTML=CP_SVG+' Server';
+  cb.onclick=function(){navigator.clipboard.writeText(url).then(function(){
+    cb.innerHTML=CP_SVG+' Copied!';cb.classList.add('copied');
+    setTimeout(function(){cb.innerHTML=CP_SVG+' Server';cb.classList.remove('copied');},2000);
+  });};
+  d.appendChild(cb);
+  var src=srcUrl(p,q);
+  if(src){var sa=document.createElement('button');sa.type='button';sa.className='link-btn link-source';
+    sa.innerHTML=CP_SVG+' Source';sa.onclick=function(){navigator.clipboard.writeText(src).then(function(){sa.innerHTML=CP_SVG+' Copied!';sa.classList.add('copied');setTimeout(function(){sa.innerHTML=CP_SVG+' Source';sa.classList.remove('copied');},2000);});};d.appendChild(sa);}
+  var dl=document.createElement('button');dl.type='button';
+  dl.className='link-btn link-dl';dl.innerHTML=DL_SVG+' Download';
+  dl.onclick=function(){dlOne(url,q.replace(/[^a-zA-Z0-9._-]/g,'_')+'-'+p.value,dl);};
+  d.appendChild(dl);
+  return d;
+}
+function buildCard(container,p,q,isPref){
+  container.innerHTML='';
+  var curSize=SZ;
+  var url=srvUrl(p,q);
+  var badge=document.createElement('span');badge.className='badge';badge.textContent=p.label;
+  var ph=document.createElement('div');ph.className='ph';ph.textContent='\u2026';
+  var status=document.createElement('span');status.className='status';status.textContent='loading\u2026';
+  var img=document.createElement('img');img.alt=p.label;img.style.cursor='pointer';img.title='Click to copy server URL';img.onclick=function(){navigator.clipboard.writeText(url).then(function(){dims.textContent='Copied!';setTimeout(function(){dims.textContent=img.naturalWidth+'\u00d7'+img.naturalHeight+'px';},1500);});};
+  img.onload=function(){if(ph.parentNode)ph.replaceWith(img);status.textContent='';dims.textContent=img.naturalWidth+'\u00d7'+img.naturalHeight+'px';};
+  img.onerror=function(){status.textContent='not found';container.classList.add('card-err');};
+  var dims=document.createElement('span');dims.className='img-dims';
+  img.src=url;
+  container.appendChild(badge);container.appendChild(ph);container.appendChild(dims);container.appendChild(status);
+  var linksEl=makeLinks(url,p,q);
+  if(p.value==='scraper'){
+    var bar=document.createElement('div');bar.className='size-bar';
+    [16,32,64,128].forEach(function(sz){
+      var b=document.createElement('button');b.type='button';b.className='size-btn';
+      b.textContent=sz+'px';if(sz===SZ)b.classList.add('active');
+      b.onclick=function(){
+        curSize=sz;
+        bar.querySelectorAll('.size-btn').forEach(function(x){x.classList.remove('active');});
+        b.classList.add('active');
+        var t=CATALOG[p.value]&&q.indexOf('.')!==-1?q.split('.')[0]:q;
+        var newUrl=S+'/'+p.value+'/'+sz+'/png/'+encodeURIComponent(t);
+        img.style.width='';img.style.height='';img.style.imageRendering='';
+        
+        status.textContent='loading\u2026';container.classList.remove('card-err');
+        img.src=newUrl;
+        var nl=makeLinks(newUrl,p,q);linksEl.replaceWith(nl);linksEl=nl;
+      };
+      bar.appendChild(b);
+    });
+    container.appendChild(bar);
+  }
+  container.appendChild(linksEl);
+}
+function downloadAll(){
+  var q=lastQuery;if(!q)return;
+  var all=[PREF].concat(FBS);
+  var btn=document.getElementById('dl-all-btn');
+  var origHtml=btn.innerHTML;
+  var total=all.length,done=0;
+  btn.innerHTML='0 / '+total+'\u2026';
+  var chain=Promise.resolve();
+  all.forEach(function(p){
+    chain=chain.then(function(){
+      var url=srvUrl(p,q);
+      var fname=q.replace(/[^a-zA-Z0-9._-]/g,'_')+'-'+p.value;
+      return fetch(url).then(function(r){if(!r.ok)throw 0;return r.blob();}).then(function(b){
+        var ext=b.type&&b.type.indexOf('svg')!==-1?'svg':'png';
+        var a=document.createElement('a');a.href=URL.createObjectURL(b);
+        a.download=fname+'.'+ext;
+        document.body.appendChild(a);a.click();
+        setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},100);
+      }).catch(function(){}).then(function(){
+        done++;btn.innerHTML=done+' / '+total+'\u2026';
+        return new Promise(function(r){setTimeout(r,350);});
+      });
+    });
+  });
+  chain.then(function(){
+    btn.innerHTML=DL_SVG+' Done!';btn.classList.add('done');
+    setTimeout(function(){btn.innerHTML=origHtml;btn.classList.remove('done');},2500);
+  });
+}
+document.getElementById('sf').addEventListener('submit',function(e){
+  e.preventDefault();
+  var q=document.getElementById('q').value.trim();if(!q)return;
+  lastQuery=q;
+  var out=document.getElementById('output');out.classList.add('visible');
+  var pc=document.getElementById('pref');pc.className='pref-card';
+  buildCard(pc,PREF,q,true);
+  var grid=document.getElementById('fb-grid');grid.innerHTML='';
+  var lbl=document.getElementById('fb-label');
+  var dlWrap=document.getElementById('dl-all-wrap');
+  if(FBS.length===0){lbl.style.display='none';grid.style.display='none';}
+  else{lbl.style.display='';grid.style.display='';
+    FBS.forEach(function(fb){
+      var card=document.createElement('div');card.className='fb-card';
+      buildCard(card,fb,q,false);grid.appendChild(card);
+    });
+  }
+  dlWrap.style.display='';
+});
+<\/script>
+</body>
+</html>`;
+    }
+
+    function downloadOfflineSearchPage() {
+      initToolsProfileBuilder();
+      const html = buildOfflineSearchHtml();
+      const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'faviconapi-search.html';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 100);
+    }
     (function setupCodeCopyButtonsOnPage() {
       setupCodeCopyButtons(document.querySelector('.docs-main'));
     })();

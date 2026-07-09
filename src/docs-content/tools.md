@@ -132,6 +132,41 @@ The id is base64url of a compact JSON array:
 
 **App names** — domain-only providers (scraper, raster providers, brandfetch) are skipped when the target has no dot (service name).
 
+## Offline search page
+
+Download a **self-contained HTML file** that lets you look up favicons from your own computer — no need to visit the FaviconAPI website every time. The file uses the provider chain and minimum size from your profile, baked directly into the page.
+
+### How it works
+
+The downloaded `faviconapi-search.html` file contains:
+
+- Your FaviconAPI server URL.
+- Your profile configuration (preferred provider, fallbacks, minimum size).
+- A search box where you type a domain (`github.com`) or app name (`immich`).
+- A favicon preview with a copyable URL.
+
+When you search, the page fetches the icon from your FaviconAPI server using the profile URL pattern (`/{profileId}/{query}`). This means the file works anywhere you can open a browser, but **requires a network connection** to your FaviconAPI instance to retrieve icons.
+
+### Download
+
+1. Open the homepage and click **Tools** in the top navigation.
+2. Configure your **preferred provider**, **fallbacks**, and **minimum size** in the profile builder.
+3. Click **Download HTML** under **Offline search page**.
+
+The file is generated in your browser with the current profile settings. To change providers or size, download a new copy.
+
+### Use
+
+1. Open `faviconapi-search.html` in any browser (double-click the file or drag it into a browser window).
+2. Type a domain or app name in the search box and press Enter.
+3. The favicon appears with its full URL — click **Copy** to copy the URL to your clipboard.
+
+### Tips
+
+- The file works on any device that can reach your FaviconAPI server — save it on a USB stick, share it with colleagues, or keep it on your desktop for quick lookups.
+- Each download snapshots your current profile. If you change your provider chain, download a fresh copy to get the updated settings.
+- The copy button requires a secure context (`https://` or `localhost`). When opening a local file, some browsers may block clipboard access — in that case, select the URL text manually.
+
 ## Bookmarklet
 
 Copy a site's favicon URL from any page you visit — without opening the FaviconAPI homepage first.
