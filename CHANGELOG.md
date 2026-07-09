@@ -5,6 +5,16 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.4] — 2026-07-09
+
+### Changed
+
+- **Web UI — "Build custom URL" offcanvas opening** — clicking the toolbar button now opens the offcanvas panel at its default 400 px width instead of first sliding in at 400 px and then expanding to 720 px with a visible delay. The panel only expands to 720 px when a tool section ("Search from browser" / "Build custom URL") is opened inside the panel, matching the behaviour of the Tools menu item.
+
+### Fixed
+
+- **Web UI — offcanvas header docs link** — moved the `?` documentation link from the "Custom URL" tool card to the offcanvas header next to "Browser tools", linking to `/docs/tools`. The link is now visible on all three pages (`index.html`, `api.html`, `docs.html`).
+
 ## [2.9.3] — 2026-07-09
 
 ### Added
