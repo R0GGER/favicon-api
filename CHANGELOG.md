@@ -5,6 +5,21 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.10.0] — 2026-07-10
+
+### Added
+
+- **Browser Tools — Offline search page** — new tool in the Browser Tools panel that generates a downloadable, self-contained HTML file for looking up favicons from your own computer. The file embeds your FaviconAPI server URL and profile configuration (preferred provider, fallbacks, minimum size) and requires no installation — just open it in any browser. Features:
+  - **Preferred provider** shown prominently with the icon at profile size, fallback providers in a grid below.
+  - **Size buttons** on the HTML scraper card (16 / 32 / 64 / 128 px) to preview the icon at different resolutions with actual dimensions displayed.
+  - **Three actions per provider**: *Server* (copy proxy URL), *Source* (copy upstream URL, domain-based providers only), *Download* (save icon to disk).
+  - **Download all** button to batch-download icons from every provider in the chain.
+  - **Click any icon** to copy its server URL to the clipboard.
+  - Catalog providers (selfhst, Dashboard Icons, LobeHub, SVGL) automatically strip the domain to a slug when the query contains a dot (e.g. `plex.tv` → `plex`).
+  - Umami analytics tag is embedded when `UI_ANALYTICS_SCRIPT_SRC` and `UI_ANALYTICS_WEBSITE_ID` are configured.
+- **CORS headers** — all responses now include `Access-Control-Allow-Origin: *` so the offline search page (and other cross-origin clients) can fetch icons via `fetch()`.
+- **Documentation** — added "Offline search page" section to the Tools docs page.
+
 ## [2.9.4] — 2026-07-09
 
 ### Changed
