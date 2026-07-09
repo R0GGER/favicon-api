@@ -4060,7 +4060,7 @@
         if (!isSizeFilterActive()) {
           fill.style.left = '0%';
           fill.style.right = '0%';
-          fill.style.opacity = '0';
+          fill.style.opacity = '';
         } else if (currentMinSizeFilter > 0 && currentMaxSizeFilter > 0) {
           fill.style.left = `${pct(minIdx)}%`;
           fill.style.right = `${100 - pct(maxIdx)}%`;
