@@ -11,6 +11,7 @@ FaviconAPI is a self-hosted favicon proxy with a browser-based UI that fetches w
 - **Browser search** - add `/search?q=%s` as a custom search engine (Chrome, Edge, Firefox)
 - **Custom URL** - Build a shareable URL with your own preferred provider, fallbacks and minimum icon size. 
 - **Bookmarklet** - drag **FaviconAPI Copy** to your bookmarks bar to copy a site's favicon URL
+- **Offline search page** - download a self-contained HTML file to look up favicons from your own computer
 
 ---
 
