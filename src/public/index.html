@@ -305,6 +305,35 @@
       background: #f5f0ea;
     }
 
+    .modal-title-group {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .modal-help {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.35rem;
+      height: 1.35rem;
+      border: 1.5px solid #c8bfb8;
+      background: transparent;
+      color: #8a8480;
+      font-size: 0.8rem;
+      font-weight: 700;
+      border-radius: 50%;
+      cursor: pointer;
+      text-decoration: none;
+      line-height: 1;
+    }
+
+    .modal-help:hover {
+      color: #2d2a26;
+      border-color: #8a8480;
+      background: #f5f0ea;
+    }
+
     .modal-body {
       padding: 1rem 1.35rem 1.35rem;
       font-size: 0.9rem;
@@ -383,6 +412,75 @@
     .profile-url-box code { font-size: 0.78rem; }
 
     .profile-url-box .modal-copy-btn { align-self: flex-end; }
+
+    .profile-use-sections {
+      border-top: 1px solid #ece6de;
+      margin-top: 0.35rem;
+      padding-top: 0.85rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+    }
+
+    .profile-use-section {
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+    }
+
+    .profile-use-section > strong {
+      font-size: 0.82rem;
+      color: #2d2a26;
+    }
+
+    .profile-use-section > p {
+      font-size: 0.8rem;
+      color: #6b6560;
+      margin: 0 0 0.1rem;
+    }
+
+    .profile-use-url-box {
+      margin-bottom: 0;
+    }
+
+    .tools-profile-card .profile-hint {
+      color: #5b4a63;
+    }
+
+    .tools-preview-block {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .tools-preview-block .tools-test-open-btn {
+      align-self: flex-end;
+    }
+
+    .tools-test-open-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: #5b2e7e;
+      text-decoration: none;
+      padding: 0.2rem 0.5rem;
+      border: 1px solid #d9c2e6;
+      border-radius: 5px;
+      background: transparent;
+    }
+
+    .tools-test-open-btn:hover {
+      background: #ece0f4;
+      border-color: #b78dd0;
+    }
+
+    .tools-test-open-btn svg {
+      width: 10px;
+      height: 10px;
+      fill: currentColor;
+    }
 
     .profile-field {
       display: flex;
@@ -513,6 +611,12 @@
     }
 
     .browser-guide li + li { margin-top: 0.25rem; }
+
+    .browser-guide li strong {
+      display: inline;
+      font-size: inherit;
+      margin-bottom: 0;
+    }
 
     .browser-guide a {
       color: #5b2e7e;
@@ -2339,7 +2443,7 @@
     .offcanvas-overlay.open { display: flex; }
 
     .offcanvas-panel {
-      width: min(400px, 100%);
+      width: min(500px, 100%);
       height: 100%;
       background: #faf6f1;
       border-left: 1px solid #e0dbd5;
@@ -2347,7 +2451,41 @@
       display: flex;
       flex-direction: column;
       transform: translateX(100%);
-      transition: transform 0.25s ease;
+      transition: transform 0.25s ease, width 0.25s ease;
+    }
+
+    .offcanvas-panel.expanded {
+      width: min(720px, 100%);
+    }
+
+    .tool-details {
+      margin-top: 0.6rem;
+      padding-top: 0.8rem;
+      border-top: 1px dashed #d0c1dc;
+    }
+    .tool-details .modal-intro {
+      font-size: 0.85rem;
+      color: #4a4540;
+      line-height: 1.5;
+      margin-bottom: 0.7rem;
+    }
+    .tool-details .browser-guide { margin-top: 0.8rem; }
+    .tool-action .caret {
+      display: inline-block;
+      margin-left: 0.35rem;
+      transition: transform 0.2s ease;
+      font-size: 0.7rem;
+    }
+    .tool-action[aria-expanded="true"] .caret { transform: rotate(180deg); }
+    .tool-card-title-group {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    .tool-card-title-group .modal-help {
+      width: 18px;
+      height: 18px;
+      font-size: 0.75rem;
     }
 
     .offcanvas-overlay.open .offcanvas-panel {
@@ -2651,7 +2789,7 @@
           </div>
         </div>
         <div class="download-toolbar-actions">
-          <button type="button" class="download-all-btn btn-cta-attention" id="profile-builder-btn" onclick="openProfileModal()" data-tip="Build a shareable URL with your own preferred provider, fallbacks and minimum icon size. The settings are encoded in the URL — no account needed." aria-label="Build a custom favicon URL: a shareable URL with your own preferred provider, fallbacks and minimum icon size, encoded in the URL with no account needed">
+          <button type="button" class="download-all-btn btn-cta-attention" id="profile-builder-btn" onclick="openProfileModal()" data-tip="Build a shareable URL with your own preferred provider, fallbacks and minimum icon size." aria-label="Build a custom favicon URL: a shareable URL with your own preferred provider, fallbacks and minimum icon size, encoded in the URL with no account needed">
             <span class="cta-pointer cta-pointer--left" aria-hidden="true">👉</span>
             <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.715 6.542 3.343 7.914a3 3 0 1 0 4.243 4.243l1.828-1.829A3 3 0 0 0 8.586 5.5L8 6.086a1.002 1.002 0 0 0-.154.199 2 2 0 0 1 .861 3.337L6.88 11.45a2 2 0 1 1-2.83-2.83l.793-.792a4.018 4.018 0 0 1-.128-1.287z"/><path d="M6.586 4.672A3 3 0 0 0 7.414 9.5l.775-.776a2 2 0 0 1-.896-3.346L9.12 3.55a2 2 0 1 1 2.83 2.83l-.793.792c.112.42.155.855.128 1.287l1.372-1.372a3 3 0 1 0-4.243-4.243L6.586 4.672z"/></svg>
             Build custom URL
@@ -3133,32 +3271,127 @@
   <div class="offcanvas-overlay" id="tools-offcanvas" hidden aria-hidden="true" onclick="onToolsOffcanvasBackdropClick(event)">
     <aside class="offcanvas-panel" role="dialog" aria-modal="true" aria-labelledby="tools-offcanvas-title" onclick="event.stopPropagation()">
       <div class="offcanvas-header">
-        <h2 id="tools-offcanvas-title">Browser tools</h2>
+        <h2 id="tools-offcanvas-title">Browser tools <a href="/docs/tools" target="_blank" rel="noopener noreferrer" class="modal-help" aria-label="Documentation">?</a></h2>
         <button type="button" class="modal-close" onclick="closeToolsOffcanvas()" aria-label="Close">&times;</button>
       </div>
       <div class="offcanvas-body">
-        <p class="offcanvas-intro">Shortcuts to use FaviconAPI from your browser address bar or bookmarks bar.</p>
+        <p class="offcanvas-intro">Set up your profile once and it powers the search engine, custom URL and bookmarklet below &mdash; your preferences are encoded in the URL, no account needed.</p>
+
+        <div class="tool-card tools-profile-card">
+          <div class="profile-form">
+            <div class="profile-field">
+              <label for="tools-pref">Preferred provider</label>
+              <select id="tools-pref"></select>
+            </div>
+            <div class="profile-field">
+              <label>Fallbacks (optional, in order)</label>
+              <div class="profile-fallbacks">
+                <div class="profile-fallback-cell"><span class="profile-fallback-num">1</span><select id="tools-fb-1" aria-label="Fallback 1"></select></div>
+                <div class="profile-fallback-cell"><span class="profile-fallback-num">2</span><select id="tools-fb-2" aria-label="Fallback 2"></select></div>
+                <div class="profile-fallback-cell"><span class="profile-fallback-num">3</span><select id="tools-fb-3" aria-label="Fallback 3"></select></div>
+                <div class="profile-fallback-cell"><span class="profile-fallback-num">4</span><select id="tools-fb-4" aria-label="Fallback 4"></select></div>
+              </div>
+            </div>
+            <div class="profile-field">
+              <label for="tools-size">Minimum icon size</label>
+              <select id="tools-size"></select>
+              <span class="profile-hint">SVG = unlimited (vector, served as-is). PNG = served at exactly this size; smaller sources are skipped.</span>
+            </div>
+            <div class="profile-field">
+              <label for="tools-test">Test URL (domain or app name)</label>
+              <input type="text" id="tools-test" placeholder="example.com  or  immich" autocomplete="off">
+            </div>
+            <div class="tools-preview-block" id="tools-preview" style="display:none">
+              <div class="profile-preview">
+                <span class="profile-preview-thumb">
+                  <img id="tools-preview-img" alt="Test URL favicon preview">
+                </span>
+                <span class="profile-preview-meta" id="tools-preview-meta"></span>
+              </div>
+              <a class="tools-test-open-btn" id="tools-test-url-open" href="#" target="_blank" rel="noopener noreferrer">
+                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M9.5 3.5a.5.5 0 01.5-.5h3a.5.5 0 01.5.5v3a.5.5 0 01-1 0V4.707L7.354 9.854a.5.5 0 01-.708-.708L11.793 4H10a.5.5 0 01-.5-.5z"/><path d="M3 4.5A1.5 1.5 0 014.5 3H8a.5.5 0 010 1H4.5a.5.5 0 00-.5.5v8a.5.5 0 00.5.5h8a.5.5 0 00.5-.5V9a.5.5 0 011 0v3.5A1.5 1.5 0 0112.5 14h-8A1.5 1.5 0 013 12.5v-8z"/></svg>
+                Open in new tab
+              </a>
+            </div>
+          </div>
+        </div>
 
         <div class="tool-card">
           <div>
             <strong><span class="icon">&#128269;</span> Browser search</strong>
             <p>Add FaviconAPI as a custom search engine and look up favicons straight from your address bar.</p>
           </div>
-          <button type="button" class="bookmarklet-btn tool-action" id="search-browser-btn" onclick="openSearchModal()">
+          <button type="button" class="bookmarklet-btn tool-action" id="search-browser-btn" aria-expanded="false" aria-controls="tool-details-search" onclick="toggleToolDetails('search')">
             <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/></svg>
             Search from browser
+            <span class="caret" aria-hidden="true">&#9662;</span>
           </button>
+          <div class="tool-details" id="tool-details-search" hidden>
+            <p class="modal-intro">Add FaviconAPI as a custom search engine. Use <code>%s</code> as the query placeholder &mdash; your browser replaces it with whatever you type in the address bar. The URL uses the profile you configured above.</p>
+            <div class="search-url-box">
+              <code id="search-engine-url"></code>
+              <button type="button" class="modal-copy-btn" onclick="copySearchEngineUrl()">Copy URL</button>
+            </div>
+            <div class="browser-guide">
+              <section>
+                <h3>Google Chrome</h3>
+                <ol>
+                  <li>Open <strong>Settings</strong> &rarr; <strong>Search engine</strong> &rarr; <strong>Manage search engines and site search</strong>.</li>
+                  <li>Click <strong>Add</strong> under Site search.</li>
+                  <li>Name: <strong>FaviconAPI</strong></li>
+                  <li>Shortcut: <strong>fav</strong> (optional)</li>
+                  <li>URL: <a id="search-engine-url-chrome" href="#" target="_blank" rel="noopener"></a></li>
+                </ol>
+              </section>
+              <section>
+                <h3>Microsoft Edge</h3>
+                <ol>
+                  <li>Open <strong>Settings</strong> &rarr; <strong>Privacy, search, and services</strong> &rarr; <strong>Address bar and search</strong> &rarr; <strong>Manage search engines</strong>.</li>
+                  <li>Click <strong>Add</strong>.</li>
+                  <li>Name: <strong>FaviconAPI</strong></li>
+                  <li>Keyword: <strong>fav</strong> (optional)</li>
+                  <li>URL: <a id="search-engine-url-edge" href="#" target="_blank" rel="noopener"></a></li>
+                </ol>
+              </section>
+              <section>
+                <h3>Mozilla Firefox</h3>
+                <ol>
+                  <li>Firefox may offer <strong>Add search engine</strong> automatically on this page (OpenSearch).</li>
+                  <li>Or open <strong>Settings</strong> &rarr; <strong>Search</strong> &rarr; scroll to <strong>Search Shortcuts</strong> &rarr; <strong>Add</strong>.</li>
+                  <li>Name: <strong>FaviconAPI</strong></li>
+                  <li>Keyword: <strong>fav</strong> (optional)</li>
+                  <li>URL: <a id="search-engine-url-firefox" href="#" target="_blank" rel="noopener"></a></li>
+                </ol>
+              </section>
+              <section>
+                <h3>Apple Safari</h3>
+                <ol>
+                  <li>Desktop Safari does not support custom search-engine URLs.</li>
+                  <li>On iPhone/iPad: <strong>Settings</strong> &rarr; <strong>Safari</strong> &rarr; <strong>Search Engine</strong> (only built-in engines are available).</li>
+                </ol>
+                <p class="note">Use Chrome, Edge or Firefox for this feature, or use the bookmarklet below.</p>
+              </section>
+            </div>
+          </div>
         </div>
 
         <div class="tool-card">
           <div>
             <strong><span class="icon">&#128279;</span> Custom URL</strong>
-            <p>Build a shareable URL with your own preferred provider, fallbacks and minimum icon size. The settings are encoded in the URL &mdash; no account needed.</p>
+            <p>Build a shareable URL with your own preferred provider, fallbacks and minimum icon size.</p>
           </div>
-          <button type="button" class="bookmarklet-btn tool-action" onclick="openProfileModal()">
+          <button type="button" class="bookmarklet-btn tool-action" aria-expanded="false" aria-controls="tool-details-custom" onclick="toggleToolDetails('custom')">
             <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.715 6.542 3.343 7.914a3 3 0 1 0 4.243 4.243l1.828-1.829A3 3 0 0 0 8.586 5.5L8 6.086a1.002 1.002 0 0 0-.154.199 2 2 0 0 1 .861 3.337L6.88 11.45a2 2 0 1 1-2.83-2.83l.793-.792a4.018 4.018 0 0 1-.128-1.287z"/><path d="M6.586 4.672A3 3 0 0 0 7.414 9.5l.775-.776a2 2 0 0 1-.896-3.346L9.12 3.55a2 2 0 1 1 2.83 2.83l-.793.792c.112.42.155.855.128 1.287l1.372-1.372a3 3 0 1 0-4.243-4.243L6.586 4.672z"/></svg>
             Build custom URL
+            <span class="caret" aria-hidden="true">&#9662;</span>
           </button>
+          <div class="tool-details" id="tool-details-custom" hidden>
+            <p class="modal-intro">Your shareable URL &mdash; encoded with the profile you configured above. Paste it into dashboards or password managers and swap the trailing segment per site: <code>&lt;url&gt;/{domain-or-appname}</code>.</p>
+            <div class="search-url-box profile-url-box">
+              <code id="profile-url"></code>
+              <button type="button" class="modal-copy-btn" onclick="copyProfileUrl()">Copy URL</button>
+            </div>
+          </div>
         </div>
 
         <div class="tool-card">
@@ -3174,114 +3407,6 @@
 
       </div>
     </aside>
-  </div>
-
-  <div class="modal-overlay" id="search-modal" hidden aria-hidden="true">
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="search-modal-title">
-      <div class="modal-header">
-        <h2 id="search-modal-title">Search from browser</h2>
-        <button type="button" class="modal-close" onclick="closeSearchModal()" aria-label="Close">&times;</button>
-      </div>
-      <div class="modal-body">
-        <p class="modal-intro">Add FaviconAPI as a custom search engine. Use <code>%s</code> as the query placeholder &mdash; your browser replaces it with whatever you type in the address bar.</p>
-        <div class="search-url-box">
-          <code id="search-engine-url">http://localhost:3100/search?q=%s</code>
-          <button type="button" class="modal-copy-btn" onclick="copySearchEngineUrl()">Copy URL</button>
-        </div>
-        <div class="browser-guide">
-          <section>
-            <h3>Google Chrome</h3>
-            <ol>
-              <li>Open <strong>Settings</strong> &rarr; <strong>Search engine</strong> &rarr; <strong>Manage search engines and site search</strong>.</li>
-              <li>Click <strong>Add</strong> under Site search.</li>
-              <li>Name: <strong>FaviconAPI</strong></li>
-              <li>Shortcut: <strong>fav</strong> (optional)</li>
-              <li>URL: <a id="search-engine-url-chrome" href="#" target="_blank" rel="noopener"></a></li>
-            </ol>
-          </section>
-          <section>
-            <h3>Microsoft Edge</h3>
-            <ol>
-              <li>Open <strong>Settings</strong> &rarr; <strong>Privacy, search, and services</strong> &rarr; <strong>Address bar and search</strong> &rarr; <strong>Manage search engines</strong>.</li>
-              <li>Click <strong>Add</strong>.</li>
-              <li>Name: <strong>FaviconAPI</strong></li>
-              <li>Keyword: <strong>fav</strong> (optional)</li>
-              <li>URL: <a id="search-engine-url-edge" href="#" target="_blank" rel="noopener"></a></li>
-            </ol>
-          </section>
-          <section>
-            <h3>Mozilla Firefox</h3>
-            <ol>
-              <li>Firefox may offer <strong>Add search engine</strong> automatically on this page (OpenSearch).</li>
-              <li>Or open <strong>Settings</strong> &rarr; <strong>Search</strong> &rarr; scroll to <strong>Search Shortcuts</strong> &rarr; <strong>Add</strong>.</li>
-              <li>Name: <strong>FaviconAPI</strong></li>
-              <li>Keyword: <strong>fav</strong> (optional)</li>
-              <li>URL: <a id="search-engine-url-firefox" href="#" target="_blank" rel="noopener"></a></li>
-            </ol>
-          </section>
-          <section>
-            <h3>Apple Safari</h3>
-            <ol>
-              <li>Desktop Safari does not support custom search-engine URLs.</li>
-              <li>On iPhone/iPad: <strong>Settings</strong> &rarr; <strong>Safari</strong> &rarr; <strong>Search Engine</strong> (only built-in engines are available).</li>
-            </ol>
-            <p class="note">Use Chrome, Edge or Firefox for this feature, or use the bookmarklet in Tools.</p>
-          </section>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="modal-overlay" id="profile-modal" hidden aria-hidden="true">
-    <div class="modal profile-modal" role="dialog" aria-modal="true" aria-labelledby="profile-modal-title">
-      <div class="modal-header">
-        <h2 id="profile-modal-title">Build custom URL</h2>
-        <button type="button" class="modal-close" onclick="closeProfileModal()" aria-label="Close">&times;</button>
-      </div>
-      <div class="modal-body">
-        <p class="modal-intro">Pick a preferred provider, optional fallbacks and a minimum icon size. The URL below encodes your choices - use it as <code>&lt;url&gt;/{domain-or-appname}</code>.</p>
-
-        <div class="profile-form">
-          <div class="profile-field">
-            <label for="profile-preferred">Preferred provider</label>
-            <select id="profile-preferred"></select>
-          </div>
-
-          <div class="profile-field">
-            <label>Fallbacks (optional, in order)</label>
-            <div class="profile-fallbacks">
-              <div class="profile-fallback-cell"><span class="profile-fallback-num">1</span><select id="profile-fallback-1" aria-label="Fallback 1"></select></div>
-              <div class="profile-fallback-cell"><span class="profile-fallback-num">2</span><select id="profile-fallback-2" aria-label="Fallback 2"></select></div>
-              <div class="profile-fallback-cell"><span class="profile-fallback-num">3</span><select id="profile-fallback-3" aria-label="Fallback 3"></select></div>
-              <div class="profile-fallback-cell"><span class="profile-fallback-num">4</span><select id="profile-fallback-4" aria-label="Fallback 4"></select></div>
-            </div>
-          </div>
-
-          <div class="profile-field">
-            <label for="profile-size">Minimum icon size</label>
-            <select id="profile-size"></select>
-            <span class="profile-hint">SVG = unlimited (vector, served as-is). PNG = served at exactly this size; sources smaller than this are skipped.</span>
-          </div>
-
-          <div class="profile-field">
-            <label for="profile-test">Preview with a domain or app name (optional)</label>
-            <input type="text" id="profile-test" placeholder="example.com  or  immich" autocomplete="off">
-          </div>
-        </div>
-
-        <div class="search-url-box profile-url-box">
-          <code id="profile-url"></code>
-          <button type="button" class="modal-copy-btn" onclick="copyProfileUrl()">Copy URL</button>
-        </div>
-
-        <div class="profile-preview" id="profile-preview" style="display:none">
-          <span class="profile-preview-thumb">
-            <img id="profile-preview-img" alt="Custom favicon preview">
-          </span>
-          <span class="profile-preview-meta" id="profile-preview-meta"></span>
-        </div>
-      </div>
-    </div>
   </div>
 
   <div class="modal-overlay" id="about-modal" hidden aria-hidden="true">
@@ -3309,49 +3434,34 @@
   <script>
     document.getElementById('api-example').textContent = `${location.origin}/{domain-or-appname}`;
 
-    const searchEngineUrl = `${location.origin}/search?q=%s`;
+    function toggleToolDetails(section, opts) {
+      const target = document.getElementById(`tool-details-${section}`);
+      if (!target) return;
+      const forceOpen = !!(opts && opts.forceOpen);
+      const wasOpen = !target.hidden;
 
-    (function setupSearchEngineModal() {
-      const urlEl = document.getElementById('search-engine-url');
-      if (!urlEl) return;
-      urlEl.textContent = searchEngineUrl;
-      ['chrome', 'edge', 'firefox'].forEach((browser) => {
-        const link = document.getElementById(`search-engine-url-${browser}`);
-        if (!link) return;
-        link.href = searchEngineUrl;
-        link.textContent = searchEngineUrl;
+      document.querySelectorAll('.tool-details').forEach((el) => { el.hidden = true; });
+      document.querySelectorAll('.tool-action[aria-expanded]').forEach((btn) => {
+        btn.setAttribute('aria-expanded', 'false');
       });
-    })();
 
-    function openSearchModal() {
-      closeToolsOffcanvas();
-      const modal = document.getElementById('search-modal');
-      if (!modal) return;
-      modal.hidden = false;
-      modal.classList.add('open');
-      modal.setAttribute('aria-hidden', 'false');
-      document.body.style.overflow = 'hidden';
-      modal.addEventListener('click', onSearchModalBackdropClick);
-      document.addEventListener('keydown', onSearchModalKeydown);
-    }
+      const shouldOpen = forceOpen || !wasOpen;
+      if (shouldOpen) {
+        initToolsProfileBuilder();
+        target.hidden = false;
+        const btn = document.querySelector(`.tool-action[aria-controls="tool-details-${section}"]`);
+        if (btn) btn.setAttribute('aria-expanded', 'true');
+      }
 
-    function closeSearchModal() {
-      const modal = document.getElementById('search-modal');
-      if (!modal) return;
-      modal.hidden = true;
-      modal.classList.remove('open');
-      modal.setAttribute('aria-hidden', 'true');
-      modalsAllowBodyScroll();
-      modal.removeEventListener('click', onSearchModalBackdropClick);
-      document.removeEventListener('keydown', onSearchModalKeydown);
+      const panel = document.querySelector('#tools-offcanvas .offcanvas-panel');
+      const anyOpen = !!document.querySelector('.tool-details:not([hidden])');
+      if (panel) panel.classList.toggle('expanded', anyOpen);
     }
 
     function modalsAllowBodyScroll() {
       const toolsOpen = document.getElementById('tools-offcanvas')?.classList.contains('open');
-      const searchOpen = document.getElementById('search-modal')?.classList.contains('open');
-      const profileOpen = document.getElementById('profile-modal')?.classList.contains('open');
       const aboutOpen = document.getElementById('about-modal')?.classList.contains('open');
-      if (!toolsOpen && !searchOpen && !profileOpen && !aboutOpen) {
+      if (!toolsOpen && !aboutOpen) {
         document.body.style.overflow = '';
       }
     }
@@ -3413,8 +3523,9 @@
     const PROFILE_SIZE_OPTIONS = [16, 32, 64, 128];
     const PROFILE_DEFAULT_SIZE = 128;
 
-    let profileBuilderReady = false;
+    let toolsBuilderReady = false;
     let profileCopyUrl = '';
+    let searchEngineUrl = '';
 
     function encodeProfileClient(preferred, fallbacks, size) {
       const json = JSON.stringify([1, preferred, fallbacks, size]);
@@ -3447,19 +3558,25 @@
       select.appendChild(frag);
     }
 
-    async function initProfileBuilder() {
-      if (profileBuilderReady) return;
+    function buildCustomBookmarkletCode(pid) {
+      const O = location.origin;
+      return `javascript:(function(){var H='${O}';var P='`+pid+`';var d=location.hostname;if(!d){alert('No domain on this page.');return;}var u=H+'/'+P+'/'+d;navigator.clipboard.writeText(u).then(function(){var t=document.createElement('div');t.style.cssText='position:fixed;top:20px;right:20px;z-index:2147483647;background:#5b2e7e;color:#fff;padding:12px 14px;border-radius:8px;font:14px system-ui,-apple-system,sans-serif;box-shadow:0 4px 12px rgba(0,0,0,.3);max-width:min(420px,90vw);display:flex;align-items:center;gap:12px';var i=document.createElement('img');i.src=u;i.alt='';i.style.cssText='width:40px;height:40px;flex:0 0 auto;border-radius:6px;background:rgba(255,255,255,.15);padding:4px;object-fit:contain';i.onerror=function(){i.style.display='none';};var b=document.createElement('div');b.style.cssText='display:flex;flex-direction:column;gap:4px;min-width:0';var ti=document.createElement('div');ti.textContent='\\u2713 Favicon URL copied';ti.style.cssText='font-weight:600';var a=document.createElement('a');a.href=u;a.target='_blank';a.rel='noopener noreferrer';a.textContent=u;a.style.cssText='color:#fff;text-decoration:underline;word-break:break-all;font-size:12px';b.appendChild(ti);b.appendChild(a);t.appendChild(i);t.appendChild(b);document.body.appendChild(t);setTimeout(function(){t.remove();},5000);},function(e){alert('Copy failed: '+e);});})();`;
+    }
+
+    async function initToolsProfileBuilder() {
+      if (toolsBuilderReady) return;
       await providersReady;
 
-      const preferred = document.getElementById('profile-preferred');
+      const preferred = document.getElementById('tools-pref');
+      if (!preferred) return;
       fillProfileSelect(preferred, { includeNone: false });
       preferred.value = 'scraper';
 
       for (let i = 1; i <= 4; i += 1) {
-        fillProfileSelect(document.getElementById(`profile-fallback-${i}`), { includeNone: true });
+        fillProfileSelect(document.getElementById(`tools-fb-${i}`), { includeNone: true });
       }
 
-      const sizeSelect = document.getElementById('profile-size');
+      const sizeSelect = document.getElementById('tools-size');
       const sizeFrag = document.createDocumentFragment();
       for (const size of PROFILE_SIZE_OPTIONS) {
         const o = document.createElement('option');
@@ -3473,46 +3590,60 @@
       const inputs = [
         preferred,
         sizeSelect,
-        document.getElementById('profile-test'),
-        ...[1, 2, 3, 4].map((i) => document.getElementById(`profile-fallback-${i}`)),
+        document.getElementById('tools-test'),
+        ...[1, 2, 3, 4].map((i) => document.getElementById(`tools-fb-${i}`)),
       ];
       for (const el of inputs) {
-        el.addEventListener('input', updateProfileUrl);
-        el.addEventListener('change', updateProfileUrl);
+        el.addEventListener('input', updateToolsProfile);
+        el.addEventListener('change', updateToolsProfile);
       }
 
-      profileBuilderReady = true;
-      updateProfileUrl();
+      toolsBuilderReady = true;
+      updateToolsProfile();
     }
 
-    function updateProfileUrl() {
-      const preferred = document.getElementById('profile-preferred').value || 'scraper';
+    function updateToolsProfile() {
+      const preferred = document.getElementById('tools-pref')?.value || 'scraper';
       const fallbacks = [1, 2, 3, 4]
-        .map((i) => document.getElementById(`profile-fallback-${i}`).value)
+        .map((i) => document.getElementById(`tools-fb-${i}`)?.value)
         .filter(Boolean);
-      const size = parseInt(document.getElementById('profile-size').value, 10) || PROFILE_DEFAULT_SIZE;
+      const size = parseInt(document.getElementById('tools-size')?.value, 10) || PROFILE_DEFAULT_SIZE;
 
       const id = encodeProfileClient(preferred, fallbacks, size);
       const base = `${location.origin}/${id}/`;
-      profileCopyUrl = base;
 
-      const test = document.getElementById('profile-test').value.trim();
-      const urlEl = document.getElementById('profile-url');
-      const preview = document.getElementById('profile-preview');
-      const previewImg = document.getElementById('profile-preview-img');
-      const previewMeta = document.getElementById('profile-preview-meta');
+      profileCopyUrl = base;
+      const profileUrlEl = document.getElementById('profile-url');
+      if (profileUrlEl) profileUrlEl.textContent = `${base}{domain-or-appname}`;
+
+      searchEngineUrl = `${location.origin}/${id}/%s`;
+      const searchEl = document.getElementById('search-engine-url');
+      if (searchEl) searchEl.textContent = searchEngineUrl;
+      ['chrome', 'edge', 'firefox'].forEach((browser) => {
+        const link = document.getElementById(`search-engine-url-${browser}`);
+        if (!link) return;
+        link.href = searchEngineUrl;
+        link.textContent = searchEngineUrl;
+      });
+
+      const bmLink = document.getElementById('bookmarklet-link');
+      if (bmLink) bmLink.setAttribute('href', buildCustomBookmarkletCode(id));
+
+      const test = document.getElementById('tools-test')?.value.trim() || '';
+      const openLink = document.getElementById('tools-test-url-open');
+      const preview = document.getElementById('tools-preview');
+      const previewImg = document.getElementById('tools-preview-img');
+      const previewMeta = document.getElementById('tools-preview-meta');
 
       if (test) {
         const full = base + encodeURIComponent(test);
-        urlEl.textContent = full;
-        profileCopyUrl = full;
-        previewImg.src = full;
-        previewMeta.textContent = full;
-        preview.style.display = '';
+        if (openLink) openLink.href = full;
+        if (previewImg) previewImg.src = full;
+        if (previewMeta) previewMeta.textContent = full;
+        if (preview) preview.style.display = '';
       } else {
-        urlEl.textContent = `${base}{domain-or-appname}`;
-        preview.style.display = 'none';
-        previewImg.removeAttribute('src');
+        if (preview) preview.style.display = 'none';
+        if (previewImg) previewImg.removeAttribute('src');
       }
     }
 
@@ -3556,35 +3687,7 @@
 
     function openProfileModal() {
       dismissCtaAttention();
-      closeToolsOffcanvas();
-      const modal = document.getElementById('profile-modal');
-      if (!modal) return;
-      initProfileBuilder();
-      modal.hidden = false;
-      modal.classList.add('open');
-      modal.setAttribute('aria-hidden', 'false');
-      document.body.style.overflow = 'hidden';
-      modal.addEventListener('click', onProfileModalBackdropClick);
-      document.addEventListener('keydown', onProfileModalKeydown);
-    }
-
-    function closeProfileModal() {
-      const modal = document.getElementById('profile-modal');
-      if (!modal) return;
-      modal.hidden = true;
-      modal.classList.remove('open');
-      modal.setAttribute('aria-hidden', 'true');
-      modalsAllowBodyScroll();
-      modal.removeEventListener('click', onProfileModalBackdropClick);
-      document.removeEventListener('keydown', onProfileModalKeydown);
-    }
-
-    function onProfileModalBackdropClick(e) {
-      if (e.target.id === 'profile-modal') closeProfileModal();
-    }
-
-    function onProfileModalKeydown(e) {
-      if (e.key === 'Escape') closeProfileModal();
+      openToolsOffcanvas();
     }
 
     function openToolsOffcanvas() {
@@ -3598,6 +3701,7 @@
       if (btn) btn.setAttribute('aria-expanded', 'true');
       document.body.style.overflow = 'hidden';
       document.addEventListener('keydown', onToolsOffcanvasKeydown);
+      initToolsProfileBuilder();
     }
 
     function closeToolsOffcanvas() {
@@ -3608,6 +3712,9 @@
       panel.classList.remove('open');
       panel.setAttribute('aria-hidden', 'true');
       if (btn) btn.setAttribute('aria-expanded', 'false');
+      document.querySelectorAll('.tool-details').forEach((el) => { el.hidden = true; });
+      document.querySelectorAll('.tool-action[aria-expanded]').forEach((b) => b.setAttribute('aria-expanded', 'false'));
+      panel.querySelector('.offcanvas-panel')?.classList.remove('expanded');
       modalsAllowBodyScroll();
       document.removeEventListener('keydown', onToolsOffcanvasKeydown);
     }
@@ -3627,14 +3734,6 @@
       handleToolsHash();
       window.addEventListener('hashchange', handleToolsHash);
     })();
-
-    function onSearchModalBackdropClick(e) {
-      if (e.target.id === 'search-modal') closeSearchModal();
-    }
-
-    function onSearchModalKeydown(e) {
-      if (e.key === 'Escape') closeSearchModal();
-    }
 
     (function setupBookmarklet() {
       const link = document.getElementById('bookmarklet-link');
@@ -6883,10 +6982,12 @@
     }
 
     // Fast proxy at scraperMaxIconSize uses /scraper/{domain} server-side downscale.
-    // Other proxy sizes need a large enough discovered source.
+    // The proxy only truly downscales when the source icon is at least as large;
+    // when icons are known but all smaller, the proxy cannot deliver scraperMaxIconSize.
     function scraperCanDownscaleTo(size) {
-      if (size > 0 && scraperMaxIconSize > 0 && size === scraperMaxIconSize) return true;
-      return size > 0 && scraperLargestDiscoveredSize() >= size;
+      const largest = scraperLargestDiscoveredSize();
+      if (size > 0 && scraperMaxIconSize > 0 && size === scraperMaxIconSize && largest === 0) return true;
+      return size > 0 && largest >= size;
     }
 
     function pickScraperIconIndex(min, max) {
@@ -7315,7 +7416,8 @@
         idx,
         sortSize: Math.max(icon.width || 0, icon.height || icon.width || 0),
       }));
-      if (scraperMaxIconSize > 0 && scraperCanDownscaleTo(scraperMaxIconSize)) {
+      const largestDiscovered = scraperLargestDiscoveredSize();
+      if (scraperMaxIconSize > 0 && (largestDiscovered === 0 || largestDiscovered >= scraperMaxIconSize)) {
         entries.push({ type: 'proxy', sortSize: scraperMaxIconSize });
       }
       const existingSizes = new Set(entries.map((e) => e.sortSize));
@@ -7344,7 +7446,7 @@
       const sizeLabel = `${maxSize}\u00d7${maxSize}`;
       btn.setAttribute(
         'aria-label',
-        `Fast proxy URL: largest icon downscaled to ${sizeLabel} for faster loading`
+        `Fast proxy URL: optimized for ${sizeLabel} for faster loading`
       );
       btn.appendChild(document.createTextNode(String(maxSize)));
 
@@ -7356,7 +7458,7 @@
         '<iconify-icon icon="f7:hare-fill" aria-hidden="true"></iconify-icon>' +
         '<span>Fast proxy URL</span>' +
         '</span>' +
-        `<span class="proxy-tip-body">Uses the largest available icon, downscaled to ${escapeHtml(sizeLabel)} for faster page loads and smaller downloads. Embed with <code>/{domain}</code>.</span>` +
+        `<span class="proxy-tip-body">Optimized for ${escapeHtml(sizeLabel)} for faster page loads and smaller downloads. Embed with <code>/{domain}</code>.</span>` +
         `<span class="proxy-tip-url" data-tip="${escapeHtml(embedUrl)}">${escapeHtml(embedUrl)}</span>`;
       btn.appendChild(tip);
     }

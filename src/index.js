@@ -62,7 +62,7 @@ const {
 const cache = require('./cache');
 const apiRoutes = require('./apiRoutes');
 const apiStore = require('./apiStore');
-const { renderDocPage, NAV_PAGES } = require('./docsRender');
+const { renderDocPage, NAV_PAGES, buildSearchIndex } = require('./docsRender');
 const { extractDomainFromInput } = require('./domainValidation');
 const { decodeProfile } = require('./customProfile');
 const { resolveProfileIcon } = require('./profileResolve');
@@ -176,6 +176,13 @@ function renderDocsPage(slug) {
 }
 
 if (UI_ENABLE_DOCS) {
+  let _docsSearchIndex = null;
+  app.get('/api/docs/search-index', (_req, res) => {
+    if (!_docsSearchIndex) _docsSearchIndex = buildSearchIndex();
+    res.set('Cache-Control', 'no-cache');
+    res.json(_docsSearchIndex);
+  });
+
   app.get(['/docs', '/docs/'], (_req, res) => {
     res.redirect(301, '/docs/getting-started');
   });

@@ -248,6 +248,77 @@ function renderMarkdown(markdown) {
   return marked.parse(rewriteMarkdownLinks(markdown));
 }
 
+function stripMarkdownForSearch(text) {
+  return text
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`[^`]+`/g, ' ')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/[*_#>|~]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function buildSearchIndex() {
+  const index = [];
+  for (const page of NAV_PAGES) {
+    const resolved = resolveDocPath(page.slug);
+    if (!resolved) continue;
+    let raw;
+    try {
+      raw = fs.readFileSync(resolved.filePath, 'utf8');
+    } catch {
+      continue;
+    }
+
+    const lines = raw.split('\n');
+    let currentHeading = page.title;
+    let currentId = '';
+    let currentLines = [];
+    let inCodeBlock = false;
+
+    const flushSection = () => {
+      const text = stripMarkdownForSearch(currentLines.join(' '));
+      if (text || !currentId) {
+        index.push({
+          slug: page.slug,
+          pageTitle: page.title,
+          sectionId: currentId,
+          sectionTitle: currentHeading,
+          text: text.slice(0, 600),
+        });
+      }
+      currentLines = [];
+    };
+
+    for (const line of lines) {
+      if (line.trimStart().startsWith('```')) {
+        inCodeBlock = !inCodeBlock;
+        currentLines.push(line);
+        continue;
+      }
+      if (inCodeBlock) {
+        currentLines.push(line);
+        continue;
+      }
+      const m = line.match(/^(#{1,3})\s+(.+)$/);
+      if (m) {
+        flushSection();
+        const headingText = m[2]
+          .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+          .replace(/[*_`]/g, '')
+          .trim();
+        currentHeading = headingText;
+        currentId = slugify(headingText);
+      } else {
+        currentLines.push(line);
+      }
+    }
+    flushSection();
+  }
+  return index;
+}
+
 function prepareMarkdown(markdown, slug) {
   if (!slug) {
     return markdown.replace(/^#\s+FaviconAPI\s*\n+/, '');
@@ -294,4 +365,5 @@ module.exports = {
   NAV_PAGES,
   resolveDocPath,
   renderDocPage,
+  buildSearchIndex,
 };
