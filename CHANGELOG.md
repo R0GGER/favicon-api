@@ -5,6 +5,13 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.10.1] — 2026-07-10
+
+### Changed
+
+- **Web UI — Browser Tools icons** — replaced emoji/SVG icons in the offcanvas panel with Material Symbols via Iconify: `search`, `link-2`, `bookmark` and `toggle-off` on the four tool card titles; matching icons on the **Search from browser**, **Build custom URL** and **FaviconAPI Copy** buttons. Applied on `index.html`, `api.html` and `docs.html`. Iconify script added to `api.html` and `docs.html`.
+- **Web UI — top navigation font size** — increased `font-size` from `0.85rem` to `0.95rem` for nav links, the About button and the Tools button on `index.html`, `api.html` and `docs.html`.
+
 ## [2.10.0] — 2026-07-10
 
 ### Added
