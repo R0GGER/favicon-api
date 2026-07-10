@@ -210,6 +210,15 @@
       margin-bottom: 0.15rem;
     }
 
+    .tool-card strong iconify-icon {
+      display: inline-block;
+      vertical-align: -0.15em;
+      width: 1em;
+      height: 1em;
+      margin-right: 0.35rem;
+      color: #5b2e7e;
+    }
+
     .tool-card p {
       font-size: 0.88rem;
       line-height: 1.5;
@@ -243,10 +252,19 @@
     .bookmarklet-btn:hover { background: #7b3fa8; }
     .bookmarklet-btn:active { transform: scale(0.97); }
 
-    .bookmarklet-btn svg {
+    .bookmarklet-btn svg,
+    .bookmarklet-btn iconify-icon {
       width: 14px;
       height: 14px;
+      flex-shrink: 0;
+    }
+
+    .bookmarklet-btn svg {
       fill: currentColor;
+    }
+
+    .bookmarklet-btn iconify-icon {
+      color: currentColor;
     }
 
     .modal-overlay {
@@ -2241,7 +2259,7 @@
     .top-nav a {
       color: #5b2e7e;
       text-decoration: none;
-      font-size: 0.85rem;
+      font-size: 0.95rem;
       font-weight: 500;
       line-height: 1;
       display: inline-flex;
@@ -2273,7 +2291,7 @@
       color: #5b2e7e;
       background: none;
       border: none;
-      font-size: 0.85rem;
+      font-size: 0.95rem;
       font-weight: 500;
       line-height: 1;
       align-items: center;
@@ -2326,7 +2344,7 @@
       background: transparent;
       border: 1px solid #d9c2e6;
       border-radius: 6px;
-      font-size: 0.85rem;
+      font-size: 0.95rem;
       font-weight: 500;
       line-height: 1;
       display: inline-flex;
@@ -3319,11 +3337,11 @@
 
         <div class="tool-card">
           <div>
-            <strong><span class="icon">&#128269;</span> Browser search</strong>
+            <strong><iconify-icon icon="material-symbols:search" aria-hidden="true"></iconify-icon> Browser search</strong>
             <p>Add FaviconAPI as a custom search engine and look up favicons straight from your address bar.</p>
           </div>
           <button type="button" class="bookmarklet-btn tool-action" id="search-browser-btn" aria-expanded="false" aria-controls="tool-details-search" onclick="toggleToolDetails('search')">
-            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/></svg>
+            <iconify-icon icon="material-symbols:search" aria-hidden="true"></iconify-icon>
             Search from browser
             <span class="caret" aria-hidden="true">&#9662;</span>
           </button>
@@ -3378,11 +3396,11 @@
 
         <div class="tool-card">
           <div>
-            <strong><span class="icon">&#128279;</span> Custom URL</strong>
+            <strong><iconify-icon icon="material-symbols:link-2" aria-hidden="true"></iconify-icon> Custom URL</strong>
             <p>Build a shareable URL with your own preferred provider, fallbacks and minimum icon size.</p>
           </div>
           <button type="button" class="bookmarklet-btn tool-action" aria-expanded="false" aria-controls="tool-details-custom" onclick="toggleToolDetails('custom')">
-            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.715 6.542 3.343 7.914a3 3 0 1 0 4.243 4.243l1.828-1.829A3 3 0 0 0 8.586 5.5L8 6.086a1.002 1.002 0 0 0-.154.199 2 2 0 0 1 .861 3.337L6.88 11.45a2 2 0 1 1-2.83-2.83l.793-.792a4.018 4.018 0 0 1-.128-1.287z"/><path d="M6.586 4.672A3 3 0 0 0 7.414 9.5l.775-.776a2 2 0 0 1-.896-3.346L9.12 3.55a2 2 0 1 1 2.83 2.83l-.793.792c.112.42.155.855.128 1.287l1.372-1.372a3 3 0 1 0-4.243-4.243L6.586 4.672z"/></svg>
+            <iconify-icon icon="material-symbols:link-2" aria-hidden="true"></iconify-icon>
             Build custom URL
             <span class="caret" aria-hidden="true">&#9662;</span>
           </button>
@@ -3397,18 +3415,18 @@
 
         <div class="tool-card">
           <div>
-            <strong><span class="icon">&#9733;</span> Bookmarklet</strong>
+            <strong><iconify-icon icon="material-symbols:bookmark" aria-hidden="true"></iconify-icon> Bookmarklet</strong>
             <p><span style="color:#5b2e7e;font-weight:700">Drag</span> the button to your bookmarks bar (don't click &amp; copy &mdash; the name will only auto-fill when dragging). Click the saved bookmark on any page to copy that site's favicon URL.</p>
           </div>
           <a class="bookmarklet-btn tool-action" id="bookmarklet-link" href="#" draggable="true" data-tip="Drag me to your bookmarks bar" data-tip-pos="top" onclick="bookmarkletClicked(event)">
-            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v13.5a.5.5 0 0 1-.777.416L8 13.101l-5.223 2.815A.5.5 0 0 1 2 15.5V2z"/></svg>
+            <iconify-icon icon="material-symbols:bookmark" aria-hidden="true"></iconify-icon>
             FaviconAPI Copy
           </a>
         </div>
 
         <div class="tool-card">
           <div>
-            <strong><span class="icon">&#128190;</span> Offline search page</strong>
+            <strong><iconify-icon icon="material-symbols:toggle-off" aria-hidden="true"></iconify-icon> Offline search page</strong>
             <p>Download a self-contained HTML file to look up favicons from your own computer &mdash; uses the provider chain configured above.</p>
           </div>
           <button type="button" class="bookmarklet-btn tool-action" onclick="downloadOfflineSearchPage()">
