@@ -118,10 +118,17 @@ app.set('trust proxy', true);
 
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
+  if (req.headers['access-control-request-private-network'] === 'true') {
+    res.setHeader('Access-Control-Allow-Private-Network', 'true');
+  }
   if (req.method === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    const reqHeaders = req.headers['access-control-request-headers'];
+    res.setHeader('Access-Control-Allow-Headers', reqHeaders || 'Content-Type');
     return res.sendStatus(204);
+  }
+  if (req.headers.origin) {
+    res.setHeader('Access-Control-Allow-Private-Network', 'true');
   }
   next();
 });
@@ -387,6 +394,7 @@ const JSON_CACHE_CONTROL = 'no-cache';
 function sendFavicon(res, entry) {
   res.set('Content-Type', entry.contentType);
   res.set('Cache-Control', entry.notFound ? NOT_FOUND_CACHE_CONTROL : CACHE_CONTROL);
+  res.set('Cross-Origin-Resource-Policy', 'cross-origin');
   res.set('X-Favicon-Source', entry.provider);
   if (entry.url) res.set('X-Favicon-Url', entry.url);
   if (entry.resolvedFormat) res.set('X-Brandfetch-Format', entry.resolvedFormat);

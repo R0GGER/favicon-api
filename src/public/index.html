@@ -514,7 +514,8 @@
     }
 
     .profile-field select,
-    .profile-field input[type="text"] {
+    .profile-field input[type="text"],
+    .profile-field input[type="number"] {
       width: 100%;
       padding: 0.5rem 0.6rem;
       font-size: 0.88rem;
@@ -526,9 +527,47 @@
     }
 
     .profile-field select:focus,
-    .profile-field input[type="text"]:focus {
+    .profile-field input[type="text"]:focus,
+    .profile-field input[type="number"]:focus {
       outline: none;
       border-color: #5b2e7e;
+    }
+
+    .tool-card-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      align-items: flex-start;
+    }
+
+    .tool-card-actions-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      gap: 0.75rem;
+    }
+
+    .tool-inline-field {
+      flex: 0 1 auto;
+      min-width: 0;
+    }
+
+    .tool-toast-field {
+      flex-direction: row;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .tool-toast-field label {
+      white-space: nowrap;
+    }
+
+    .tool-toast-field input[type="number"] {
+      width: 4.75rem;
+    }
+
+    .tool-card-actions > .profile-hint {
+      max-width: 36rem;
     }
 
     .profile-fallbacks {
@@ -3418,10 +3457,19 @@
             <strong><iconify-icon icon="material-symbols:bookmark" aria-hidden="true"></iconify-icon> Bookmarklet</strong>
             <p><span style="color:#5b2e7e;font-weight:700">Drag</span> the button to your bookmarks bar (don't click &amp; copy &mdash; the name will only auto-fill when dragging). Click the saved bookmark on any page to copy that site's favicon URL.</p>
           </div>
-          <a class="bookmarklet-btn tool-action" id="bookmarklet-link" href="#" draggable="true" data-tip="Drag me to your bookmarks bar" data-tip-pos="top" onclick="bookmarkletClicked(event)">
-            <iconify-icon icon="material-symbols:bookmark" aria-hidden="true"></iconify-icon>
-            FaviconAPI Copy
-          </a>
+          <div class="tool-card-actions">
+            <div class="tool-card-actions-row">
+              <a class="bookmarklet-btn tool-action" id="bookmarklet-link" href="#" draggable="true" data-tip="Drag me to your bookmarks bar" data-tip-pos="top" onclick="bookmarkletClicked(event)">
+                <iconify-icon icon="material-symbols:bookmark" aria-hidden="true"></iconify-icon>
+                FaviconAPI Copy
+              </a>
+              <div class="profile-field tool-inline-field tool-toast-field">
+                <label for="tools-bm-toast">Preview (sec)</label>
+                <input type="number" id="tools-bm-toast" min="1" max="120" step="1" value="10" inputmode="numeric" aria-describedby="tools-bm-toast-hint">
+              </div>
+            </div>
+            <span class="profile-hint" id="tools-bm-toast-hint">How long the copy confirmation stays visible. Preview shows the FaviconAPI icon when allowed; on strict sites (e.g. formula1.com) it falls back to the page&rsquo;s own favicon.</span>
+          </div>
         </div>
 
         <div class="tool-card">
@@ -3588,9 +3636,69 @@
       select.appendChild(frag);
     }
 
+    const BOOKMARKLET_TOAST_STORAGE_KEY = 'faviconapi-bm-toast-sec';
+    const BOOKMARKLET_TOAST_DEFAULT_SEC = 10;
+
+    function loadBookmarkletToastSec() {
+      try {
+        const v = parseInt(localStorage.getItem(BOOKMARKLET_TOAST_STORAGE_KEY), 10);
+        if (Number.isFinite(v) && v >= 1) return Math.min(v, 120);
+      } catch {}
+      return BOOKMARKLET_TOAST_DEFAULT_SEC;
+    }
+
+    function getBookmarkletToastMs() {
+      const input = document.getElementById('tools-bm-toast');
+      const raw = input ? parseInt(input.value, 10) : loadBookmarkletToastSec();
+      const sec = Number.isFinite(raw) && raw >= 1 ? Math.min(raw, 120) : BOOKMARKLET_TOAST_DEFAULT_SEC;
+      return sec * 1000;
+    }
+
+    function saveBookmarkletToastSec() {
+      try {
+        localStorage.setItem(BOOKMARKLET_TOAST_STORAGE_KEY, String(getBookmarkletToastMs() / 1000));
+      } catch {}
+    }
+
+    function buildDefaultBookmarkletCode() {
+      const O = location.origin;
+      return `javascript:(function(){var H='${O}';var d=location.hostname;if(!d){alert('No domain on this page.');return;}var u=H+'/'+d;navigator.clipboard.writeText(u).then(function(){var t=document.createElement('div');t.style.cssText='position:fixed;top:20px;right:20px;z-index:2147483647;background:#5b2e7e;color:#fff;padding:12px 14px;border-radius:8px;font:14px system-ui,-apple-system,sans-serif;box-shadow:0 4px 12px rgba(0,0,0,.3);max-width:min(420px,90vw);display:flex;align-items:center;gap:12px';var i=document.createElement('img');i.alt='';i.style.cssText='width:40px;height:40px;flex:0 0 auto;border-radius:6px;background:rgba(255,255,255,.15);padding:4px;object-fit:contain';var bu='';function bmPi(){var ls=document.querySelectorAll('link[rel~="icon"],link[rel="apple-touch-icon"]');for(var j=0;j<ls.length;j++){if(ls[j].href)return ls[j].href;}return location.origin+'/favicon.ico';}i.src=bmPi();fetch(u,{mode:'cors'}).then(function(r){return r.blob();}).then(function(b){if(b&&(b.type.indexOf('image/')===0||b.size>64)){bu=URL.createObjectURL(b);i.src=bu;}}).catch(function(){});var b=document.createElement('div');b.style.cssText='display:flex;flex-direction:column;gap:4px;min-width:0';var ti=document.createElement('div');ti.textContent='\\u2713 Favicon URL copied';ti.style.cssText='font-weight:600';var a=document.createElement('a');a.href=u;a.target='_blank';a.rel='noopener noreferrer';a.textContent=u;a.style.cssText='color:#fff;text-decoration:underline;word-break:break-all;font-size:12px';b.appendChild(ti);b.appendChild(a);t.appendChild(i);t.appendChild(b);document.body.appendChild(t);setTimeout(function(){if(bu)URL.revokeObjectURL(bu);t.remove();},${getBookmarkletToastMs()});},function(e){alert('Copy failed: '+e);});})();`;
+    }
+
+    function updateBookmarkletHref() {
+      const bmLink = document.getElementById('bookmarklet-link');
+      if (!bmLink) return;
+      const preferred = document.getElementById('tools-pref')?.value;
+      if (preferred && toolsBuilderReady) {
+        const fallbacks = [1, 2, 3, 4]
+          .map((i) => document.getElementById(`tools-fb-${i}`)?.value)
+          .filter(Boolean);
+        const size = parseInt(document.getElementById('tools-size')?.value, 10) || PROFILE_DEFAULT_SIZE;
+        const id = encodeProfileClient(preferred, fallbacks, size);
+        bmLink.setAttribute('href', buildCustomBookmarkletCode(id));
+      } else {
+        bmLink.setAttribute('href', buildDefaultBookmarkletCode());
+      }
+    }
+
+    function initBookmarkletToastControl() {
+      const input = document.getElementById('tools-bm-toast');
+      if (!input) return;
+      input.value = String(loadBookmarkletToastSec());
+      const onChange = () => {
+        const sec = parseInt(input.value, 10);
+        if (!Number.isFinite(sec) || sec < 1) input.value = String(BOOKMARKLET_TOAST_DEFAULT_SEC);
+        else if (sec > 120) input.value = '120';
+        saveBookmarkletToastSec();
+        updateBookmarkletHref();
+      };
+      input.addEventListener('input', onChange);
+      input.addEventListener('change', onChange);
+    }
+
     function buildCustomBookmarkletCode(pid) {
       const O = location.origin;
-      return `javascript:(function(){var H='${O}';var P='`+pid+`';var d=location.hostname;if(!d){alert('No domain on this page.');return;}var u=H+'/'+P+'/'+d;navigator.clipboard.writeText(u).then(function(){var t=document.createElement('div');t.style.cssText='position:fixed;top:20px;right:20px;z-index:2147483647;background:#5b2e7e;color:#fff;padding:12px 14px;border-radius:8px;font:14px system-ui,-apple-system,sans-serif;box-shadow:0 4px 12px rgba(0,0,0,.3);max-width:min(420px,90vw);display:flex;align-items:center;gap:12px';var i=document.createElement('img');i.src=u;i.alt='';i.style.cssText='width:40px;height:40px;flex:0 0 auto;border-radius:6px;background:rgba(255,255,255,.15);padding:4px;object-fit:contain';i.onerror=function(){i.style.display='none';};var b=document.createElement('div');b.style.cssText='display:flex;flex-direction:column;gap:4px;min-width:0';var ti=document.createElement('div');ti.textContent='\\u2713 Favicon URL copied';ti.style.cssText='font-weight:600';var a=document.createElement('a');a.href=u;a.target='_blank';a.rel='noopener noreferrer';a.textContent=u;a.style.cssText='color:#fff;text-decoration:underline;word-break:break-all;font-size:12px';b.appendChild(ti);b.appendChild(a);t.appendChild(i);t.appendChild(b);document.body.appendChild(t);setTimeout(function(){t.remove();},5000);},function(e){alert('Copy failed: '+e);});})();`;
+      return `javascript:(function(){var H='${O}';var P='`+pid+`';var d=location.hostname;if(!d){alert('No domain on this page.');return;}var u=H+'/'+P+'/'+d;navigator.clipboard.writeText(u).then(function(){var t=document.createElement('div');t.style.cssText='position:fixed;top:20px;right:20px;z-index:2147483647;background:#5b2e7e;color:#fff;padding:12px 14px;border-radius:8px;font:14px system-ui,-apple-system,sans-serif;box-shadow:0 4px 12px rgba(0,0,0,.3);max-width:min(420px,90vw);display:flex;align-items:center;gap:12px';var i=document.createElement('img');i.alt='';i.style.cssText='width:40px;height:40px;flex:0 0 auto;border-radius:6px;background:rgba(255,255,255,.15);padding:4px;object-fit:contain';var bu='';function bmPi(){var ls=document.querySelectorAll('link[rel~="icon"],link[rel="apple-touch-icon"]');for(var j=0;j<ls.length;j++){if(ls[j].href)return ls[j].href;}return location.origin+'/favicon.ico';}i.src=bmPi();fetch(u,{mode:'cors'}).then(function(r){return r.blob();}).then(function(b){if(b&&(b.type.indexOf('image/')===0||b.size>64)){bu=URL.createObjectURL(b);i.src=bu;}}).catch(function(){});var b=document.createElement('div');b.style.cssText='display:flex;flex-direction:column;gap:4px;min-width:0';var ti=document.createElement('div');ti.textContent='\\u2713 Favicon URL copied';ti.style.cssText='font-weight:600';var a=document.createElement('a');a.href=u;a.target='_blank';a.rel='noopener noreferrer';a.textContent=u;a.style.cssText='color:#fff;text-decoration:underline;word-break:break-all;font-size:12px';b.appendChild(ti);b.appendChild(a);t.appendChild(i);t.appendChild(b);document.body.appendChild(t);setTimeout(function(){if(bu)URL.revokeObjectURL(bu);t.remove();},${getBookmarkletToastMs()});},function(e){alert('Copy failed: '+e);});})();`;
     }
 
     async function initToolsProfileBuilder() {
@@ -3657,7 +3765,7 @@
       });
 
       const bmLink = document.getElementById('bookmarklet-link');
-      if (bmLink) bmLink.setAttribute('href', buildCustomBookmarkletCode(id));
+      if (bmLink) updateBookmarkletHref();
 
       const test = document.getElementById('tools-test')?.value.trim() || '';
       const openLink = document.getElementById('tools-test-url-open');
@@ -3766,10 +3874,8 @@
     })();
 
     (function setupBookmarklet() {
-      const link = document.getElementById('bookmarklet-link');
-      if (!link) return;
-      const code = `javascript:(function(){var H='${location.origin}';var d=location.hostname;if(!d){alert('No domain on this page.');return;}var u=H+'/'+d;navigator.clipboard.writeText(u).then(function(){var t=document.createElement('div');t.style.cssText='position:fixed;top:20px;right:20px;z-index:2147483647;background:#5b2e7e;color:#fff;padding:12px 14px;border-radius:8px;font:14px system-ui,-apple-system,sans-serif;box-shadow:0 4px 12px rgba(0,0,0,.3);max-width:min(420px,90vw);display:flex;align-items:center;gap:12px';var i=document.createElement('img');i.src=u;i.alt='';i.style.cssText='width:40px;height:40px;flex:0 0 auto;border-radius:6px;background:rgba(255,255,255,.15);padding:4px;object-fit:contain';i.onerror=function(){i.style.display='none';};var b=document.createElement('div');b.style.cssText='display:flex;flex-direction:column;gap:4px;min-width:0';var ti=document.createElement('div');ti.textContent='\\u2713 Favicon URL copied';ti.style.cssText='font-weight:600';var a=document.createElement('a');a.href=u;a.target='_blank';a.rel='noopener noreferrer';a.textContent=u;a.style.cssText='color:#fff;text-decoration:underline;word-break:break-all;font-size:12px';b.appendChild(ti);b.appendChild(a);t.appendChild(i);t.appendChild(b);document.body.appendChild(t);setTimeout(function(){t.remove();},5000);},function(e){alert('Copy failed: '+e);});})();`;
-      link.setAttribute('href', code);
+      initBookmarkletToastControl();
+      updateBookmarkletHref();
     })();
 
     function bookmarkletClicked(e) {
