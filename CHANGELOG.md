@@ -5,6 +5,23 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.10.2] — 2026-07-11
+
+### Added
+
+- **Browser Tools — bookmarklet preview duration** — the Bookmarklet card now includes a **Preview (sec)** field (default 10 s, range 1–120). The value is stored in `localStorage` and baked into the generated bookmarklet code on change. Re-drag **FaviconAPI Copy** after adjusting the setting so existing bookmarks pick up the new duration.
+
+### Changed
+
+- **Bookmarklet copy toast** — preview duration increased from a hard-coded 5 s to the configurable value above; toast UI lives in the Bookmarklet tool card (alongside **FaviconAPI Copy**) with the hint below the controls.
+- **CORS middleware** — OPTIONS preflight now echoes requested headers and responds with `Access-Control-Allow-Private-Network: true` when applicable; cross-origin GET responses also send that header so browsers can reach self-hosted instances from public HTTPS pages when permitted.
+- **Favicon responses** — `Cross-Origin-Resource-Policy: cross-origin` on proxied icon bodies so embedded previews are not blocked by default CORP behaviour.
+
+### Fixed
+
+- **Bookmarklet icon preview** — the toast no longer relies on `onerror` alone (CSP blocks often fail silently). It shows the **page's own favicon** immediately, then upgrades to the FaviconAPI icon via `fetch()` + blob when the host page allows cross-origin requests. On strict CSP sites (e.g. formula1.com) the page favicon remains as preview; the copied URL is still always the FaviconAPI link.
+- **Bookmarklet preview fetch** — removed the `response.ok` guard so 404 placeholder PNGs from the API can still be shown via `fetch()` + blob when CORS permits.
+
 ## [2.10.1] — 2026-07-10
 
 ### Changed
