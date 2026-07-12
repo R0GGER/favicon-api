@@ -199,6 +199,10 @@ send `Cache-Control: public, max-age=86400`; the v1 CDN route sends
 serve repeat requests without ever hitting Node, which is the cheapest possible
 hit.
 
+> **Using Cloudflare?** Disable **HTTP/3 (with QUIC)** on the zone, otherwise
+> browsers on networks where UDP/443 is blocked stall ~2s per page load before
+> falling back to HTTP/2. See [Proxy → Cloudflare](proxy.md#cloudflare).
+
 ### 10. Preload popular sites after deploy
 
 After a fresh install or cache wipe, the first request for each domain is slow

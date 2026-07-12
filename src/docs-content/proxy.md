@@ -59,3 +59,29 @@ favicon.example.com {
 }
 ```
 
+## Cloudflare
+
+If you put the site behind Cloudflare's proxy (orange cloud), **disable HTTP/3
+(with QUIC)**. Cloudflare advertises HTTP/3 via an `alt-svc` header, which makes
+browsers attempt a QUIC connection over UDP/443. On networks where that UDP path
+is blocked, filtered, or unreliable, the browser stalls on the failed QUIC
+attempt for roughly **2 seconds** before falling back to TCP (HTTP/2) — adding a
+consistent ~2s to page load, even though the server itself responds in a few
+hundred milliseconds.
+
+Turn it off in the Cloudflare dashboard:
+
+> **Zone (`domain.tld`) → Speed → Settings → tab "Protocol Optimization" →
+> disable "HTTP/3 (with QUIC)"**
+
+After disabling, the `alt-svc: h3` header disappears and browsers connect over
+HTTP/2, removing the delay. Verify with:
+
+```bash
+curl -sI https://domain.tld/ | grep -i alt-svc
+```
+
+No `alt-svc` line should be returned. Browsers that already cached the old
+`alt-svc` record keep trying QUIC until it expires (up to 24h); clear the
+browser's cached network state (or wait it out) to test immediately.
+
