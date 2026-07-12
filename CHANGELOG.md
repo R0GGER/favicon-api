@@ -5,6 +5,18 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.11.0] — 2026-07-12
+
+### Added
+
+- **Static asset extraction & caching** — the inline `<style>` and main `<script>` blocks of `index.html`, `api.html` and `docs.html` are now split out at boot into separate, content-hashed, minified assets served from `/assets/<hash>.css` and `/assets/<hash>.js` with `Cache-Control: public, max-age=31536000, immutable`. The HTML source files keep the blocks inline as the single source of truth; the extraction happens in-memory at startup (no files written to disk). Identical blocks shared between pages collapse to the same hashed URL (dedup), so shared CSS/JS is downloaded and cached once. New module `src/staticAssets.js`; new dependency `esbuild` for minification (with a safe fallback to the un-minified blocks if unavailable).
+- **Resource hints** — `<link rel="preconnect">` for `code.iconify.design` and `api.iconify.design` on all three pages so Iconify's runtime icon-data requests connect faster.
+
+### Changed
+
+- **Page delivery** — CSS and JS are now loaded as separate cacheable resources (JS via `defer`) instead of inline, so repeat visits and navigation between `/`, `/api` and `/docs` skip re-downloading and re-parsing ~250 KB of markup. The homepage's main script shrank from ~250 KB inline to ~147 KB minified external.
+- **Result images** — provider/result `<img>` on the homepage now use `loading="lazy"` and `decoding="async"` (off-screen provider icons load only when scrolled into view); the site logo stays eager (LCP).
+
 ## [2.10.2] — 2026-07-11
 
 ### Added
