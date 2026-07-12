@@ -5,6 +5,16 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.11.1] — 2026-07-13
+
+### Changed
+
+- **Self-hosted Iconify web component** — the `iconify-icon` script is now served from the site's own origin (`/vendor/iconify-icon-2.3.0.min.js`) on `index.html`, `api.html` and `docs.html` instead of the third-party `code.iconify.design` CDN, and the now-unused `code.iconify.design` preconnect was removed (the `api.iconify.design` preconnect for runtime icon data is kept). The component is `defer`, so it blocks `DOMContentLoaded`; loading it from a third-party origin that advertises HTTP/3 could stall page load ~2 s on networks where QUIC (UDP/443) is blocked or unreliable, before falling back to TCP. Serving it same-origin (over the site's own HTTP/2) removes that third-party dependency from the critical render path.
+
+### Added
+
+- **Documentation — Cloudflare HTTP/3** — new "Cloudflare" section in the Proxy docs (and a cross-reference from Tweaks) explaining that, behind Cloudflare's proxy, **HTTP/3 (with QUIC)** should be disabled (`Zone → Speed → Settings → Protocol Optimization`) to avoid the ~2 s QUIC-stall-then-TCP-fallback on affected client networks, with a `curl` check for the `alt-svc` header.
+
 ## [2.11.0] — 2026-07-12
 
 ### Added
