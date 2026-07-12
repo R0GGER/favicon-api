@@ -67,6 +67,8 @@ const { extractDomainFromInput } = require('./domainValidation');
 const { decodeProfile } = require('./customProfile');
 const { resolveProfileIcon } = require('./profileResolve');
 
+const { extractPageAssets, getAsset } = require('./staticAssets');
+
 const { version: APP_VERSION } = require('../package.json');
 
 // Mirror of the parsing logic in src/apiRoutes.js (kept local so the homepage
@@ -138,18 +140,30 @@ app.use((req, res, next) => {
 // URLs resolve to whichever public origin the deployment is reached on,
 // without requiring the operator to bake the hostname into the image.
 // `__VERSION__` is substituted from package.json for the page footer.
-const INDEX_HTML_TEMPLATE = fs.readFileSync(
-  path.join(__dirname, 'public', 'index.html'),
-  'utf8'
-);
-const API_HTML_TEMPLATE = fs.readFileSync(
-  path.join(__dirname, 'public', 'api.html'),
-  'utf8'
-);
-const DOCS_HTML_TEMPLATE = fs.readFileSync(
-  path.join(__dirname, 'public', 'docs.html'),
-  'utf8'
-);
+// Read each page template and split its inline <style>/<script> out into
+// separate, content-hashed, immutably-cached assets (see src/staticAssets.js).
+// The returned `.html` is the shrunk template that references those assets; the
+// per-request token substitution below runs on it unchanged.
+const INDEX_HTML_TEMPLATE = extractPageAssets(
+  fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8')
+).html;
+const API_HTML_TEMPLATE = extractPageAssets(
+  fs.readFileSync(path.join(__dirname, 'public', 'api.html'), 'utf8')
+).html;
+const DOCS_HTML_TEMPLATE = extractPageAssets(
+  fs.readFileSync(path.join(__dirname, 'public', 'docs.html'), 'utf8')
+).html;
+
+// Serve the extracted CSS/JS from memory. Filenames embed a content hash, so the
+// bytes are safe to cache forever; a content change yields a new URL.
+app.get('/assets/:file', (req, res, next) => {
+  const asset = getAsset(`/assets/${req.params.file}`);
+  if (!asset) return next();
+  res.set('Content-Type', asset.contentType);
+  res.set('Cache-Control', 'public, max-age=31536000, immutable');
+  res.set('Cross-Origin-Resource-Policy', 'cross-origin');
+  res.send(asset.body);
+});
 
 function getBaseUrl(req) {
   return `${req.protocol}://${req.get('host')}`;
