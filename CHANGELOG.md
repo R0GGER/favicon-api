@@ -5,6 +5,12 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.13.0] — 2026-07-14
+
+### Added
+
+- **HTML scraper — optional per-domain catalog source pin (`domainIconTags` `source`)** — a `domainIconTags.js` entry may now carry an optional `source` field (`'selfhst'`, `'dashboardicons'` or `'svgl'`) to control which catalog serves its icon, e.g. `{ domain: 'azure.microsoft.com', iconTag: 'microsoft-azure', source: 'dashboardicons' }`. When set, `fetchScraperCatalogFallback` tries that catalog first and then falls through to the remaining catalogs in the default order (`selfhst → dashboardicons → svgl`), so a missing strict match never drops the branded override; an unknown value is ignored. Entries without a `source` keep the existing default order unchanged. New `iconSourceForDomain()` export in `domainIconTags.js`; `listDomainIconTags()` now includes `source` when present.
+
 ## [2.12.0] — 2026-07-14
 
 ### Changed
