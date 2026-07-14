@@ -82,31 +82,23 @@ function pickLargestIcoFrame(frames) {
   return best;
 }
 
-function bgraToRgba(buffer, width, height) {
-  const pixels = width * height;
-  const rgba = Buffer.alloc(pixels * 4);
-  for (let i = 0; i < pixels; i++) {
-    const src = i * 4;
-    rgba[src] = buffer[src + 2];
-    rgba[src + 1] = buffer[src + 1];
-    rgba[src + 2] = buffer[src];
-    rgba[src + 3] = buffer[src + 3];
+// Build a sharp instance from a decode-ico frame. PNG frames are decoded by
+// sharp directly; BMP frames come back from decode-ico as raw pixel data that is
+// ALREADY in RGBA order, so it is handed to sharp as-is (no channel swap — an
+// earlier BGRA→RGBA swap corrupted colours, turning e.g. Microsoft red into
+// blue on ICOs that use BMP frames).
+function icoFrameToSharp(frame) {
+  if (frame.type === 'png') {
+    return sharp(Buffer.from(frame.data));
   }
-  return rgba;
+  const rgba = Buffer.from(frame.data.buffer, frame.data.byteOffset, frame.data.byteLength);
+  return sharp(rgba, {
+    raw: { width: frame.width, height: frame.height, channels: 4 },
+  });
 }
 
 async function icoFrameToPng(frame) {
-  let input;
-  if (frame.type === 'png') {
-    input = sharp(Buffer.from(frame.data));
-  } else {
-    const bgra = Buffer.from(frame.data.buffer, frame.data.byteOffset, frame.data.byteLength);
-    const rgba = bgraToRgba(bgra, frame.width, frame.height);
-    input = sharp(rgba, {
-      raw: { width: frame.width, height: frame.height, channels: 4 },
-    });
-  }
-  return input.png().toBuffer();
+  return icoFrameToSharp(frame).png().toBuffer();
 }
 
 function entryLooksLikeIco(entry) {
@@ -218,18 +210,10 @@ async function rasterizeIco(buffer) {
     );
   }
 
-  let input;
-  if (frame.type === 'png') {
-    input = sharp(Buffer.from(frame.data));
-  } else {
-    const bgra = Buffer.from(frame.data.buffer, frame.data.byteOffset, frame.data.byteLength);
-    const rgba = bgraToRgba(bgra, frame.width, frame.height);
-    input = sharp(rgba, {
-      raw: { width: frame.width, height: frame.height, channels: 4 },
-    });
-  }
-
-  return input.resize(TARGET_SIZE, TARGET_SIZE, resizeOptions()).png().toBuffer();
+  return icoFrameToSharp(frame)
+    .resize(TARGET_SIZE, TARGET_SIZE, resizeOptions())
+    .png()
+    .toBuffer();
 }
 
 async function rasterizeRaster(buffer) {
