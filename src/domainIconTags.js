@@ -11,10 +11,22 @@
  * Add one row per domain; iconTag must match a slug in selfh.st /
  * dashboardicons / lobehub (e.g. google-drive, microsoft-teams).
  *
+ * Optional `source` pins which catalog serves the icon. When set, that catalog
+ * is tried first and the remaining catalogs act as fallback (so a missing match
+ * never drops the branded override). When omitted, the default order
+ * (selfhst → dashboardicons → svgl) is used. Valid values: 'selfhst',
+ * 'dashboardicons', 'svgl'; any other value is ignored and the default order
+ * applies.
+ * 
+ * Optional: 
+ * { domain: 'azure.microsoft.com', iconTag: 'microsoft-azure', source: 'selfhst' }
+ * source: selfhst, dashboardicons, svgl, lobehub
+ *
  * Lookup runs before automatic rules in serviceSlugFromDomain.js.
  */
 const DOMAIN_ICON_TAGS = [
   // Google Workspace
+  { domain: 'google.com', iconTag: 'google', source: 'selfhst' },
   { domain: 'drive.google.com', iconTag: 'google-drive' },
   { domain: 'docs.google.com', iconTag: 'google-docs' },
   { domain: 'sheets.google.com', iconTag: 'google-sheets' },
@@ -88,22 +100,39 @@ const DOMAIN_ICON_TAGS = [
   
 ];
 
+function normalizeDomainKey(domain) {
+  return domain.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim().toLowerCase();
+}
+
 const DOMAIN_ICON_TAG_MAP = new Map(
   DOMAIN_ICON_TAGS.map(({ domain, iconTag }) => [domain.toLowerCase(), iconTag])
 );
 
+const DOMAIN_ICON_SOURCE_MAP = new Map(
+  DOMAIN_ICON_TAGS
+    .filter(({ source }) => source)
+    .map(({ domain, source }) => [domain.toLowerCase(), source.toLowerCase()])
+);
+
 function iconTagForDomain(domain) {
   if (!domain || typeof domain !== 'string') return null;
-  const key = domain.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim().toLowerCase();
-  return DOMAIN_ICON_TAG_MAP.get(key) || null;
+  return DOMAIN_ICON_TAG_MAP.get(normalizeDomainKey(domain)) || null;
+}
+
+function iconSourceForDomain(domain) {
+  if (!domain || typeof domain !== 'string') return null;
+  return DOMAIN_ICON_SOURCE_MAP.get(normalizeDomainKey(domain)) || null;
 }
 
 function listDomainIconTags() {
-  return DOMAIN_ICON_TAGS.map(({ domain, iconTag }) => ({ domain, iconTag }));
+  return DOMAIN_ICON_TAGS.map(({ domain, iconTag, source }) =>
+    source ? { domain, iconTag, source } : { domain, iconTag }
+  );
 }
 
 module.exports = {
   DOMAIN_ICON_TAGS,
   iconTagForDomain,
+  iconSourceForDomain,
   listDomainIconTags,
 };

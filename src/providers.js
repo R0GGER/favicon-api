@@ -17,7 +17,7 @@ const { upstreamFetch, ipv4Dispatcher, ipv4Http1Dispatcher } = require('./upstre
 const cache = require('./cache');
 const scraperDiskCache = require('./scraperDiskCache');
 const { serviceSlugFromDomain } = require('./serviceSlugFromDomain');
-const { iconTagForDomain } = require('./domainIconTags');
+const { iconTagForDomain, iconSourceForDomain } = require('./domainIconTags');
 
 const UPSTREAM_TIMEOUT = parseInt(process.env.UPSTREAM_TIMEOUT || '5000', 10);
 
@@ -2209,28 +2209,36 @@ async function normalizeFallbackResult(entry, provider) {
   }
 }
 
+// Strict catalog lookups keyed by source. The slug is derived from the domain
+// label, not typed by a user, so resolve it strictly (exact catalog slug /
+// curated alias only). A fuzzy match here would replace a site's real favicon
+// with a similarly-named but unrelated catalog icon (e.g. maflplus.eu →
+// "mailplus"); when there's no strict match we fall through to genuine HTML
+// scraping instead.
+const SCRAPER_CATALOG_ATTEMPTS = {
+  selfhst: (slug) => fetchSelfhst(slug, 'color', { strict: true }),
+  dashboardicons: (slug) => fetchDashboardIcons(slug, 'color', { strict: true }),
+  svgl: (slug) => fetchSvgl(slug, 'color', 128, { strict: true }),
+};
+const SCRAPER_CATALOG_ORDER = ['selfhst', 'dashboardicons', 'svgl'];
+
 async function fetchScraperCatalogFallback(domain) {
   const slug = serviceSlugFromDomain(domain);
   if (!slug) return null;
 
-  // The slug is derived from the domain label, not typed by a user, so resolve
-  // it strictly (exact catalog slug / curated alias only). A fuzzy match here
-  // would replace a site's real favicon with a similarly-named but unrelated
-  // catalog icon (e.g. maflplus.eu → "mailplus"); when there's no strict match
-  // we fall through to genuine HTML scraping instead.
-  const selfhstResult = await fetchSelfhst(slug, 'color', { strict: true });
-  if (selfhstResult) {
-    return normalizeFallbackResult(selfhstResult, 'scraper-fallback:selfhst');
-  }
+  // Optional per-domain source pin (domainIconTags.js `source`): try the chosen
+  // catalog first, then the remaining catalogs in the default order so a missing
+  // match never drops the branded override. An unknown source is ignored.
+  const preferredSource = iconSourceForDomain(domain);
+  const order = preferredSource && SCRAPER_CATALOG_ATTEMPTS[preferredSource]
+    ? [preferredSource, ...SCRAPER_CATALOG_ORDER.filter((s) => s !== preferredSource)]
+    : SCRAPER_CATALOG_ORDER;
 
-  const dashResult = await fetchDashboardIcons(slug, 'color', { strict: true });
-  if (dashResult) {
-    return normalizeFallbackResult(dashResult, 'scraper-fallback:dashboardicons');
-  }
-
-  const svglResult = await fetchSvgl(slug, 'color', 128, { strict: true });
-  if (svglResult) {
-    return normalizeFallbackResult(svglResult, 'scraper-fallback:svgl');
+  for (const source of order) {
+    const result = await SCRAPER_CATALOG_ATTEMPTS[source](slug);
+    if (result) {
+      return normalizeFallbackResult(result, `scraper-fallback:${source}`);
+    }
   }
 
   return null;
