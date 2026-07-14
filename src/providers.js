@@ -17,6 +17,7 @@ const { upstreamFetch, ipv4Dispatcher, ipv4Http1Dispatcher } = require('./upstre
 const cache = require('./cache');
 const scraperDiskCache = require('./scraperDiskCache');
 const { serviceSlugFromDomain } = require('./serviceSlugFromDomain');
+const { iconTagForDomain } = require('./domainIconTags');
 
 const UPSTREAM_TIMEOUT = parseInt(process.env.UPSTREAM_TIMEOUT || '5000', 10);
 
@@ -62,6 +63,8 @@ function invalidateScraperDomainCaches(domain) {
   scraperPageCache.delete(domain);
   besticonIconsCache.delete(domain);
   scraperPageInflight.delete(domain);
+  googleWorkspaceLogoCache.delete(domain);
+  googleWorkspaceLogoInflight.delete(domain);
   scraperDiskCache.invalidateDomain(domain).catch(() => {});
 }
 
@@ -1539,7 +1542,7 @@ async function fetchScraperAllIcons(domain) {
   const pageLinkCandidates = [];
   if (html) {
     try {
-      const parsed = parseIconCandidatesFromHtml(html, finalBaseUrl || referer);
+      const parsed = parseIconCandidatesFromHtml(html, finalBaseUrl || referer, domain);
       iconCandidates.push(...parsed.primaryCandidates);
       for (const candidate of parsed.primaryCandidates) {
         pageLinkCandidates.push(candidate);
@@ -1549,6 +1552,17 @@ async function fetchScraperAllIcons(domain) {
       }
     } catch {
       /* ignore */
+    }
+  }
+
+  // Google product subdomains that redirect to a login page expose no product
+  // logo in their own HTML; recover it from the workspace marketing page so the
+  // size strip reflects the real (scalable) logo instead of the tiny favicon.
+  const workspaceLogoCandidates = await googleWorkspaceLogoFallback(domain, html);
+  for (const candidate of workspaceLogoCandidates) {
+    pageLinkCandidates.push(candidate);
+    for (const variant of expandSizedVariants(candidate.href)) {
+      pageLinkCandidates.push({ ...candidate, ...variant });
     }
   }
 
@@ -1593,12 +1607,69 @@ async function fetchScraperAllIcons(domain) {
     }
   }
 
-  const sorted = [...byUrl.values()].sort((a, b) => {
+  let sorted = [...byUrl.values()].sort((a, b) => {
     const areaA = (a.width || 0) * (a.height || a.width || 0);
     const areaB = (b.width || 0) * (b.height || b.width || 0);
     if (areaB !== areaA) return areaB - areaA;
     return (b.width || 0) - (a.width || 0);
   });
+
+  // Keep the discovered-icon list (which drives the size strip and the sized
+  // /scraper/{size}/… endpoints) consistent with the icon fetchScraper() will
+  // actually serve. Two cases resolve to a catalog icon instead of the scraped
+  // favicon:
+  //   1. Override — an explicit domainIconTags mapping (e.g. azure.microsoft.com
+  //      → microsoft-azure) is authoritative over the site's generic favicon,
+  //      unless the scrape already found a specific Google product logo.
+  //   2. Fallback — discovery only surfaced sub-128px icons (bot wall / sign-in
+  //      redirect exposing just a 16/32px favicon).
+  const largestDiscovered = sorted.reduce(
+    (max, icon) => Math.max(max, icon.width || 0, icon.height || 0),
+    0
+  );
+  const discoveredHasProductLogo = [...byUrl.keys()].some((u) =>
+    /gstatic\.com\/images\/branding\/productlogos\//i.test(u)
+  );
+  const overrideWithCatalog = !!iconTagForDomain(domain) && !discoveredHasProductLogo;
+  if (SCRAPER_FALLBACK && (overrideWithCatalog || largestDiscovered < MIN_SOURCE_SIZE)) {
+    try {
+      const fb = await fetchScraperCatalogFallback(domain);
+      if (fb && fb.url) {
+        const dims = await readImageDimensions(fb.buffer, {
+          contentType: fb.contentType,
+          url: fb.url,
+        }).catch(() => null);
+        const width = dims
+          ? Math.max(dims.width || 0, dims.height || 0)
+          : scraperMaxIconSizeEnabled()
+            ? SCRAPER_MAX_ICON_SIZE
+            : MIN_SOURCE_SIZE;
+        if (width >= MIN_SOURCE_SIZE) {
+          const format = /\.svg(?:$|[?#])/i.test(fb.url)
+            ? 'svg'
+            : (fb.contentType || '').includes('svg')
+              ? 'svg'
+              : 'png';
+          const catalogIcon = {
+            url: fb.url,
+            width,
+            height: width,
+            format,
+            bytes: fb.buffer ? fb.buffer.length : 0,
+          };
+          if (overrideWithCatalog) {
+            // The curated icon is authoritative: it is the only icon we expose,
+            // so every size and the size strip reflect exactly what is served.
+            sorted = [catalogIcon];
+          } else if (!byUrl.has(fb.url)) {
+            sorted.unshift(catalogIcon);
+          }
+        }
+      }
+    } catch {
+      /* catalog reflection is best-effort */
+    }
+  }
 
   scraperIconsCache.set(domain, sorted);
   if (sorted.length > 0) {
@@ -1702,7 +1773,164 @@ async function fetchScraperPage(domain, { bypassCache = false } = {}) {
   return promise;
 }
 
-function parseIconCandidatesFromHtml(html, finalBaseUrl) {
+// Google product domains (meet, chat, drive, calendar, keep, …) redirect
+// anonymous/bot requests to their workspace.google.com marketing page. That
+// page's <link rel="icon"> is only a tiny generic Google "G", but its body
+// references every Google product's real, current logo on the gstatic
+// "productlogos" CDN, e.g.
+//   https://www.gstatic.com/images/branding/productlogos/meet_2026/v2/web/192px.svg
+// Matching one of those to the requested domain lets the scraper serve the
+// site's actual icon (scraped live, so it tracks Google's redesigns) instead of
+// the redirected marketing page's generic favicon — no per-domain hardcoding.
+const GOOGLE_PRODUCT_LOGO_RE =
+  /https?:\/\/[^"'\s)<>]*gstatic\.com\/images\/branding\/productlogos\/([^/"'\s)<>]+)\/[^"'\s)<>]+\.(?:svg|png)(?:[?#][^"'\s)<>]*)?/gi;
+
+// Candidate product tokens derived from a domain, used to match a productlogos
+// path segment (year suffix stripped): the leading label (meet.google.com →
+// "meet") plus the resolved service slug and its parts (mail.google.com →
+// "gmail"; drive.google.com → "google-drive" → "drive").
+function googleProductTokens(domain) {
+  const tokens = new Set();
+  if (!domain || typeof domain !== 'string') return tokens;
+  const labels = domain.toLowerCase().split('.').filter(Boolean);
+  if (labels[0]) tokens.add(labels[0]);
+  const slug = serviceSlugFromDomain(domain);
+  if (slug) {
+    tokens.add(slug.toLowerCase());
+    for (const part of slug.toLowerCase().split('-')) {
+      if (part) tokens.add(part);
+    }
+  }
+  return tokens;
+}
+
+function googleProductLogoCandidates(html, domain) {
+  if (!html || !domain) return [];
+  if (!/gstatic\.com\/images\/branding\/productlogos\//i.test(html)) return [];
+
+  const tokens = googleProductTokens(domain);
+  if (tokens.size === 0) return [];
+
+  const out = [];
+  const seen = new Set();
+  for (const match of html.matchAll(GOOGLE_PRODUCT_LOGO_RE)) {
+    const url = match[0];
+    const product = (match[1] || '').toLowerCase().replace(/_\d{4}$/, '');
+    if (!product || !tokens.has(product)) continue;
+    if (seen.has(url)) continue;
+    seen.add(url);
+    const isSvg = /\.svg(?:$|[?#])/i.test(url);
+    out.push({
+      href: url,
+      sizes: isSvg ? 'any' : '192x192',
+      type: isSvg ? 'image/svg+xml' : 'image/png',
+      rel: 'icon',
+    });
+  }
+  return out;
+}
+
+// Some Google product subdomains (drive, docs, sheets, slides, …) redirect
+// anonymous requests to the accounts.google.com login page, whose HTML exposes
+// no product logo at all (only a generic favicon). Others (meet, chat, calendar)
+// redirect to their workspace.google.com marketing page, which does. When the
+// site's own HTML yields no matching product logo, fall back to scraping the
+// product's workspace.google.com marketing page — a reliable, public, live
+// source of every product's current logo (so no per-domain hardcoded URLs).
+const GOOGLE_WORKSPACE_PRODUCT_BASE = 'https://workspace.google.com/products/';
+
+const googleWorkspaceLogoCache = new LRUCache({
+  max: SCRAPER_ICONS_CACHE_MAX,
+  ttl: SCRAPER_ICONS_CACHE_TTL_MS,
+});
+const googleWorkspaceLogoInflight = new Map();
+
+function isGoogleProductSubdomain(domain) {
+  if (!domain || typeof domain !== 'string') return false;
+  const d = domain.toLowerCase();
+  return d.endsWith('.google.com') && d.split('.').filter(Boolean).length >= 3;
+}
+
+// Ordered workspace product-page slugs to try for a Google product subdomain,
+// e.g. drive.google.com → ["drive", …]; mail.google.com → ["mail","gmail"].
+function googleWorkspaceProductSlugs(domain) {
+  const out = [];
+  const seen = new Set();
+  const add = (s) => {
+    const v = (s || '').toLowerCase().trim();
+    // Skip the bare "google" token: `products/google/` 404s (a large body) and
+    // every other workspace page redundantly lists all product logos anyway.
+    if (v && v !== 'google' && /^[a-z0-9-]+$/.test(v) && !seen.has(v)) {
+      seen.add(v);
+      out.push(v);
+    }
+  };
+  const labels = domain.toLowerCase().split('.').filter(Boolean);
+  add(labels[0]);
+  // The resolved service slug maps aliases to the real workspace product
+  // (e.g. mail → gmail). Only its individual parts are ever valid product
+  // slugs — the hyphenated form (e.g. "google-drive") never is.
+  const slug = serviceSlugFromDomain(domain);
+  if (slug) {
+    for (const part of slug.split('-')) add(part);
+  }
+  return out;
+}
+
+async function fetchGoogleWorkspaceProductHtml(slug) {
+  const url = `${GOOGLE_WORKSPACE_PRODUCT_BASE}${encodeURIComponent(slug)}/`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT);
+  try {
+    const res = await upstreamFetch(url, {
+      signal: controller.signal,
+      redirect: 'follow',
+      headers: scraperDocumentHeaders(),
+    });
+    if (!res.ok) return null;
+    const html = await res.text();
+    return html && html.length >= HTML_MIN_BYTES ? html : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function computeGoogleWorkspaceLogoCandidates(domain) {
+  for (const slug of googleWorkspaceProductSlugs(domain)) {
+    const html = await fetchGoogleWorkspaceProductHtml(slug);
+    if (!html) continue;
+    const candidates = googleProductLogoCandidates(html, domain);
+    if (candidates.length > 0) return candidates;
+  }
+  return [];
+}
+
+async function fetchGoogleWorkspaceLogoCandidates(domain) {
+  if (googleWorkspaceLogoCache.has(domain)) return googleWorkspaceLogoCache.get(domain);
+  if (googleWorkspaceLogoInflight.has(domain)) return googleWorkspaceLogoInflight.get(domain);
+  const promise = computeGoogleWorkspaceLogoCandidates(domain)
+    .then((candidates) => {
+      googleWorkspaceLogoCache.set(domain, candidates);
+      return candidates;
+    })
+    .finally(() => googleWorkspaceLogoInflight.delete(domain));
+  googleWorkspaceLogoInflight.set(domain, promise);
+  return promise;
+}
+
+// Returns Google product-logo candidates from the workspace marketing page, but
+// only when needed: the domain is a Google product subdomain AND its own HTML
+// did not already expose a matching product logo (meet/chat/calendar do, so they
+// skip the extra fetch).
+async function googleWorkspaceLogoFallback(domain, primaryHtml) {
+  if (!isGoogleProductSubdomain(domain)) return [];
+  if (primaryHtml && googleProductLogoCandidates(primaryHtml, domain).length > 0) return [];
+  return fetchGoogleWorkspaceLogoCandidates(domain);
+}
+
+function parseIconCandidatesFromHtml(html, finalBaseUrl, domain = null) {
   const linkCandidates = [];
   const $ = cheerio.load(html);
   const baseHref = $('base[href]').attr('href');
@@ -1739,6 +1967,12 @@ function parseIconCandidatesFromHtml(html, finalBaseUrl) {
     }
   });
 
+  // Icons referenced in the page body (Google product logos on redirected
+  // marketing pages). These are absolute gstatic URLs, so no base resolution.
+  if (domain) {
+    linkCandidates.push(...googleProductLogoCandidates(html, domain));
+  }
+
   return {
     primaryCandidates: linkCandidates,
     resolveBase,
@@ -1746,7 +1980,13 @@ function parseIconCandidatesFromHtml(html, finalBaseUrl) {
   };
 }
 
-async function buildScraperCandidates(domain, html, finalBaseUrl, linkHeader = null) {
+async function buildScraperCandidates(
+  domain,
+  html,
+  finalBaseUrl,
+  linkHeader = null,
+  extraCandidates = []
+) {
   const baseUrl = `https://${domain}/`;
   const primaryCandidates = [];
   const fallbackCandidates = [];
@@ -1754,12 +1994,14 @@ async function buildScraperCandidates(domain, html, finalBaseUrl, linkHeader = n
   let parsed = { primaryCandidates: [], resolveBase: finalBaseUrl || baseUrl };
   if (html) {
     try {
-      parsed = parseIconCandidatesFromHtml(html, finalBaseUrl);
+      parsed = parseIconCandidatesFromHtml(html, finalBaseUrl, domain);
       primaryCandidates.push(...parsed.primaryCandidates);
     } catch {
       /* parsing failed - fall through */
     }
   }
+
+  if (extraCandidates.length > 0) primaryCandidates.push(...extraCandidates);
 
   try {
     const manifestIcons = await loadManifestIconCandidates(domain, {
@@ -1886,13 +2128,17 @@ async function fetchScraperForDomain(domain) {
   const referer = `https://${domain}/`;
   const { html, finalBaseUrl, linkHeader } = await fetchScraperPage(domain);
 
+  // For Google product subdomains that redirect to a login page (drive, docs, …)
+  // the scraped HTML has no product logo; recover it from the workspace page.
+  const workspaceLogoCandidates = await googleWorkspaceLogoFallback(domain, html);
+
   if (BESTICON_URL) {
     const besticonCandidates = await fetchBesticonCandidates(domain);
     if (besticonCandidates.length > 0) {
       let parsed = { primaryCandidates: [] };
       if (html) {
         try {
-          parsed = parseIconCandidatesFromHtml(html, finalBaseUrl);
+          parsed = parseIconCandidatesFromHtml(html, finalBaseUrl, domain);
         } catch {
           /* ignore */
         }
@@ -1907,8 +2153,23 @@ async function fetchScraperForDomain(domain) {
         domain,
         besticonCandidates.map((c) => c.href)
       );
+      // The sidecar besticon does its own HTML scrape but only understands
+      // <link>/manifest/well-known-path icons — it misses icons referenced in
+      // the page body (e.g. Google product logos on redirected marketing pages).
+      // Merge our own parsed HTML candidates (+ sized variants) so those win too.
+      const pageLinkCandidates = [];
+      for (const candidate of [
+        ...parsed.primaryCandidates,
+        ...workspaceLogoCandidates,
+      ]) {
+        pageLinkCandidates.push(candidate);
+        for (const variant of expandSizedVariants(candidate.href)) {
+          pageLinkCandidates.push({ ...candidate, ...variant });
+        }
+      }
       const combined = rankCandidates([
         ...besticonCandidates,
+        ...pageLinkCandidates,
         ...hintCandidates,
         ...manifestIcons,
       ]);
@@ -1921,7 +2182,8 @@ async function fetchScraperForDomain(domain) {
     domain,
     html,
     finalBaseUrl,
-    linkHeader
+    linkHeader,
+    workspaceLogoCandidates
   );
 
   const bestPrimary = await probeScraperCandidates(rankedPrimary, finalBaseUrl);
@@ -1966,6 +2228,11 @@ async function fetchScraperCatalogFallback(domain) {
     return normalizeFallbackResult(dashResult, 'scraper-fallback:dashboardicons');
   }
 
+  const svglResult = await fetchSvgl(slug, 'color', 128, { strict: true });
+  if (svglResult) {
+    return normalizeFallbackResult(svglResult, 'scraper-fallback:svgl');
+  }
+
   return null;
 }
 
@@ -1993,6 +2260,21 @@ async function fetchScraper(domain) {
   // of overriding it with a catalog logo.
   const result = await fetchScraperForDomain(domain);
   const scrapedBigEnough = !!result && (result.sourceWidth || 0) >= MIN_SOURCE_SIZE;
+
+  // A curated domain→icon-tag mapping (domainIconTags.js) is an intentional
+  // override: prefer the branded catalog icon over the site's own — often
+  // generic — favicon. E.g. azure.microsoft.com serves the plain Microsoft
+  // four-square logo, not the Azure icon. Exception: when the HTML scrape
+  // already found a specific product logo (Google's gstatic productlogos, which
+  // are the exact, current brand icons), keep that instead of the catalog.
+  const hasExplicitIconTag = !!iconTagForDomain(domain);
+  const scrapedIsProductLogo =
+    !!result && /gstatic\.com\/images\/branding\/productlogos\//i.test(result.url || '');
+
+  if (SCRAPER_FALLBACK && hasExplicitIconTag && !scrapedIsProductLogo) {
+    const catalogResult = await fetchScraperCatalogFallback(domain);
+    if (catalogResult) return catalogResult;
+  }
 
   if (SCRAPER_FALLBACK && !scrapedBigEnough) {
     const catalogResult = await fetchScraperCatalogFallback(domain);
@@ -2169,6 +2451,7 @@ module.exports = {
   fetchScraperAsset,
   fetchScraperPage,
   parseIconCandidatesFromHtml,
+  googleWorkspaceLogoFallback,
   fetchManifestIcons,
   discoverManifestUrls,
   resolveManifestIcons,

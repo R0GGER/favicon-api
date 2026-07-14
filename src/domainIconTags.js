@@ -1,9 +1,15 @@
 /**
  * Explicit domain → icon-tag (service slug) mappings.
  *
- * Used by service-icon fallbacks when scraping / external providers do not
- * yield a good favicon. Add one row per domain; iconTag must match a slug in
- * selfh.st / dashboardicons / lobehub (e.g. google-drive, microsoft-teams).
+ * An explicit mapping is authoritative: the HTML scraper prefers the branded
+ * catalog icon (selfh.st / dashboardicons / svgl) over the site's own — often
+ * generic — favicon. E.g. azure.microsoft.com serves the plain Microsoft logo,
+ * but the microsoft-azure catalog icon is the real Azure logo. The one
+ * exception is when the scrape already found a specific Google product logo
+ * (gstatic productlogos), which is the exact, current brand icon and is kept.
+ *
+ * Add one row per domain; iconTag must match a slug in selfh.st /
+ * dashboardicons / lobehub (e.g. google-drive, microsoft-teams).
  *
  * Lookup runs before automatic rules in serviceSlugFromDomain.js.
  */
@@ -19,6 +25,8 @@ const DOMAIN_ICON_TAGS = [
   { domain: 'photos.google.com', iconTag: 'google-photos' },
 
   // Microsoft 365 (examples — extend as needed)
+  { domain: 'microsoft.com', iconTag: 'microsoft' },
+  { domain: 'office.com', iconTag: 'microsoft-office' },
   { domain: 'outlook.office.com', iconTag: 'microsoft-outlook' },
   { domain: 'teams.microsoft.com', iconTag: 'microsoft-teams' },
   { domain: 'onedrive.live.com', iconTag: 'microsoft-onedrive' },
@@ -33,8 +41,7 @@ const DOMAIN_ICON_TAGS = [
   { domain: 'project.office.com', iconTag: 'microsoft-project' },
   { domain: 'forms.office.com', iconTag: 'microsoft-forms' },
   
-  // Microsoft Admin Center
-  //{ domain: 'admin.cloud.microsoft.com', iconTag: 'admin-center' },
+  // Microsoft Admin
   { domain: 'azure.microsoft.com', iconTag: 'microsoft-azure' },
   { domain: 'intune.microsoft.com', iconTag: 'microsoft-intune' },
 

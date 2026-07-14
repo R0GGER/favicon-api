@@ -151,7 +151,7 @@ function buildServiceFetchers(service) {
       fetchWithCache('svgl', service, '128_c_v2', () => fetchSvgl(service, 'color', 128)),
   };
 
-  const defaultOrder = ['selfhst', 'dashboardicons', 'lobehub', 'svgl'];
+  const defaultOrder = ['selfhst', 'dashboardicons', 'svgl', 'lobehub'];
   if (DEFAULT_PROVIDER && all[DEFAULT_PROVIDER]) {
     const rest = defaultOrder.filter((k) => k !== DEFAULT_PROVIDER);
     return [DEFAULT_PROVIDER, ...rest].map((k) => all[k]);

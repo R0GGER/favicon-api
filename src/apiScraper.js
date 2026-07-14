@@ -5,6 +5,7 @@ const {
   fetchScraperAsset,
   parseSizesAttr,
   expandSizedVariants,
+  googleWorkspaceLogoFallback,
   PROVIDERS,
 } = require('./providers');
 const { resolveServiceSlugForProviderSync } = require('./serviceAliases');
@@ -158,7 +159,8 @@ async function gatherCandidates(domain) {
     try {
       const { primaryCandidates } = parseIconCandidatesFromHtml(
         html,
-        finalBaseUrl || baseUrl
+        finalBaseUrl || baseUrl,
+        domain
       );
       for (const candidate of primaryCandidates) {
         const tier = classifyLinkCandidate(candidate);
@@ -208,6 +210,22 @@ async function gatherCandidates(domain) {
     } catch {
       /* manifest discovery without HTML is best-effort */
     }
+  }
+
+  // Google product subdomains (drive, docs, …) redirect anonymous requests to
+  // the login page, which exposes no product logo. Recover the current logo from
+  // the product's workspace.google.com marketing page.
+  try {
+    const workspaceLogos = await googleWorkspaceLogoFallback(domain, html);
+    for (const candidate of workspaceLogos) {
+      const tier = classifyLinkCandidate(candidate);
+      buckets[tier].push(candidate);
+      for (const variant of expandSizedVariants(candidate.href)) {
+        buckets[tier].push({ ...candidate, ...variant });
+      }
+    }
+  } catch {
+    /* workspace fallback is best-effort */
   }
 
   // Standard well-known paths as fallback candidates.
