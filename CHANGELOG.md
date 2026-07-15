@@ -5,6 +5,23 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.14.0] — 2026-07-15
+
+### Added
+
+- **Preload script — Chrome UX Report (CrUX) as the default domain source** — `scripts/preload-top-sites.js` now defaults to `--source crux`, ranking domains by real Chrome page visits instead of Tranco's DNS/traffic aggregate. This naturally excludes pure-infrastructure domains (CDN/DNS/tracking backends) and dead sites. Because CrUX only ranks in coarse magnitude tiers (1000/10K/100K/1M) with random order *within* a tier, the script uses Tranco rank as a within-tier tiebreaker so the output is a genuine high→low popularity order (google, youtube, facebook, …). A new `--source` option selects `crux` (default), `verified` (Tranco order, kept only if the site also appears in CrUX), `tranco` (raw ranking), or `file`.
+- **Preload script — registrable-domain deduplication via the Public Suffix List** — origins are collapsed to their eTLD+1 (fetched from publicsuffix.org at runtime, no new dependency), so `pt.xhamster.com` and `www.xhamster.com` both become `xhamster.com`, with correct handling of multi-level suffixes (`go.id`, `co.uk`, `gov.co`). Falls back to the last two labels if the list cannot be fetched.
+- **Preload script — service/infra domain filtering** — known CDN, DNS, cloud-backend and ad/tracking domains (e.g. `gstatic.com`, `akamaiedge.net`, `cloudfront.net`, `doubleclick.net`) are dropped from the preload set by default; pass `--no-filter` to keep them.
+- **Preload script — `--sizes` option** — additionally warms extra icon sizes via `/scraper/{size}/{domain}` (comma-separated `16,32,64,128,256`; bare `--sizes` warms all five). Previously only the standard best-pick and the 128×128 v1 PNG were cached; other sizes were generated on demand. Failed sizes are reported per size in the run summary.
+
+### Changed
+
+- **Best-pick cache key no longer carries a misleading size segment** — `pickBest()` stored its entry under `best_32_{domain}`, but the `32` was only a cache-bucket label: the stored image is the winning provider's icon at its native/best resolution (scraper output capped at `SCRAPER_MAX_ICON_SIZE`, i.e. 128 px), not 32 px. The key is now `best_{domain}` (no size segment). Existing `best_32_*` files are no longer read and expire via TTL/eviction.
+
+### Fixed
+
+- **`.microsoft` brand gTLD rejected as a scanner path (`cloud.microsoft`, `static.microsoft`)** — `microsoft` was listed in `BLOCKED_FILE_EXTENSIONS` in `src/domainValidation.js`, which is meant for bot-scan file extensions (`.php`, `.env`, …). Because `.microsoft` is a real ICANN brand TLD, valid domains such as `cloud.microsoft` were rejected with `invalid_url: Could not parse url into a domain`. Removed `microsoft` from the blocklist so these domains validate normally; genuine scanner extensions remain blocked.
+
 ## [2.13.0] — 2026-07-14
 
 ### Added
