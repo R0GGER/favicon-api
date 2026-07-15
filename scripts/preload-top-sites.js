@@ -14,9 +14,97 @@
 
 const fs = require('fs');
 const https = require('https');
+const zlib = require('zlib');
 
 const TRANCO_LATEST_URL = 'https://tranco-list.eu/latest_list';
+// Chrome UX Report top-million, cached monthly from Google BigQuery. Ranked by
+// real Chrome page visits, so pure infrastructure (CDN/DNS/tracking backends)
+// and dead sites do not appear — unlike Tranco's DNS/traffic-based ranking.
+const CRUX_LATEST_URL =
+  'https://raw.githubusercontent.com/zakird/crux-top-lists/main/data/global/current.csv.gz';
 const USER_AGENT = 'FaviconProxy-preload/1.0';
+
+// Pure service/infrastructure domains that have no user-facing website or
+// favicon (CDN, DNS/registry, cloud backends, ad/tracking endpoints). These
+// occasionally still surface in ranking lists; we drop them so the preload set
+// only contains real, browsable websites. Company sites that happen to also run
+// infra (e.g. cloudflare.com, appsflyer.com, criteo.com) are deliberately NOT
+// listed here. Matching also covers subdomains (foo.gstatic.com).
+const SERVICE_DOMAINS = new Set([
+  // Google infrastructure / CDN / ads / tracking
+  'gstatic.com', 'googleapis.com', 'googleusercontent.com', 'googlevideo.com',
+  'ggpht.com', 'gvt1.com', 'gvt2.com', 'googlesyndication.com', 'googletagmanager.com',
+  'googletagservices.com', 'googleadservices.com', 'google-analytics.com',
+  'doubleclick.net', 'app-measurement.com', 'usercontent.goog', '2mdn.net',
+  // Apple infrastructure
+  'aaplimg.com', 'apple-dns.net', 'mzstatic.com', 'cdn-apple.com',
+  // Microsoft infrastructure
+  'microsoftonline.com', 'windowsupdate.com', 'trafficmanager.net', 'azureedge.net',
+  'windows.net', 'msedge.net', 'cloudapp.net', 's-microsoft.com',
+  // Meta / Facebook infrastructure
+  'fbcdn.net', 'cdninstagram.com', 'whatsapp.net', 'fbsbx.com',
+  // Amazon / AWS infrastructure
+  'amazonaws.com', 'cloudfront.net', 'media-amazon.com', 'ssl-images-amazon.com',
+  // CDNs
+  'akamai.net', 'akamaiedge.net', 'akamaihd.net', 'akadns.net', 'akam.net',
+  'edgekey.net', 'edgesuite.net', 'fastly.net', 'fastlylb.net', 'llnwd.net',
+  // DNS / registry infrastructure
+  'gtld-servers.net', 'root-servers.net', 'nstld.com', 'domaincontrol.com',
+  'ripn.net', 'registrar-servers.com',
+  // Ad / tracking endpoints (no browsable site)
+  'adnxs.com', 'adsrvr.org', 'criteo.net', 'scorecardresearch.com',
+  'appsflyersdk.com', 'demdex.net', 'rubiconproject.com', 'pubmatic.com',
+  'casalemedia.com',
+  // TikTok / ByteDance infrastructure
+  'tiktokcdn.com', 'tiktokv.com', 'bytefcdn.com', 'byteoversea.com', 'ibyteimg.com',
+]);
+
+function isServiceDomain(host) {
+  if (SERVICE_DOMAINS.has(host)) return true;
+  for (const svc of SERVICE_DOMAINS) {
+    if (host.endsWith(`.${svc}`)) return true;
+  }
+  return false;
+}
+
+/** Normalize a raw origin/domain into a bare hostname (no scheme/path/www). */
+function normalizeHost(raw) {
+  if (!raw || typeof raw !== 'string') return null;
+  const host = raw
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/\/.*$/, '')
+    .replace(/^www\./, '');
+  return host || null;
+}
+
+/** Naive registrable domain (last two labels) — good enough for set lookups. */
+function registrableGuess(host) {
+  const parts = host.split('.');
+  return parts.length <= 2 ? host : parts.slice(-2).join('.');
+}
+
+/**
+ * Dedupe, normalize, drop service domains, and cap to `limit`. When `cruxSet`
+ * is provided, only domains present in the Chrome UX Report are kept (proves
+ * the site gets real browser visits — excludes dead and infra-only domains).
+ */
+function applyFilters(rawDomains, { filterServices, limit, cruxSet = null }) {
+  const out = [];
+  const seen = new Set();
+  for (const raw of rawDomains) {
+    const host = normalizeHost(raw);
+    if (!host || !host.includes('.')) continue;
+    if (seen.has(host)) continue;
+    if (filterServices && isServiceDomain(host)) continue;
+    if (cruxSet && !cruxSet.has(host) && !cruxSet.has(registrableGuess(host))) continue;
+    seen.add(host);
+    out.push(host);
+    if (out.length >= limit) break;
+  }
+  return out;
+}
 
 function parseArgs(argv) {
   const out = { _: [] };
@@ -48,11 +136,22 @@ function usage(code = 0) {
     'Options:',
     '  --base-url URL       FaviconAPI base URL',
     '                       (default: PRELOAD_BASE_URL or http://localhost:3100)',
+    '  --source NAME        Domain source: crux (default), verified, tranco, or file',
+    '                       crux     = Chrome UX Report, ranked by real page visits',
+    '                                  (magnitude tiers 1000/10K/100K/1M; random',
+    '                                  order within a tier). Excludes dead sites.',
+    '                       verified = Tranco ranking, kept only if the site also',
+    '                                  appears in CrUX (fine ordering + real visits)',
+    '                       tranco   = raw Tranco DNS/traffic ranking',
+    '                       file     = local list (requires --domains-file)',
+    '                       Tip: with crux, pick --limit at a tier boundary',
+    '                       (1000, 10000, …) to capture a whole tier.',
     '  --limit N            Number of domains to preload (default: 500)',
     '  --concurrency N      Parallel domain workers (default: 4)',
     '  --api-key KEY        API key for /api/v1/favicon',
     '                       (or PRELOAD_API_KEY / API_KEY env var)',
-    '  --domains-file PATH  Local domain list (one domain per line) instead of Tranco',
+    '  --domains-file PATH  Local domain list (one domain per line); sets --source file',
+    '  --no-filter          Do NOT drop known service/infra domains (CDN, DNS, etc.)',
     '  --skip-standard      Skip GET /{domain}',
     '  --skip-v1            Skip GET /api/v1/favicon',
     '  --timeout MS         Per-request timeout in ms (default: 30000)',
@@ -60,7 +159,8 @@ function usage(code = 0) {
     '',
     'Examples:',
     '  node scripts/preload-top-sites.js',
-    '  node scripts/preload-top-sites.js --base-url http://localhost:3100 --limit 100',
+    '  node scripts/preload-top-sites.js --limit 1000',
+    '  node scripts/preload-top-sites.js --source tranco --limit 100',
     '  docker compose exec favicon-api node scripts/preload-top-sites.js --base-url http://127.0.0.1:3000',
     '',
   ].join('\n');
@@ -142,44 +242,84 @@ async function resolveTrancoListId(timeoutMs) {
   return match[1];
 }
 
-async function fetchTrancoDomains(limit, timeoutMs) {
+async function fetchTrancoDomains(limit, timeoutMs, { filterServices, cruxSet = null }) {
   const listId = await resolveTrancoListId(timeoutMs);
-  const csvUrl = `https://tranco-list.eu/download/${listId}/${limit}`;
+  // Over-fetch so filtering (service drop + optional CrUX intersection) still
+  // leaves at least `limit` domains.
+  const factor = cruxSet ? 6 : filterServices ? 3 : 1;
+  const rawLimit = Math.min(Math.max(limit * factor, limit), 1000000);
+  const csvUrl = `https://tranco-list.eu/download/${listId}/${rawLimit}`;
   const res = await httpsRequest(csvUrl, { timeoutMs });
   if (res.status !== 200) {
     throw new Error(`Tranco download failed (${res.status}) for ${csvUrl}`);
   }
 
-  const domains = [];
+  const raw = [];
   for (const line of res.body.toString('utf8').split(/\r?\n/)) {
     const trimmed = line.trim();
     if (!trimmed) continue;
     const comma = trimmed.indexOf(',');
-    const domain = (comma >= 0 ? trimmed.slice(comma + 1) : trimmed).trim().toLowerCase();
-    if (domain && domain.includes('.')) domains.push(domain);
-    if (domains.length >= limit) break;
+    raw.push(comma >= 0 ? trimmed.slice(comma + 1) : trimmed);
   }
 
+  const domains = applyFilters(raw, { filterServices, limit, cruxSet });
   if (domains.length === 0) {
-    throw new Error('Tranco list was empty.');
+    throw new Error('Tranco list was empty after filtering.');
   }
   return { listId, domains };
 }
 
-function loadDomainsFromFile(filePath, limit) {
-  const raw = fs.readFileSync(filePath, 'utf8');
-  const domains = [];
-  for (const line of raw.split(/\r?\n/)) {
-    const domain = line
-      .replace(/^\s*\d+\s*,?\s*/, '')
-      .replace(/^https?:\/\//, '')
-      .replace(/\/.*$/, '')
-      .trim()
-      .toLowerCase();
-    if (!domain || !domain.includes('.')) continue;
-    domains.push(domain);
-    if (domains.length >= limit) break;
+/**
+ * Download and decompress the CrUX top-million list.
+ *
+ * CrUX ranks sites in coarse popularity buckets (1000, 10000, …) rather than a
+ * fine 1..N order, and does not sort within a bucket. That makes it a great
+ * membership signal ("is this a real, currently-visited site?") but a poor
+ * source of ordered top-N results — hence it is used to verify Tranco's order.
+ *
+ * Returns:
+ *   orderedHosts — hosts in file order (used only for --source crux)
+ *   hostSet      — every host + its registrable guess, for membership lookups
+ */
+async function loadCrux(timeoutMs) {
+  const res = await httpsRequest(CRUX_LATEST_URL, { timeoutMs });
+  if (res.status !== 200) {
+    throw new Error(`CrUX download failed (${res.status}) for ${CRUX_LATEST_URL}`);
   }
+
+  let csv;
+  try {
+    csv = zlib.gunzipSync(res.body).toString('utf8');
+  } catch (err) {
+    throw new Error(`Could not decompress CrUX list: ${err.message || err}`);
+  }
+
+  const orderedHosts = [];
+  const hostSet = new Set();
+  const lines = csv.split(/\r?\n/);
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    const comma = line.indexOf(',');
+    const origin = comma >= 0 ? line.slice(0, comma) : line;
+    // CrUX CSV header is "origin,rank".
+    if (i === 0 && origin.toLowerCase() === 'origin') continue;
+    const host = normalizeHost(origin);
+    if (!host || !host.includes('.')) continue;
+    orderedHosts.push(host);
+    hostSet.add(host);
+    hostSet.add(registrableGuess(host));
+  }
+
+  if (hostSet.size === 0) {
+    throw new Error('CrUX list was empty.');
+  }
+  return { orderedHosts, hostSet };
+}
+
+function loadDomainsFromFile(filePath, limit, filterServices) {
+  const raw = fs.readFileSync(filePath, 'utf8').split(/\r?\n/);
+  const domains = applyFilters(raw, { filterServices, limit });
   if (domains.length === 0) {
     throw new Error(`No domains found in ${filePath}`);
   }
@@ -280,22 +420,67 @@ async function main() {
   const skipStandard = !!args['skip-standard'];
   const skipV1 = !!args['skip-v1'];
   const dryRun = !!args['dry-run'];
+  const filterServices = !args['no-filter'];
+  const source = String(
+    args.source || (args['domains-file'] ? 'file' : 'crux'),
+  ).toLowerCase();
 
   if (skipStandard && skipV1) {
     throw new Error('Nothing to do: both --skip-standard and --skip-v1 are set.');
   }
+  if (!['verified', 'crux', 'tranco', 'file'].includes(source)) {
+    throw new Error(
+      `Unknown --source "${source}" (expected: verified, crux, tranco, or file).`,
+    );
+  }
 
   let listId = null;
   let domains;
-  if (args['domains-file']) {
-    domains = loadDomainsFromFile(args['domains-file'], limit);
+  if (source === 'file' || args['domains-file']) {
+    if (!args['domains-file']) {
+      throw new Error('--source file requires --domains-file PATH.');
+    }
+    domains = loadDomainsFromFile(args['domains-file'], limit, filterServices);
     console.log(`Loaded ${domains.length} domains from ${args['domains-file']}`);
-  } else {
+  } else if (source === 'tranco') {
     console.log(`Fetching top ${limit} domains from Tranco…`);
-    const tranco = await fetchTrancoDomains(limit, timeoutMs);
+    const tranco = await fetchTrancoDomains(limit, timeoutMs, { filterServices });
     listId = tranco.listId;
     domains = tranco.domains;
     console.log(`Tranco list ${listId}: ${domains.length} domains`);
+  } else if (source === 'crux') {
+    console.log(`Fetching top ${limit} most-visited sites from CrUX…`);
+    const { orderedHosts } = await loadCrux(timeoutMs);
+    domains = applyFilters(orderedHosts, { filterServices, limit });
+    listId = 'CrUX-current';
+    console.log(`CrUX list (${listId}): ${domains.length} domains`);
+    // CrUX ranks in magnitude tiers (1000/10K/100K/1M) and orders sites
+    // randomly within a tier. A limit that lands mid-tier therefore yields a
+    // random subset of that tier; a tier boundary captures the whole tier.
+    const CRUX_TIERS = [1000, 10000, 100000, 1000000];
+    if (!CRUX_TIERS.includes(limit)) {
+      const nextTier = CRUX_TIERS.find((t) => t >= limit) || limit;
+      console.log(
+        `Note: CrUX orders sites randomly within its ${nextTier} tier, so this ` +
+          `${limit}-site slice is a random subset. Use --limit ${nextTier} to get ` +
+          'the whole tier (all its most-visited sites).',
+      );
+    }
+  } else {
+    // verified: Tranco order, kept only if the site really appears in CrUX.
+    console.log(`Fetching most-visited sites (Tranco order, verified via CrUX)…`);
+    const { hostSet } = await loadCrux(timeoutMs);
+    const tranco = await fetchTrancoDomains(limit, timeoutMs, {
+      filterServices,
+      cruxSet: hostSet,
+    });
+    listId = `${tranco.listId} (CrUX-verified)`;
+    domains = tranco.domains;
+    console.log(`Verified list ${listId}: ${domains.length} domains`);
+    console.log('Dead sites and service-only domains excluded (not in CrUX).');
+  }
+  if (filterServices) {
+    console.log('Service/infra domains (CDN, DNS, tracking) filtered out.');
   }
 
   if (dryRun) {
