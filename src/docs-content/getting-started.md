@@ -611,9 +611,9 @@ The tables below cover the most-used variables. For the complete list — includ
 
 ---
 
-## Performance tuning
+## Performance tuning and Tweaks
 
-See [Performance tuning](/performance.md) for cache TTL recommendations, scraper latency, and worker sizing.
+See [Performance tuning](https://faviconapi.com/docs/tweaks) for cache TTL recommendations, scraper latency, and worker sizing.
 
 ---
 

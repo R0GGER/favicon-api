@@ -225,6 +225,9 @@ function usage(code = 0) {
     '                       (or PRELOAD_API_KEY / API_KEY env var)',
     '  --domains-file PATH  Local domain list (one domain per line); sets --source file',
     '  --no-filter          Do NOT drop known service/infra domains (CDN, DNS, etc.)',
+    '  --sizes LIST         Also warm extra icon sizes via /scraper/{size}/{domain}.',
+    '                       Comma-separated; valid: 16,32,64,128,256. Bare --sizes',
+    '                       warms all five. Multiplies requests per domain.',
     '  --skip-standard      Skip GET /{domain}',
     '  --skip-v1            Skip GET /api/v1/favicon',
     '  --timeout MS         Per-request timeout in ms (default: 30000)',
@@ -451,6 +454,11 @@ function siteUrl(baseUrl, domain) {
   return `${baseUrl.replace(/\/+$/, '')}/${encodeURIComponent(domain)}`;
 }
 
+function scraperSizeUrl(baseUrl, domain, size) {
+  const root = baseUrl.replace(/\/+$/, '');
+  return `${root}/scraper/${size}/${encodeURIComponent(domain)}`;
+}
+
 function v1Url(baseUrl, domain) {
   const root = baseUrl.replace(/\/+$/, '');
   const target = `https://${domain}`;
@@ -464,6 +472,20 @@ function v1Headers(apiKey) {
 
 async function preloadStandard(baseUrl, domain, timeoutMs) {
   const url = siteUrl(baseUrl, domain);
+  const res = await fetchWithTimeout(url, { timeoutMs });
+  const contentType = res.headers['content-type'] || '';
+  if (res.status === 200 && contentType.startsWith('image/')) {
+    return { ok: true, status: res.status, bytes: res.body.length };
+  }
+  return {
+    ok: false,
+    status: res.status,
+    error: res.status === 200 ? `Unexpected content-type: ${contentType}` : `HTTP ${res.status}`,
+  };
+}
+
+async function preloadScraperSize(baseUrl, domain, size, timeoutMs) {
+  const url = scraperSizeUrl(baseUrl, domain, size);
   const res = await fetchWithTimeout(url, { timeoutMs });
   const contentType = res.headers['content-type'] || '';
   if (res.status === 200 && contentType.startsWith('image/')) {
@@ -542,12 +564,25 @@ async function main() {
   const skipV1 = !!args['skip-v1'];
   const dryRun = !!args['dry-run'];
   const filterServices = !args['no-filter'];
+
+  // Extra icon sizes to warm via the scraper's sized route (/scraper/{size}/{domain}).
+  const VALID_SIZES = [16, 32, 64, 128, 256];
+  const sizesArg = args.sizes === true ? String(VALID_SIZES.join(',')) : String(args.sizes || '');
+  const sizes = sizesArg
+    .split(',')
+    .map((s) => parseInt(s.trim(), 10))
+    .filter((n) => VALID_SIZES.includes(n));
+  if (sizesArg.trim() && sizes.length === 0) {
+    throw new Error(`Invalid --sizes; choose from ${VALID_SIZES.join(', ')}.`);
+  }
   const source = String(
     args.source || (args['domains-file'] ? 'file' : 'crux'),
   ).toLowerCase();
 
-  if (skipStandard && skipV1) {
-    throw new Error('Nothing to do: both --skip-standard and --skip-v1 are set.');
+  if (skipStandard && skipV1 && sizes.length === 0) {
+    throw new Error(
+      'Nothing to do: both --skip-standard and --skip-v1 are set (and no --sizes).',
+    );
   }
   if (!['verified', 'crux', 'tranco', 'file'].includes(source)) {
     throw new Error(
@@ -634,6 +669,7 @@ async function main() {
   const modes = [];
   if (!skipStandard) modes.push('standard (GET /{domain})');
   if (!skipV1) modes.push('API v1 (/api/v1/favicon)');
+  if (sizes.length) modes.push(`scraper sizes (${sizes.join(', ')})`);
 
   console.log(`Base URL: ${baseUrl}`);
   console.log(`Modes: ${modes.join(', ')}`);
@@ -644,6 +680,7 @@ async function main() {
   const stats = {
     standard: { ok: 0, fail: 0 },
     v1: { ok: 0, fail: 0, cached: 0, fresh: 0 },
+    sizes: { ok: 0, fail: 0 },
     failures: [],
   };
 
@@ -651,7 +688,7 @@ async function main() {
   let completed = 0;
 
   await mapPool(domains, concurrency, async (domain) => {
-    const row = { domain, standard: null, v1: null };
+    const row = { domain, standard: null, v1: null, sizes: null };
 
     if (!skipStandard) {
       try {
@@ -680,6 +717,27 @@ async function main() {
       }
     }
 
+    if (sizes.length) {
+      row.sizes = { ok: 0, fail: 0, errors: [] };
+      for (const size of sizes) {
+        try {
+          const r = await preloadScraperSize(baseUrl, domain, size, timeoutMs);
+          if (r.ok) {
+            row.sizes.ok += 1;
+            stats.sizes.ok += 1;
+          } else {
+            row.sizes.fail += 1;
+            stats.sizes.fail += 1;
+            row.sizes.errors.push(`${size}: ${r.error || r.status}`);
+          }
+        } catch (err) {
+          row.sizes.fail += 1;
+          stats.sizes.fail += 1;
+          row.sizes.errors.push(`${size}: ${err.message || String(err)}`);
+        }
+      }
+    }
+
     completed += 1;
     const standardTag = skipStandard
       ? ''
@@ -691,12 +749,16 @@ async function main() {
       : row.v1.ok
         ? `v1=ok${row.v1.cached ? ',cached' : ''}`
         : `v1=fail(${row.v1.error || row.v1.status})`;
-    const tags = [standardTag, v1Tag].filter(Boolean).join(' ');
+    const sizesTag = row.sizes
+      ? `sizes=${row.sizes.ok}/${sizes.length}${row.sizes.fail ? ' fail' : ''}`
+      : '';
+    const tags = [standardTag, v1Tag, sizesTag].filter(Boolean).join(' ');
     console.log(`[${completed}/${domains.length}] ${domain}${tags ? ` — ${tags}` : ''}`);
 
     if (
       (!skipStandard && !row.standard.ok) ||
-      (!skipV1 && !row.v1.ok)
+      (!skipV1 && !row.v1.ok) ||
+      (row.sizes && row.sizes.fail > 0)
     ) {
       stats.failures.push(row);
     }
@@ -715,6 +777,11 @@ async function main() {
       `API v1: ${stats.v1.ok} ok (${stats.v1.cached} cached, ${stats.v1.fresh} fresh), ${stats.v1.fail} failed`,
     );
   }
+  if (sizes.length) {
+    console.log(
+      `Scraper sizes (${sizes.join(', ')}): ${stats.sizes.ok} ok, ${stats.sizes.fail} failed`,
+    );
+  }
 
   if (stats.failures.length > 0) {
     console.log('');
@@ -723,6 +790,7 @@ async function main() {
       const parts = [];
       if (row.standard && !row.standard.ok) parts.push(`standard: ${row.standard.error || row.standard.status}`);
       if (row.v1 && !row.v1.ok) parts.push(`v1: ${row.v1.error || row.v1.status}`);
+      if (row.sizes && row.sizes.fail > 0) parts.push(`sizes: ${row.sizes.errors.join(', ')}`);
       console.log(`  ${row.domain} — ${parts.join('; ')}`);
     }
     if (stats.failures.length > 25) {

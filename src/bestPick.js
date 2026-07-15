@@ -222,24 +222,27 @@ async function raceFetchers(fallbacks, cacheProvider, cacheKey, cacheSize) {
 }
 
 async function pickBest(domain) {
-  const cached = await cache.get('best', domain, 32);
+  // The best-pick entry stores the winning provider's icon at its native/best
+  // resolution (scraper output is capped at SCRAPER_MAX_ICON_SIZE), so the cache
+  // key carries no size segment — the file is `best_{domain}`, not a fixed px.
+  const cached = await cache.get('best', domain, null);
   if (cached) {
     if (cached.notFound || cached.provider === 'none') {
-      await cache.del('best', domain, 32);
+      await cache.del('best', domain, null);
     } else if (DEFAULT_PROVIDER && cached.provider !== DEFAULT_PROVIDER) {
       // Pre-2.8.12 `best` entries can hold a fast CDN fallback (e.g. duckduckgo's
       // generic Google favicon for calendar.google.com) even when DEFAULT_PROVIDER
       // is scraper. Those icons pass isUnusableIcon, so invalidate and re-pick.
-      await cache.del('best', domain, 32);
+      await cache.del('best', domain, null);
     } else if (!(await isUnusableIcon(cached.buffer, cached))) {
       return cached;
     } else {
-      await cache.del('best', domain, 32);
+      await cache.del('best', domain, null);
     }
   }
 
   const fallbacks = buildFallbackFetchers(domain);
-  return raceFetchers(fallbacks, 'best', domain, 32);
+  return raceFetchers(fallbacks, 'best', domain, null);
 }
 
 async function pickBestService(service) {

@@ -1,4 +1,4 @@
-# Tweaks
+# Performance tuning & Tweaks
 
 This guide explains cache layers and scraper latency in depth.
 
@@ -214,23 +214,40 @@ For each domain it calls:
 
 | Step | Endpoint | What gets cached |
 |---|---|---|
-| Standard API | `GET /{domain}` | Best-pick provider cache (memory + disk) — same as the homepage API example |
+| Standard API | `GET /{domain}` | Best-pick provider cache (memory + disk) — same as the homepage API example. Stored under `best_{domain}` at the winning provider's native/best resolution (scraper output is capped at `SCRAPER_MAX_ICON_SIZE`). |
 | API v1 | `GET /api/v1/favicon?url=https://{domain}` | Normalized 128×128 PNG under `API_CACHE_DIR`, served via `/cdn/favicons/{domain}.png` |
+| Extra sizes *(optional, `--sizes`)* | `GET /scraper/{size}/{domain}` | Resized scraper PNGs (`scraper_{size}_{domain}`) for each requested size — 16, 32, 64, 128, 256 |
+
+By default only the standard best-pick and the 128×128 v1 PNG are cached. Other
+sizes are generated on demand when a client requests them; pass `--sizes` to
+warm them up front (see options below).
 
 See [API v1](api-v1.md) for authentication and quota rules on the v1 endpoint.
 
-#### Domain source (Tranco)
+#### Domain source (`--source`)
 
-By default the script downloads domains from the [Tranco](https://tranco-list.eu/)
-research ranking — an aggregate of Cisco Umbrella, Majestic, CrUX, Cloudflare
-Radar, and related lists, updated daily.
+By default the script uses the **Chrome UX Report (CrUX)** most-visited ranking,
+which is based on real Chrome page visits — so pure infrastructure domains
+(CDN/DNS/tracking backends) and dead sites do not appear. Four sources are
+available via `--source`:
 
-1. Resolve the latest list ID via `https://tranco-list.eu/latest_list` (redirect).
-2. Download the top *N* entries as CSV from
-   `https://tranco-list.eu/download/{listId}/{limit}` (default **500**).
+| Source | Ordering | Notes |
+|---|---|---|
+| `crux` *(default)* | High→low by CrUX popularity **tier**, with **Tranco rank as a within-tier tiebreaker** | CrUX only ranks in coarse magnitude tiers (1000/10K/100K/1M) with random order *within* a tier; the Tranco tiebreaker restores a fine high→low order (google, youtube, facebook, …). Downloaded from `crux-top-lists` (`current.csv.gz`, refreshed monthly). |
+| `verified` | Tranco rank order | [Tranco](https://tranco-list.eu/) ranking, kept **only** for domains that also appear in CrUX (proves real visits). |
+| `tranco` | Tranco rank order | Raw Tranco DNS/traffic ranking. |
+| `file` | File order | Local list via `--domains-file path/to/list.txt` (one domain per line). Implied when `--domains-file` is set. |
 
-Each CSV line is `rank,domain` (e.g. `1,google.com`). Pass `--domains-file
-path/to/list.txt` to use your own list instead (one domain per line).
+All sources apply two normalizations:
+
+- **Registrable-domain deduplication** — origins are collapsed to their eTLD+1
+  via the [Public Suffix List](https://publicsuffix.org/) (fetched at runtime),
+  so `pt.xhamster.com` and `www.xhamster.com` both become `xhamster.com`, and
+  multi-level suffixes like `go.id` / `co.uk` are handled correctly. If the PSL
+  cannot be fetched it falls back to the last two labels.
+- **Service/infra filtering** — known CDN, DNS, cloud-backend and ad/tracking
+  domains (e.g. `gstatic.com`, `akamaiedge.net`, `cloudfront.net`,
+  `doubleclick.net`) are dropped. Pass `--no-filter` to keep them.
 
 #### Usage
 
@@ -281,10 +298,13 @@ docker exec favicon-api node scripts/preload-top-sites.js \
 | Option | Default | Description |
 |---|---|---|
 | `--base-url` | `http://127.0.0.1:3000` (inside container) | FaviconAPI base URL |
-| `--limit` | `500` | Number of domains from Tranco |
+| `--source` | `crux` | Domain source: `crux`, `verified`, `tranco`, or `file` (see above) |
+| `--limit` | `500` | Number of domains to preload |
 | `--concurrency` | `4` | Parallel domain workers — use **`2`** (or **`1`** on a small VPS) for scheduled runs |
 | `--api-key` | `PRELOAD_API_KEY` / `API_KEY` env | Bearer key for `/api/v1/favicon` |
-| `--domains-file` | — | Local domain list instead of Tranco |
+| `--domains-file` | — | Local domain list (one domain per line); sets `--source file` |
+| `--no-filter` | — | Keep known service/infra domains (CDN, DNS, tracking) instead of dropping them |
+| `--sizes` | — | Also warm extra icon sizes via `/scraper/{size}/{domain}`. Comma-separated (e.g. `16,32,64,128,256`); bare `--sizes` warms all five. Multiplies requests per domain. |
 | `--skip-standard` | — | Skip `GET /{domain}` |
 | `--skip-v1` | — | Skip `/api/v1/favicon` |
 | `--timeout` | `30000` | Per-request timeout (ms) — use **`60000`** for weekly cron |
@@ -295,10 +315,12 @@ docker exec favicon-api node scripts/preload-top-sites.js \
 - **Duration.** The full top 500 typically takes **30–60 minutes**, depending on
   concurrency, upstream latency, and scraper settings. Start with `--limit 50` to
   validate before running the full list.
-- **Failures.** Some Tranco entries are infrastructure domains (e.g.
-  `gtld-servers.net`) with no usable favicon. The standard API may still return
-  a fallback icon; API v1 may respond with `422 favicon_not_found` — that is
-  normal and does not stop the script.
+- **Failures.** With the default `crux` source, most pure-infrastructure
+  domains (e.g. `gtld-servers.net`) are already excluded, so failure rates are
+  low. Any remaining domain with no usable favicon may still yield
+  `422 favicon_not_found` on API v1 while the standard API returns a fallback
+  icon — that is normal and does not stop the script. Use `--source tranco` to
+  see the higher failure rate of the raw DNS/traffic ranking.
 - **Load.** Each domain triggers upstream fetches on a cold cache. Run during
   off-peak hours or lower `--concurrency` if upstreams rate-limit you.
 - **Persistence.** Preloaded data is written to the same `CACHE_DIR` /
@@ -309,7 +331,7 @@ docker exec favicon-api node scripts/preload-top-sites.js \
 
 Preload fills both cache layers, but **default TTLs expire long before a weekly
 re-run** unless you align them. Match the [TL;DR](#tldr) block at the top of this
-page and add headroom for 500 Tranco domains in the scraper LRU:
+page and add headroom for 500 preloaded domains in the scraper LRU:
 
 ```bash
 # Scraper discovery + image bytes: 7 days (same horizon as API v1)
@@ -332,7 +354,7 @@ API_CACHE_TTL=604800
 | Variable | Recommendation | Why |
 |---|---|---|
 | `SCRAPER_DISK_CACHE` | **`true`** | Persists scraper discovery across restarts; shared across cluster workers. `{CACHE_DIR}/scraper-discovery` is the default path — set `SCRAPER_DISK_CACHE_DIR` only if you need a custom location. |
-| `SCRAPER_ICONS_CACHE_MAX` | **`1000`** | Default `500` equals the preload size; the LRU evicts entries as soon as it is full. `1000` leaves room for Tranco domains plus day-to-day lookups. Busy instances can use `2000` (see [§3](#3-right-size-the-in-memory-cache)). |
+| `SCRAPER_ICONS_CACHE_MAX` | **`1000`** | Default `500` equals the preload size; the LRU evicts entries as soon as it is full. `1000` leaves room for preloaded domains plus day-to-day lookups. Busy instances can use `2000` (see [§3](#3-right-size-the-in-memory-cache)). |
 | `SCRAPER_ICONS_CACHE_TTL` | **`604800`** (7 days) | Default `3600` (1 hour) — discovery expires before the next weekly run, forcing full re-scrapes. |
 | `DISK_CACHE_TTL` | **`604800`** (7 days) | Default `86400` (1 day) — image bytes expire too soon for weekly preload. |
 | `API_CACHE_TTL` | **`604800`** (7 days) | Already the default. **Do not increase** for weekly preload — seven days matches a Sunday-to-Sunday schedule. Raising it (e.g. to 14 or 30 days) only makes sense if you run preload **less often**; it also lengthens browser/CDN `Cache-Control` on `/cdn/favicons/`. |
@@ -387,7 +409,7 @@ Do not disable the timeout or set it very high (e.g. several minutes) with
 - **Full path to `docker`** — cron's `PATH` is minimal; run `which docker` on the host.
 - **Container name** — match `docker ps` (e.g. `favicon-api` or `maflplus-favicon-api`).
 - **Logging** — redirect stdout/stderr to a log file; configure logrotate so it does not grow unbounded.
-- **Image version** — the script ships in the image from v2.8.10 onward (`scripts/preload-top-sites.js`).
+- **Image version** — the script ships in the image from v2.8.10 onward (`scripts/preload-top-sites.js`). The CrUX default source, registrable-domain deduplication, and `--sizes` are available from v2.14.0.
 
 Weekly preload plus the [recommended `.env`](#recommended-env-for-weekly-preload)
 above keeps standard, scraper, and v1 caches warm through the week without daily
