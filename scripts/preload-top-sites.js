@@ -211,15 +211,14 @@ function usage(code = 0) {
     '  --base-url URL       FaviconAPI base URL',
     '                       (default: PRELOAD_BASE_URL or http://localhost:3100)',
     '  --source NAME        Domain source: crux (default), verified, tranco, or file',
-    '                       crux     = Chrome UX Report, ranked by real page visits',
-    '                                  (magnitude tiers 1000/10K/100K/1M; random',
-    '                                  order within a tier). Excludes dead sites.',
+    '                       crux     = Chrome UX Report, ranked by real page visits.',
+    '                                  Ordered high→low by CrUX popularity tier, with',
+    '                                  Tranco rank as within-tier tiebreaker. Excludes',
+    '                                  dead sites.',
     '                       verified = Tranco ranking, kept only if the site also',
     '                                  appears in CrUX (fine ordering + real visits)',
     '                       tranco   = raw Tranco DNS/traffic ranking',
     '                       file     = local list (requires --domains-file)',
-    '                       Tip: with crux, pick --limit at a tier boundary',
-    '                       (1000, 10000, …) to capture a whole tier.',
     '  --limit N            Number of domains to preload (default: 500)',
     '  --concurrency N      Parallel domain workers (default: 4)',
     '  --api-key KEY        API key for /api/v1/favicon',
@@ -343,6 +342,34 @@ async function fetchTrancoDomains(limit, timeoutMs, { filterServices, cruxSet = 
   return { listId, domains };
 }
 
+/**
+ * Fetch Tranco as a Map of registrable domain -> rank (1 = most popular). Used
+ * only as a within-tier tiebreaker to give CrUX a fine high→low ordering.
+ */
+async function fetchTrancoRankMap(count, timeoutMs, psl) {
+  const listId = await resolveTrancoListId(timeoutMs);
+  const rawLimit = Math.min(Math.max(count, 1), 1000000);
+  const csvUrl = `https://tranco-list.eu/download/${listId}/${rawLimit}`;
+  const res = await httpsRequest(csvUrl, { timeoutMs });
+  if (res.status !== 200) {
+    throw new Error(`Tranco download failed (${res.status}) for ${csvUrl}`);
+  }
+
+  const rankByDomain = new Map();
+  let rank = 0;
+  for (const line of res.body.toString('utf8').split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const comma = trimmed.indexOf(',');
+    rank += 1;
+    const host = normalizeHost(comma >= 0 ? trimmed.slice(comma + 1) : trimmed);
+    if (!host || !host.includes('.')) continue;
+    const domain = registrableDomain(host, psl);
+    if (domain && !rankByDomain.has(domain)) rankByDomain.set(domain, rank);
+  }
+  return { listId, rankByDomain };
+}
+
 /** Download and parse the Public Suffix List; returns null on failure. */
 async function loadPublicSuffixList(timeoutMs) {
   try {
@@ -369,8 +396,9 @@ async function loadPublicSuffixList(timeoutMs) {
  * source of ordered top-N results — hence it is used to verify Tranco's order.
  *
  * Returns:
- *   orderedDomains — registrable domains in file order (used for --source crux)
- *   domainSet      — set of registrable domains, for membership lookups
+ *   tierByDomain — Map of registrable domain -> best (smallest) CrUX rank tier,
+ *                  in first-seen file order. Its keys double as the membership
+ *                  set of every real, currently-visited site.
  */
 async function loadCrux(timeoutMs, psl) {
   const res = await httpsRequest(CRUX_LATEST_URL, { timeoutMs });
@@ -385,8 +413,7 @@ async function loadCrux(timeoutMs, psl) {
     throw new Error(`Could not decompress CrUX list: ${err.message || err}`);
   }
 
-  const orderedDomains = [];
-  const domainSet = new Set();
+  const tierByDomain = new Map();
   const lines = csv.split(/\r?\n/);
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i].trim();
@@ -395,18 +422,20 @@ async function loadCrux(timeoutMs, psl) {
     const origin = comma >= 0 ? line.slice(0, comma) : line;
     // CrUX CSV header is "origin,rank".
     if (i === 0 && origin.toLowerCase() === 'origin') continue;
+    const tier = comma >= 0 ? parseInt(line.slice(comma + 1), 10) : Number.MAX_SAFE_INTEGER;
     const host = normalizeHost(origin);
     if (!host || !host.includes('.')) continue;
     const domain = registrableDomain(host, psl);
     if (!domain || !domain.includes('.')) continue;
-    orderedDomains.push(domain);
-    domainSet.add(domain);
+    const existing = tierByDomain.get(domain);
+    // Keep the most popular tier seen for this registrable domain.
+    if (existing === undefined || tier < existing) tierByDomain.set(domain, tier);
   }
 
-  if (domainSet.size === 0) {
+  if (tierByDomain.size === 0) {
     throw new Error('CrUX list was empty.');
   }
-  return { orderedDomains, domainSet };
+  return { tierByDomain };
 }
 
 function loadDomainsFromFile(filePath, limit, filterServices, psl) {
@@ -545,27 +574,44 @@ async function main() {
     domains = tranco.domains;
     console.log(`Tranco list ${listId}: ${domains.length} domains`);
   } else if (source === 'crux') {
-    console.log(`Fetching top ${limit} most-visited sites from CrUX…`);
-    const { orderedDomains } = await loadCrux(timeoutMs, psl);
-    domains = applyFilters(orderedDomains, { filterServices, limit, psl });
-    listId = 'CrUX-current';
-    console.log(`CrUX list (${listId}): ${domains.length} domains`);
-    // CrUX ranks in magnitude tiers (1000/10K/100K/1M) and orders sites
-    // randomly within a tier. A limit that lands mid-tier therefore yields a
-    // random subset of that tier; a tier boundary captures the whole tier.
-    const CRUX_TIERS = [1000, 10000, 100000, 1000000];
-    if (!CRUX_TIERS.includes(limit)) {
-      const nextTier = CRUX_TIERS.find((t) => t >= limit) || limit;
-      console.log(
-        `Note: CrUX orders sites randomly within its ${nextTier} tier, so this ` +
-          `${limit}-site slice is a random subset. Use --limit ${nextTier} to get ` +
-          'the whole tier (all its most-visited sites).',
+    console.log('Fetching most-visited sites from CrUX (ordered high→low)…');
+    const { tierByDomain } = await loadCrux(timeoutMs, psl);
+    // CrUX only ranks in coarse tiers (1000/10K/100K/1M) with random order
+    // within a tier, so we use Tranco's fine rank as a within-tier tiebreaker.
+    const trancoCount = Math.min(Math.max(limit * 5, 50000), 1000000);
+    let trancoRank = new Map();
+    try {
+      ({ rankByDomain: trancoRank } = await fetchTrancoRankMap(trancoCount, timeoutMs, psl));
+    } catch (err) {
+      console.warn(
+        `Warning: Tranco tiebreaker unavailable (${err.message || err}); ` +
+          'order within a CrUX tier stays as-is.',
       );
     }
+
+    const entries = [];
+    for (const [domain, tier] of tierByDomain) {
+      if (filterServices && isServiceDomain(domain)) continue;
+      entries.push({ domain, tier, rank: trancoRank.get(domain) ?? Infinity });
+    }
+    // Sort by CrUX tier (popularity magnitude) then Tranco rank; Array.sort is
+    // stable, so equal-tier/equal-rank domains keep CrUX file order.
+    entries.sort((a, b) => {
+      if (a.tier !== b.tier) return a.tier - b.tier;
+      if (a.rank !== b.rank) return a.rank - b.rank;
+      return 0;
+    });
+    domains = entries.slice(0, limit).map((e) => e.domain);
+    listId = 'CrUX-current';
+    console.log(
+      `CrUX list (${listId}): ${domains.length} domains, ordered by popularity ` +
+        `tier then rank${trancoRank.size ? '' : ' (no tiebreaker)'}.`,
+    );
   } else {
     // verified: Tranco order, kept only if the site really appears in CrUX.
     console.log(`Fetching most-visited sites (Tranco order, verified via CrUX)…`);
-    const { domainSet } = await loadCrux(timeoutMs, psl);
+    const { tierByDomain } = await loadCrux(timeoutMs, psl);
+    const domainSet = new Set(tierByDomain.keys());
     const tranco = await fetchTrancoDomains(limit, timeoutMs, {
       filterServices,
       cruxSet: domainSet,
