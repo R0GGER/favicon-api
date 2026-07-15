@@ -66,7 +66,6 @@ const BLOCKED_FILE_EXTENSIONS = new Set([
   'lock',
   'log',
   'md',
-  'microsoft',
   'npmrc',
   'old',
   'optional',

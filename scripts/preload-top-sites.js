@@ -6,7 +6,9 @@
  *   1. Standard API  — GET /{domain}  (best-pick, same as the homepage API example)
  *   2. API v1        — GET /api/v1/favicon?url=https://{domain}
  *
- * Domains are fetched from the latest Tranco top-sites ranking by default.
+ * Domains come from the Chrome UX Report (CrUX) most-visited ranking by
+ * default (--source crux); Tranco and local files are also supported. Origins
+ * are deduplicated to their registrable domain via the Public Suffix List.
  *
  * Example:
  *   docker compose exec favicon-api node scripts/preload-top-sites.js --base-url http://127.0.0.1:3000
@@ -22,6 +24,10 @@ const TRANCO_LATEST_URL = 'https://tranco-list.eu/latest_list';
 // and dead sites do not appear — unlike Tranco's DNS/traffic-based ranking.
 const CRUX_LATEST_URL =
   'https://raw.githubusercontent.com/zakird/crux-top-lists/main/data/global/current.csv.gz';
+// Mozilla Public Suffix List — used to collapse origins to their registrable
+// domain (eTLD+1), e.g. pt.xhamster.com -> xhamster.com, form.kemkes.go.id ->
+// kemkes.go.id. Fetched at runtime to keep this script dependency-free.
+const PUBLIC_SUFFIX_LIST_URL = 'https://publicsuffix.org/list/public_suffix_list.dat';
 const USER_AGENT = 'FaviconProxy-preload/1.0';
 
 // Pure service/infrastructure domains that have no user-facing website or
@@ -79,28 +85,94 @@ function normalizeHost(raw) {
   return host || null;
 }
 
-/** Naive registrable domain (last two labels) — good enough for set lookups. */
+/** Naive registrable domain (last two labels) — fallback when no PSL is loaded. */
 function registrableGuess(host) {
   const parts = host.split('.');
   return parts.length <= 2 ? host : parts.slice(-2).join('.');
 }
 
+/** Parse a Public Suffix List .dat body into fast lookup sets. */
+function parsePublicSuffixList(text) {
+  const rules = new Set();
+  const wildcards = new Set(); // parent part of a "*.parent" rule
+  const exceptions = new Set(); // rule body of a "!rule"
+  for (const line of text.split(/\r?\n/)) {
+    const rule = line.trim();
+    if (!rule || rule.startsWith('//')) continue;
+    if (rule.startsWith('!')) {
+      exceptions.add(rule.slice(1).toLowerCase());
+    } else if (rule.startsWith('*.')) {
+      wildcards.add(rule.slice(2).toLowerCase());
+    } else {
+      rules.add(rule.toLowerCase());
+    }
+  }
+  return { rules, wildcards, exceptions };
+}
+
+/** Public suffix (eTLD) of a host per the PSL algorithm. */
+function publicSuffix(host, psl) {
+  const labels = host.split('.');
+  // Exception rules win outright: the suffix is the rule minus its first label.
+  for (let i = 0; i < labels.length; i += 1) {
+    if (psl.exceptions.has(labels.slice(i).join('.'))) {
+      return labels.slice(i + 1).join('.');
+    }
+  }
+  let bestLabelCount = null;
+  for (let i = 0; i < labels.length; i += 1) {
+    const candidateLabels = labels.length - i;
+    if (psl.rules.has(labels.slice(i).join('.'))) {
+      if (bestLabelCount === null || candidateLabels > bestLabelCount) {
+        bestLabelCount = candidateLabels;
+      }
+    }
+    const parent = labels.slice(i + 1).join('.');
+    if (parent && psl.wildcards.has(parent)) {
+      if (bestLabelCount === null || candidateLabels > bestLabelCount) {
+        bestLabelCount = candidateLabels;
+      }
+    }
+  }
+  // No rule matched: the default rule "*" makes the last label the suffix.
+  if (bestLabelCount === null) bestLabelCount = 1;
+  return labels.slice(labels.length - bestLabelCount).join('.');
+}
+
 /**
- * Dedupe, normalize, drop service domains, and cap to `limit`. When `cruxSet`
- * is provided, only domains present in the Chrome UX Report are kept (proves
- * the site gets real browser visits — excludes dead and infra-only domains).
+ * Registrable domain (eTLD+1). With a loaded PSL this correctly handles
+ * multi-level suffixes (co.uk, go.id, gov.co); without one it falls back to the
+ * last two labels.
  */
-function applyFilters(rawDomains, { filterServices, limit, cruxSet = null }) {
+function registrableDomain(host, psl) {
+  if (!host) return null;
+  if (!psl) return registrableGuess(host);
+  const suffix = publicSuffix(host, psl);
+  const suffixLabelCount = suffix ? suffix.split('.').length : 0;
+  const labels = host.split('.');
+  if (labels.length <= suffixLabelCount) return host; // host is itself a suffix
+  return labels.slice(labels.length - suffixLabelCount - 1).join('.');
+}
+
+/**
+ * Dedupe (collapsing to registrable domain), drop service domains, and cap to
+ * `limit`. When `cruxSet` is provided, only domains present in the Chrome UX
+ * Report are kept (proves real browser visits — excludes dead / infra-only
+ * domains). `psl` enables correct eTLD+1 deduplication.
+ */
+function applyFilters(rawDomains, { filterServices, limit, cruxSet = null, psl = null }) {
   const out = [];
   const seen = new Set();
   for (const raw of rawDomains) {
     const host = normalizeHost(raw);
     if (!host || !host.includes('.')) continue;
-    if (seen.has(host)) continue;
-    if (filterServices && isServiceDomain(host)) continue;
-    if (cruxSet && !cruxSet.has(host) && !cruxSet.has(registrableGuess(host))) continue;
-    seen.add(host);
-    out.push(host);
+    const domain = registrableDomain(host, psl);
+    if (!domain || !domain.includes('.')) continue;
+    if (seen.has(domain)) continue;
+    if (filterServices && isServiceDomain(domain)) continue;
+    if (cruxSet && !cruxSet.has(domain)) continue;
+    seen.add(domain);
+    out.push(domain);
     if (out.length >= limit) break;
   }
   return out;
@@ -128,7 +200,9 @@ function parseArgs(argv) {
 
 function usage(code = 0) {
   const msg = [
-    'Preload favicon caches for popular websites (Tranco top list).',
+    'Preload favicon caches for the most-visited websites (CrUX by default).',
+    'Origins are deduplicated to their registrable domain (eTLD+1) via the',
+    'Public Suffix List (e.g. pt.xhamster.com -> xhamster.com).',
     '',
     'Usage:',
     '  node scripts/preload-top-sites.js [options]',
@@ -242,7 +316,7 @@ async function resolveTrancoListId(timeoutMs) {
   return match[1];
 }
 
-async function fetchTrancoDomains(limit, timeoutMs, { filterServices, cruxSet = null }) {
+async function fetchTrancoDomains(limit, timeoutMs, { filterServices, cruxSet = null, psl = null }) {
   const listId = await resolveTrancoListId(timeoutMs);
   // Over-fetch so filtering (service drop + optional CrUX intersection) still
   // leaves at least `limit` domains.
@@ -262,11 +336,28 @@ async function fetchTrancoDomains(limit, timeoutMs, { filterServices, cruxSet = 
     raw.push(comma >= 0 ? trimmed.slice(comma + 1) : trimmed);
   }
 
-  const domains = applyFilters(raw, { filterServices, limit, cruxSet });
+  const domains = applyFilters(raw, { filterServices, limit, cruxSet, psl });
   if (domains.length === 0) {
     throw new Error('Tranco list was empty after filtering.');
   }
   return { listId, domains };
+}
+
+/** Download and parse the Public Suffix List; returns null on failure. */
+async function loadPublicSuffixList(timeoutMs) {
+  try {
+    const res = await httpsRequest(PUBLIC_SUFFIX_LIST_URL, { timeoutMs });
+    if (res.status !== 200) {
+      throw new Error(`HTTP ${res.status}`);
+    }
+    return parsePublicSuffixList(res.body.toString('utf8'));
+  } catch (err) {
+    console.warn(
+      `Warning: could not load Public Suffix List (${err.message || err}); ` +
+        'falling back to last-two-labels for domain deduplication.',
+    );
+    return null;
+  }
 }
 
 /**
@@ -278,10 +369,10 @@ async function fetchTrancoDomains(limit, timeoutMs, { filterServices, cruxSet = 
  * source of ordered top-N results — hence it is used to verify Tranco's order.
  *
  * Returns:
- *   orderedHosts — hosts in file order (used only for --source crux)
- *   hostSet      — every host + its registrable guess, for membership lookups
+ *   orderedDomains — registrable domains in file order (used for --source crux)
+ *   domainSet      — set of registrable domains, for membership lookups
  */
-async function loadCrux(timeoutMs) {
+async function loadCrux(timeoutMs, psl) {
   const res = await httpsRequest(CRUX_LATEST_URL, { timeoutMs });
   if (res.status !== 200) {
     throw new Error(`CrUX download failed (${res.status}) for ${CRUX_LATEST_URL}`);
@@ -294,8 +385,8 @@ async function loadCrux(timeoutMs) {
     throw new Error(`Could not decompress CrUX list: ${err.message || err}`);
   }
 
-  const orderedHosts = [];
-  const hostSet = new Set();
+  const orderedDomains = [];
+  const domainSet = new Set();
   const lines = csv.split(/\r?\n/);
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i].trim();
@@ -306,20 +397,21 @@ async function loadCrux(timeoutMs) {
     if (i === 0 && origin.toLowerCase() === 'origin') continue;
     const host = normalizeHost(origin);
     if (!host || !host.includes('.')) continue;
-    orderedHosts.push(host);
-    hostSet.add(host);
-    hostSet.add(registrableGuess(host));
+    const domain = registrableDomain(host, psl);
+    if (!domain || !domain.includes('.')) continue;
+    orderedDomains.push(domain);
+    domainSet.add(domain);
   }
 
-  if (hostSet.size === 0) {
+  if (domainSet.size === 0) {
     throw new Error('CrUX list was empty.');
   }
-  return { orderedHosts, hostSet };
+  return { orderedDomains, domainSet };
 }
 
-function loadDomainsFromFile(filePath, limit, filterServices) {
+function loadDomainsFromFile(filePath, limit, filterServices, psl) {
   const raw = fs.readFileSync(filePath, 'utf8').split(/\r?\n/);
-  const domains = applyFilters(raw, { filterServices, limit });
+  const domains = applyFilters(raw, { filterServices, limit, psl });
   if (domains.length === 0) {
     throw new Error(`No domains found in ${filePath}`);
   }
@@ -434,24 +526,28 @@ async function main() {
     );
   }
 
+  // Public Suffix List lets us dedupe origins to their registrable domain
+  // (eTLD+1) so pt.xhamster.com and xhamster.com collapse to one entry.
+  const psl = await loadPublicSuffixList(timeoutMs);
+
   let listId = null;
   let domains;
   if (source === 'file' || args['domains-file']) {
     if (!args['domains-file']) {
       throw new Error('--source file requires --domains-file PATH.');
     }
-    domains = loadDomainsFromFile(args['domains-file'], limit, filterServices);
+    domains = loadDomainsFromFile(args['domains-file'], limit, filterServices, psl);
     console.log(`Loaded ${domains.length} domains from ${args['domains-file']}`);
   } else if (source === 'tranco') {
     console.log(`Fetching top ${limit} domains from Tranco…`);
-    const tranco = await fetchTrancoDomains(limit, timeoutMs, { filterServices });
+    const tranco = await fetchTrancoDomains(limit, timeoutMs, { filterServices, psl });
     listId = tranco.listId;
     domains = tranco.domains;
     console.log(`Tranco list ${listId}: ${domains.length} domains`);
   } else if (source === 'crux') {
     console.log(`Fetching top ${limit} most-visited sites from CrUX…`);
-    const { orderedHosts } = await loadCrux(timeoutMs);
-    domains = applyFilters(orderedHosts, { filterServices, limit });
+    const { orderedDomains } = await loadCrux(timeoutMs, psl);
+    domains = applyFilters(orderedDomains, { filterServices, limit, psl });
     listId = 'CrUX-current';
     console.log(`CrUX list (${listId}): ${domains.length} domains`);
     // CrUX ranks in magnitude tiers (1000/10K/100K/1M) and orders sites
@@ -469,10 +565,11 @@ async function main() {
   } else {
     // verified: Tranco order, kept only if the site really appears in CrUX.
     console.log(`Fetching most-visited sites (Tranco order, verified via CrUX)…`);
-    const { hostSet } = await loadCrux(timeoutMs);
+    const { domainSet } = await loadCrux(timeoutMs, psl);
     const tranco = await fetchTrancoDomains(limit, timeoutMs, {
       filterServices,
-      cruxSet: hostSet,
+      cruxSet: domainSet,
+      psl,
     });
     listId = `${tranco.listId} (CrUX-verified)`;
     domains = tranco.domains;
