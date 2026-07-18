@@ -7,6 +7,7 @@ const SELFHST_INDEX_URL =
 const LOBEHUB_TOC_URL = 'https://unpkg.com/@lobehub/icons@latest/es/toc.json';
 const SVGL_INDEX_URL =
   'https://cdn.jsdelivr.net/gh/pheralb/svgl@main/src/data/svgs.ts';
+const THESVG_INDEX_URL = 'https://thesvg.org/api/registry.json';
 const METADATA_TTL_MS = 24 * 60 * 60 * 1000;
 const FUZZY_SIMILARITY_THRESHOLD = 0.8;
 const FUZZY_MIN_QUERY_LEN = 4;
@@ -26,6 +27,7 @@ let dashboardCache = { loadedAt: 0, aliasToSlug: null, slugs: null, entries: nul
 let selfhstCache = { loadedAt: 0, entries: null };
 let lobehubCache = { loadedAt: 0, aliasToSlug: null, slugs: null, entries: null };
 let svglCache = { loadedAt: 0, aliasToSlug: null, slugs: null, entries: null };
+let thesvgCache = { loadedAt: 0, aliasToSlug: null, slugs: null, entries: null };
 
 function normalizeServiceAliasKey(raw) {
   if (!raw || typeof raw !== 'string') return '';
@@ -298,6 +300,79 @@ async function ensureSvglIndex() {
   ensureSvglSyncIndex();
   if (!svglCache.loadedAt) svglCache.loadedAt = now;
   return svglCache;
+}
+
+// theSVG (thesvg.org) ships a static JSON manifest at /api/registry.json:
+//   { total, icons: [ { slug, title, aliases[], categories[], hex, url, variants[] } ] }
+// `variants` is a list of variant keys (default, mono, light, dark, wordmark, …);
+// each is served at https://thesvg.org/icons/{slug}/{variant}.svg. `default` is
+// always present and maps to the API's `color` variant.
+function buildThesvgAliasIndex(icons) {
+  const aliasToSlug = new Map();
+  const slugs = new Set();
+  const entries = new Map();
+
+  for (const item of icons || []) {
+    const slug = normalizeServiceAliasKey(item.slug);
+    if (!slug) continue;
+
+    slugs.add(slug);
+    aliasToSlug.set(slug, slug);
+    entries.set(slug, {
+      slug,
+      label: item.title || slug,
+      variants: Array.isArray(item.variants) ? item.variants : [],
+      url: item.url || '',
+    });
+
+    const titleKey = normalizeServiceAliasKey(item.title);
+    if (titleKey && !aliasToSlug.has(titleKey)) aliasToSlug.set(titleKey, slug);
+
+    for (const alias of item.aliases || []) {
+      const aliasKey = normalizeServiceAliasKey(alias);
+      if (aliasKey && !aliasToSlug.has(aliasKey)) aliasToSlug.set(aliasKey, slug);
+    }
+
+    const parts = slug.split('-');
+    if (parts.length > 1) {
+      const last = parts[parts.length - 1];
+      if (last.length >= 3 && !aliasToSlug.has(last)) aliasToSlug.set(last, slug);
+    }
+  }
+
+  return { aliasToSlug, slugs, entries, slugKeys: [...slugs] };
+}
+
+function ensureThesvgSyncIndex() {
+  if (!thesvgCache.aliasToSlug) {
+    thesvgCache = { loadedAt: 0, ...buildThesvgAliasIndex([]) };
+  }
+  return thesvgCache;
+}
+
+async function ensureThesvgIndex() {
+  const now = Date.now();
+  if (thesvgCache.aliasToSlug && now - thesvgCache.loadedAt < METADATA_TTL_MS) {
+    return thesvgCache;
+  }
+
+  try {
+    const res = await upstreamFetch(THESVG_INDEX_URL, {
+      headers: { 'User-Agent': 'FaviconProxy/1.0' },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const icons = Array.isArray(data) ? data : data?.icons || [];
+      thesvgCache = { loadedAt: now, ...buildThesvgAliasIndex(icons) };
+      return thesvgCache;
+    }
+  } catch {
+    /* use stale or empty fallback */
+  }
+
+  ensureThesvgSyncIndex();
+  if (!thesvgCache.loadedAt) thesvgCache.loadedAt = now;
+  return thesvgCache;
 }
 
 function collectDashboardCandidates(key, aliasToSlug, slugs) {
@@ -666,6 +741,71 @@ function searchSvglMatches(slug, index, limit = 8) {
   return matches.sort((a, b) => b.score - a.score).slice(0, limit);
 }
 
+function scoreThesvgSlug(slugKey, entry, queryKey) {
+  if (!slugKey || !queryKey) return 0;
+
+  let score = 0;
+  if (slugKey === queryKey) return 100;
+  if (slugKey.endsWith(`-${queryKey}`)) score = Math.max(score, 85);
+  if (slugKey.startsWith(`${queryKey}-`)) score = Math.max(score, 85);
+
+  const parts = slugKey.split('-');
+  for (let i = 0; i < parts.length; i++) {
+    const partScore = fuzzyPartScore(parts[i], queryKey);
+    if (partScore <= 0) continue;
+    score = Math.max(score, partScore + (i === parts.length - 1 ? 8 : 0));
+  }
+
+  const labelKey = normalizeServiceAliasKey(entry?.label);
+  if (labelKey === queryKey) score = Math.max(score, 90);
+  if (queryKey.length >= 3 && containsWordPart(labelKey, queryKey)) score = Math.max(score, 35);
+
+  return score;
+}
+
+function searchThesvgFuzzyMatches(queryKey, index, limit = 8) {
+  const { entries } = index;
+  if (!queryKey || !entries) return [];
+
+  return [...entries.values()]
+    .map((entry) => ({
+      slug: entry.slug,
+      label: entry.label || entry.slug,
+      score: scoreThesvgSlug(normalizeServiceAliasKey(entry.slug), entry, queryKey),
+    }))
+    .filter((match) => match.score > 0)
+    .sort((a, b) => b.score - a.score || a.slug.localeCompare(b.slug))
+    .slice(0, limit);
+}
+
+function searchThesvgMatches(slug, index, limit = 8) {
+  const queryKey = normalizeServiceAliasKey(slug);
+  if (!queryKey) return [];
+
+  const seen = new Set();
+  const matches = [];
+
+  function addMatch(candidate, score, label) {
+    if (!candidate || seen.has(candidate)) return;
+    seen.add(candidate);
+    const meta = index.entries?.get(candidate);
+    matches.push({
+      slug: candidate,
+      label: label || meta?.label || candidate,
+      score,
+    });
+  }
+
+  const resolved = index.aliasToSlug?.get(queryKey);
+  if (resolved) addMatch(resolved, 1000);
+
+  for (const match of searchThesvgFuzzyMatches(queryKey, index, limit)) {
+    addMatch(match.slug, match.score, match.label);
+  }
+
+  return matches.sort((a, b) => b.score - a.score).slice(0, limit);
+}
+
 function sortMatchesByScore(matches) {
   return [...matches].sort((a, b) => b.score - a.score || a.slug.localeCompare(b.slug));
 }
@@ -766,14 +906,31 @@ async function getSvglSlugCandidates(slug, { strict = false } = {}) {
   return searchSvglMatches(slug, index).map((match) => match.slug);
 }
 
+async function getThesvgSlugCandidates(slug, { strict = false } = {}) {
+  const index = await ensureThesvgIndex();
+
+  if (strict) {
+    const queryKey = normalizeServiceAliasKey(slug);
+    if (!queryKey) return [];
+    if (index.aliasToSlug?.has(queryKey)) {
+      const resolved = index.aliasToSlug.get(queryKey);
+      if (index.slugs?.has(resolved)) return [resolved];
+    }
+    return index.slugs?.has(queryKey) ? [queryKey] : [];
+  }
+
+  return searchThesvgMatches(slug, index).map((match) => match.slug);
+}
+
 async function getServiceSlugCandidates(slug) {
-  const [selfhst, dashboardicons, lobehub, svgl] = await Promise.all([
+  const [selfhst, dashboardicons, lobehub, svgl, thesvg] = await Promise.all([
     getSelfhstSlugCandidates(slug),
     getDashboardIconsSlugCandidates(slug),
     getLobehubSlugCandidates(slug),
     getSvglSlugCandidates(slug),
+    getThesvgSlugCandidates(slug),
   ]);
-  return [...new Set([...selfhst, ...dashboardicons, ...lobehub, ...svgl])];
+  return [...new Set([...selfhst, ...dashboardicons, ...lobehub, ...svgl, ...thesvg])];
 }
 
 async function resolveServiceSlug(slug) {
@@ -833,11 +990,12 @@ function getServiceSlugCandidatesSync(slug) {
 
 async function resolveServiceMatches(slug, { strict = false } = {}) {
   const input = normalizeServiceAliasKey(slug);
-  const [selfhstIndex, dashboardIndex, lobehubIndex, svglIndex] = await Promise.all([
+  const [selfhstIndex, dashboardIndex, lobehubIndex, svglIndex, thesvgIndex] = await Promise.all([
     ensureSelfhstIndex(),
     ensureDashboardIndex(),
     ensureLobehubIndex(),
     ensureSvglIndex(),
+    ensureThesvgIndex(),
   ]);
 
   // Strict mode (domain-derived slugs): only exact/alias matches, no fuzzy.
@@ -854,6 +1012,9 @@ async function resolveServiceMatches(slug, { strict = false } = {}) {
   const svglCandidates = strict
     ? (await getSvglSlugCandidates(input, { strict: true })).map((s) => ({ slug: s, label: s, score: 100 }))
     : searchSvglMatches(input, svglIndex);
+  const thesvgCandidates = strict
+    ? (await getThesvgSlugCandidates(input, { strict: true })).map((s) => ({ slug: s, label: s, score: 100 }))
+    : searchThesvgMatches(input, thesvgIndex);
   const allCandidates = [
     ...new Set([
       input,
@@ -861,6 +1022,7 @@ async function resolveServiceMatches(slug, { strict = false } = {}) {
       ...dashboardCandidates.map((match) => match.slug),
       ...lobehubCandidates.map((match) => match.slug),
       ...svglCandidates.map((match) => match.slug),
+      ...thesvgCandidates.map((match) => match.slug),
     ]),
   ];
 
@@ -870,7 +1032,8 @@ async function resolveServiceMatches(slug, { strict = false } = {}) {
       dashboardCandidates,
       selfhstCandidates,
       lobehubCandidates,
-      svglCandidates
+      svglCandidates,
+      thesvgCandidates
     ),
     candidates: allCandidates,
     providers: {
@@ -889,6 +1052,10 @@ async function resolveServiceMatches(slug, { strict = false } = {}) {
       svgl: {
         resolved: pickResolvedSlug(svglCandidates),
         candidates: svglCandidates,
+      },
+      thesvg: {
+        resolved: pickResolvedSlug(thesvgCandidates),
+        candidates: thesvgCandidates,
       },
     },
   };
@@ -920,6 +1087,31 @@ function getSvglVariantAvailability(slug) {
     color: true,
     light: !!(lightRoute && lightRoute !== colorRoute),
     dark: !!(darkRoute && darkRoute !== colorRoute),
+  };
+}
+
+function getThesvgEntrySync(slug) {
+  const queryKey = normalizeServiceAliasKey(slug);
+  if (!queryKey) return null;
+  const index = thesvgCache.entries?.size ? thesvgCache : ensureThesvgSyncIndex();
+  const resolved = index.aliasToSlug?.get(queryKey) || (index.slugs?.has(queryKey) ? queryKey : null);
+  if (!resolved) return null;
+  return index.entries?.get(resolved) || null;
+}
+
+// theSVG's `color` variant maps to whatever primary asset the icon ships
+// (`default` is always present, some icons also expose an explicit `color`).
+// `light`/`dark` are only advertised when theSVG actually ships those variants.
+function getThesvgVariantAvailability(slug) {
+  const entry = getThesvgEntrySync(slug);
+  if (!entry) return null;
+  const variants = entry.variants || [];
+  const hasColor = variants.includes('default') || variants.includes('color') || variants.length > 0;
+  if (!hasColor) return null;
+  return {
+    color: true,
+    light: variants.includes('light'),
+    dark: variants.includes('dark'),
   };
 }
 
@@ -955,6 +1147,17 @@ function resolveSvglSlugStrict(slug) {
   return index.slugs?.has(queryKey) ? queryKey : '';
 }
 
+function resolveThesvgSlugStrict(slug) {
+  const queryKey = normalizeServiceAliasKey(slug);
+  if (!queryKey) return '';
+  const index = thesvgCache.entries?.size ? thesvgCache : ensureThesvgSyncIndex();
+  if (index.aliasToSlug?.has(queryKey)) {
+    const resolved = index.aliasToSlug.get(queryKey);
+    if (index.slugs?.has(resolved)) return resolved;
+  }
+  return index.slugs?.has(queryKey) ? queryKey : '';
+}
+
 // Resolves a domain-derived slug to a provider catalog slug for the HTML
 // scraper's service-icon buckets. Domain labels are arbitrary brand names, so
 // resolution is strict (exact slug / curated alias only) — never a fuzzy match,
@@ -967,6 +1170,7 @@ function resolveServiceSlugForProviderSync(slug, provider) {
   if (provider === 'dashboardicons') return resolveServiceSlugSync(slug);
   if (provider === 'lobehub') return resolveLobehubSlugStrict(slug);
   if (provider === 'svgl') return resolveSvglSlugStrict(slug);
+  if (provider === 'thesvg') return resolveThesvgSlugStrict(slug);
   if (provider === 'selfhst') return resolveSelfhstSlugStrict(slug);
   return '';
 }
@@ -984,10 +1188,14 @@ module.exports = {
   getDashboardIconsSlugCandidates,
   getLobehubSlugCandidates,
   getSvglSlugCandidates,
+  getThesvgSlugCandidates,
   ensureDashboardIndex,
   ensureSelfhstIndex,
   ensureLobehubIndex,
   ensureSvglIndex,
+  ensureThesvgIndex,
   getSvglVariantAvailability,
   getSvglEntrySync,
+  getThesvgVariantAvailability,
+  getThesvgEntrySync,
 };

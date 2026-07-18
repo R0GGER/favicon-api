@@ -31,6 +31,7 @@ const {
   fetchDashboardIcons,
   fetchLobehub,
   fetchSvgl,
+  fetchThesvg,
   fetchScraper,
 } = require('./providers');
 const { fetchWithCache } = require('./bestPick');
@@ -165,6 +166,8 @@ async function fetchCandidate(provider, target, size) {
       return slug ? adaptVectorCatalog('lobehub', fetchLobehub, slug, strict, size) : null;
     case 'svgl':
       return slug ? adaptVectorCatalog('svgl', fetchSvgl, slug, strict, size) : null;
+    case 'thesvg':
+      return slug ? adaptVectorCatalog('thesvg', fetchThesvg, slug, strict, size) : null;
     default:
       return domain && RASTER_PROVIDERS[provider] ? adaptRaster(provider, domain) : null;
   }

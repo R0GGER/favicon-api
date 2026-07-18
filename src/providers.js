@@ -550,6 +550,12 @@ const PROVIDERS = {
     const route = svglRouteForVariant(entry, variant);
     return route ? svglAssetUrl(route) : '';
   },
+  thesvg: (service, variant = 'color', format = 'png') => {
+    const entry = getThesvgEntrySync(service);
+    if (!entry) return '';
+    const fileVariant = thesvgFileVariant(entry, variant);
+    return fileVariant ? thesvgAssetUrl(entry.slug, fileVariant) : '';
+  },
   faviconRun: (domain, size = 128) =>
     `https://favicon.run/favicon?domain=${encodeURIComponent(domain)}&sz=${size}`,
   twentyIcons: (domain, size = 128) =>
@@ -886,6 +892,8 @@ const {
   getLobehubSlugCandidates,
   getSvglSlugCandidates,
   getSvglEntrySync,
+  getThesvgSlugCandidates,
+  getThesvgEntrySync,
   ensureSelfhstIndex,
   ensureLobehubIndex,
   resolveServiceSlug,
@@ -894,6 +902,26 @@ const {
 } = require('./serviceAliases');
 
 const SVGL_ASSET_BASE = 'https://cdn.jsdelivr.net/gh/pheralb/svgl@main/static';
+
+const THESVG_ASSET_BASE = 'https://thesvg.org';
+
+function thesvgAssetUrl(slug, fileVariant) {
+  if (!slug || !fileVariant) return '';
+  return `${THESVG_ASSET_BASE}/icons/${encodeURIComponent(slug)}/${encodeURIComponent(fileVariant)}.svg`;
+}
+
+// Map the API's color|light|dark variant onto the actual theSVG file name. Every
+// icon ships `default` (primary brand color); some also expose `color`. light /
+// dark are only used when the icon lists them.
+function thesvgFileVariant(entry, variant) {
+  const variants = entry?.variants || [];
+  const has = (v) => variants.includes(v);
+  if (variant === 'light') return has('light') ? 'light' : null;
+  if (variant === 'dark') return has('dark') ? 'dark' : null;
+  if (has('default')) return 'default';
+  if (has('color')) return 'color';
+  return variants[0] || null;
+}
 
 function svglAssetUrl(routePath) {
   if (!routePath) return '';
@@ -1158,6 +1186,51 @@ async function fetchSvgl(service, variant = 'color', size = 128, { strict = fals
       }
 
       return { ...result, provider: 'svgl', service: slug, variant: v, size };
+    }
+  }
+  return null;
+}
+
+async function fetchThesvg(service, variant = 'color', size = 128, { strict = false, format = 'png' } = {}) {
+  const wantSvg = format === 'svg';
+  const candidates = await getThesvgSlugCandidates(service, { strict });
+  const variants = [variant];
+
+  for (const slug of candidates) {
+    const entry = getThesvgEntrySync(slug);
+    if (!entry) continue;
+    for (const v of variants) {
+      const fileVariant = thesvgFileVariant(entry, v);
+      if (!fileVariant) continue;
+      const url = thesvgAssetUrl(entry.slug, fileVariant);
+      const result = await fetchFavicon(url);
+      if (!result) continue;
+
+      const contentType = (result.contentType || '').toLowerCase();
+      const isSvg = contentType.includes('svg') || url.toLowerCase().endsWith('.svg');
+      if (isSvg && wantSvg) {
+        return {
+          ...result,
+          provider: 'thesvg',
+          service: slug,
+          variant: v,
+          format: 'svg',
+        };
+      }
+      if (isSvg) {
+        const buffer = await rasterizeSvgToSize(result.buffer, size);
+        return {
+          buffer,
+          contentType: 'image/png',
+          url: result.url,
+          provider: 'thesvg',
+          service: slug,
+          variant: v,
+          size,
+        };
+      }
+
+      return { ...result, provider: 'thesvg', service: slug, variant: v, size };
     }
   }
   return null;
@@ -1851,6 +1924,15 @@ function isGoogleProductSubdomain(domain) {
   return d.endsWith('.google.com') && d.split('.').filter(Boolean).length >= 3;
 }
 
+// Curated domainIconTags aliases for Google products hosted outside *.google.com
+// (e.g. gmail.com → gmail). These should use the same live workspace product
+// logo as mail.google.com, not a stale catalog PNG.
+function isGoogleWorkspaceIconAlias(domain) {
+  const tag = (iconTagForDomain(domain) || '').toLowerCase();
+  if (!tag) return false;
+  return tag === 'gmail' || tag === 'google' || tag.startsWith('google-');
+}
+
 // Ordered workspace product-page slugs to try for a Google product subdomain,
 // e.g. drive.google.com → ["drive", …]; mail.google.com → ["mail","gmail"].
 function googleWorkspaceProductSlugs(domain) {
@@ -1921,11 +2003,11 @@ async function fetchGoogleWorkspaceLogoCandidates(domain) {
 }
 
 // Returns Google product-logo candidates from the workspace marketing page, but
-// only when needed: the domain is a Google product subdomain AND its own HTML
-// did not already expose a matching product logo (meet/chat/calendar do, so they
-// skip the extra fetch).
+// only when needed: the domain is a Google product subdomain (or a curated
+// alias like gmail.com) AND its own HTML did not already expose a matching
+// product logo (meet/chat/calendar do, so they skip the extra fetch).
 async function googleWorkspaceLogoFallback(domain, primaryHtml) {
-  if (!isGoogleProductSubdomain(domain)) return [];
+  if (!isGoogleProductSubdomain(domain) && !isGoogleWorkspaceIconAlias(domain)) return [];
   if (primaryHtml && googleProductLogoCandidates(primaryHtml, domain).length > 0) return [];
   return fetchGoogleWorkspaceLogoCandidates(domain);
 }
@@ -2219,8 +2301,9 @@ const SCRAPER_CATALOG_ATTEMPTS = {
   selfhst: (slug) => fetchSelfhst(slug, 'color', { strict: true }),
   dashboardicons: (slug) => fetchDashboardIcons(slug, 'color', { strict: true }),
   svgl: (slug) => fetchSvgl(slug, 'color', 128, { strict: true }),
+  thesvg: (slug) => fetchThesvg(slug, 'color', 128, { strict: true }),
 };
-const SCRAPER_CATALOG_ORDER = ['selfhst', 'dashboardicons', 'svgl'];
+const SCRAPER_CATALOG_ORDER = ['selfhst', 'dashboardicons', 'svgl', 'thesvg'];
 
 async function fetchScraperCatalogFallback(domain) {
   const slug = serviceSlugFromDomain(domain);
@@ -2455,6 +2538,7 @@ module.exports = {
   fetchDashboardIcons,
   fetchLobehub,
   fetchSvgl,
+  fetchThesvg,
   fetchScraper,
   fetchScraperAsset,
   fetchScraperPage,
