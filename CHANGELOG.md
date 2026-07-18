@@ -5,6 +5,26 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.15.0] — 2026-07-19
+
+### Added
+
+- **theSVG provider** — new service-icon catalog backed by [theSVG](https://thesvg.org/) (6,400+ brand SVG icons; [CDN docs](https://github.com/GLINCKER/thesvg#cdn)). The catalog is loaded from `https://thesvg.org/api/registry.json` (24 h TTL) and SVG assets are fetched from `https://thesvg.org/icons/{slug}/{variant}.svg`. Canonical route: `/thesvg/{size}/{ext}/{service}[?variant=color|light|dark]`, short alias: `/ts/` (plus legacy `/ts/{service}[?size=][&variant=]`). Native raster sizes 64, 128, 256; SVG is the default format (`/thesvg/0/svg/{service}`). API `color` maps to theSVG's `default` variant; `light`/`dark` are advertised only when the icon ships those files. Included in `/services/resolve/:service` (`providers.thesvg`), `/{service}/json` and `/{domain}/json` (`endpoints.thesvg`), the best-pick race, scraper catalog fallback (`selfhst → dashboardicons → svgl → thesvg`), the v1 API source priority, `DEFAULT_PROVIDER=thesvg`, custom profiles, and the Web UI (new **theSVG** card).
+- **`UI_FAVICON_PROVIDERS` / `UI_APP_ICON_PROVIDERS`** — choose which homepage result cards are shown, with favicon providers and CDN icon catalogs as separate lists. Empty / unset = all. Exposed on `GET /providers` as `faviconProviders` and `appIconProviders`. The custom URL builder’s preferred/fallback dropdowns use the same lists. API routes are unchanged.
+- **Documentation — Caddy optimizations** — Proxy docs add a “Caddy optimizations” guide (compression, no global short `Cache-Control`, HTTP/3/UDP 443, keep-alive buffers, optional edge cache) and the minimal Caddy snippet no longer overrides immutable `/assets` and `/cdn/favicons` cache headers.
+
+### Changed
+
+- **Web UI — “App Icons” renamed to “CDN Icons”** — section divider (grid + table), checkbox label (“Also include CDN icon lookups”), homepage/SEO copy, and empty-state messaging now say CDN Icons. Env/API keys (`UI_INCLUDE_APP_ICONS`, `UI_APP_ICON_PROVIDERS`, `includeAppIcons`, `appIconProviders`) are unchanged.
+- **Web UI — shared site header across Home, API and Docs** — logo + **FaviconAPI** title sit in a left-aligned brand row with the top nav on the same line; the site-wide subtitle (“Get the highest resolution favicon…”) sits underneath. The homepage replaces the old centered providers line with a short intro (CDN catalogs, **14,000+** icons / **11,000+** unique with no overlap, still growing every day) plus a Tips box. `api.html` and `docs.html` use the same header layout; all three pages share a **1280px** content width.
+- **Preload script — DataForSEO only; CrUX and Tranco removed** — `scripts/preload-top-sites.js` now defaults to `--source dataforseo` and pulls domains exclusively from [DataForSEO's free "Top 1000 Websites By Ranking Keywords"](https://dataforseo.com/free-seo-stats/top-1000-websites) list (max ~1000). The `--source crux`, `--source verified`, and `--source tranco` options are gone; only `dataforseo` and `file` remain. `scripts/export-crux-top.js` is removed.
+- **Preload script — new `--location` option** — DataForSEO exposes per-country rankings, so `--location` accepts a country name or numeric DataForSEO location ID (e.g. `--location 0` / `Worldwide`, `--location Netherlands`, `--location "United States"`, `--location 2528`). Defaults to `Worldwide` (`0`).
+- **Preload script — warms all scraper sizes by default** — each domain now also hits `/scraper/{size}/{domain}` for **16, 32, 64, 128, 256, 512** (512 added; previously opt-in via `--sizes` and capped at 256). Override with `--sizes`, or skip with `--skip-sizes`.
+
+### Fixed
+
+- **HTML scraper — `gmail.com` (and other curated Google product aliases) now match `mail.google.com`** — `gmail.com` was mapped to the `gmail` catalog slug via `domainIconTags`, so the scraper served the selfh.st PNG instead of the live gstatic `productlogos` icon that `mail.google.com` gets from the workspace marketing page. `googleWorkspaceLogoFallback` now also runs for curated Google icon-tag aliases (`gmail`, `google`, `google-*`), so both hostnames resolve to the same current Gmail product logo.
+
 ## [2.14.0] — 2026-07-15
 
 ### Added
