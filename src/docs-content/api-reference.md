@@ -61,6 +61,7 @@ Unchanged: `/logodev/{size}/{domain}` (alias `/l/`). No `ext` segment.
 | `GET /dashboardicons/{size}/{format}/{service}` | [Dashboard Icons](https://github.com/homarr-labs/dashboard-icons) (alias `/di/`) |
 | `GET /lobehub/{size}/{format}/{service}` | [LobeHub icons](https://www.npmjs.com/package/@lobehub/icons-static-svg) (alias `/lb/`). Light/dark serve theme PNGs when available |
 | `GET /svgl/{size}/{format}/{service}` | [SVGL](https://github.com/pheralb/svgl) (alias `/sv/`). Default format is SVG (`/svgl/0/svg/{service}`) |
+| `GET /thesvg/{size}/{format}/{service}` | [theSVG](https://thesvg.org/) (alias `/ts/`). Default format is SVG (`/thesvg/0/svg/{service}`); CDN: `https://thesvg.org/icons/{slug}/{variant}.svg` |
 | `GET /services/resolve/{service}` | Resolve a search term to canonical slugs per catalog |
 | `GET /s-asset?url=...` | Server-side asset proxy for scraper-discovered icons. Cached, SSRF-guarded |
 | `GET /search?q={query}` | Browser search — redirects to `/?q={query}` |
@@ -84,6 +85,7 @@ https://your-host/google/64/png/github.com
 https://your-host/selfhst/128/png/jellyfin
 https://your-host/selfhst/0/svg/jellyfin
 https://your-host/svgl/0/svg/github
+https://your-host/thesvg/0/svg/github
 https://your-host/brandfetch/128/png/github.com
 https://your-host/github.com/json
 https://your-host/jellyfin/json
@@ -105,7 +107,7 @@ Returns proxy and upstream `source` URLs for every applicable provider.
 | `/{domain}/json` | Domain with a dot | `domain`, `endpoints` (website providers + catalog blocks) |
 | `/{app-name}/json` | Service name without a dot | `service`, `endpoints.best`, `endpoints.resolve`, catalog blocks |
 
-### Service-icon blocks (`selfhst`, `dashboardicons`, `lobehub`, `svgl`)
+### Service-icon blocks (`selfhst`, `dashboardicons`, `lobehub`, `svgl`, `thesvg`)
 
 Each block is empty (`service: null`, …) when that catalog has **no matching slug**.
 
@@ -114,6 +116,7 @@ Each block is empty (`service: null`, …) when that catalog has **no matching s
 - **selfh.st** and **dashboardicons** — color / light / dark after CDN probe (24 h cache)
 - **lobehub** — light/dark probed against `@lobehub/icons-static-png` theme assets
 - **svgl** — SVG listed as primary; top-level `png` entry for raster URLs
+- **thesvg** — SVG listed as primary (`default` → API `color`); light/dark when the icon ships those variants; top-level `png` entry for raster URLs
 
 Domain JSON derives catalog slugs via `resolveServiceMatches()` using the label from the domain (e.g. `reddit.com` → `reddit`).
 
@@ -138,6 +141,8 @@ Responses use **`Cache-Control: no-cache`**.
   "brandfetch": false,
   "defaultProvider": "scraper",
   "includeAppIcons": true,
+  "faviconProviders": ["scraper", "google", "ddg", "yandex", "faviconso", "vemetric", "favicondev", "faviconkit", "faviconrun", "twentyicons", "ryanjc", "logodev", "brandfetch"],
+  "appIconProviders": ["selfhst", "dashboardicons", "lobehub", "svgl", "thesvg"],
   "urlMode": "proxy",
   "upstreamIpv4": true,
   "api": {
@@ -149,7 +154,9 @@ Responses use **`Cache-Control: no-cache`**.
 ```
 
 - `urlMode` — mirrors `UI_CARD_URL` (`proxy` or `source`)
-- `includeAppIcons` — mirrors `UI_INCLUDE_APP_ICONS` (default checkbox state)
+- `includeAppIcons` — mirrors `UI_INCLUDE_APP_ICONS` (default “Also include CDN icon lookups” checkbox)
+- `faviconProviders` — mirrors `UI_FAVICON_PROVIDERS` (homepage favicon cards; empty env = all)
+- `appIconProviders` — mirrors `UI_APP_ICON_PROVIDERS` (homepage CDN icon cards; empty env = all)
 
 ## Response behavior
 

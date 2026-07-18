@@ -50,7 +50,7 @@ So I built it. FaviconAPI brings 10+ favicon providers and four service-icon cat
 2. **Races providers in parallel** on `/{domain}` (website favicons) and `/{app-name}` (service icons when the path has no dot).
 3. **Caches responses** in memory (LRU) and on disk to reduce upstream load and improve latency.
 4. **Normalizes icons** for the v1 JSON API into 128×128 PNG files served from a CDN route.
-5. **Looks up service icons** from the [selfh.st icons](https://github.com/selfhst/icons), [homarr dashboard-icons](https://github.com/homarr-labs/dashboard-icons), [LobeHub icons](https://www.npmjs.com/package/@lobehub/icons-static-svg), and [SVGL](https://github.com/pheralb/svgl) catalogs by service name.
+5. **Looks up service icons** from the [selfh.st icons](https://github.com/selfhst/icons), [homarr dashboard-icons](https://github.com/homarr-labs/dashboard-icons), [LobeHub icons](https://www.npmjs.com/package/@lobehub/icons-static-svg), [SVGL](https://github.com/pheralb/svgl), and [theSVG](https://thesvg.org/) catalogs by service name.
 6. **Generates custom profile URLs** that encode a preferred provider, fallbacks, and a minimum size directly in the path — no account or storage required.
 
 > Interactive API docs and a live playground are available at `/api` on a running instance.
@@ -72,10 +72,14 @@ Copy to `.env`, adjust the values, then start the stack:
 PORT=3000
 
 # --- Web UI (homepage) ---
-# When true (1/yes/on) or unset, the homepage checkbox "Also include app icon
+# When true (1/yes/on) or unset, the homepage checkbox "Also include CDN icon
 # lookups" is checked by default. Set to false (or 0/no/off) to leave it
 # unchecked. Default = true.
 UI_INCLUDE_APP_ICONS=true
+
+# Comma-separated favicon / CDN icon cards on the homepage (empty = all).
+# UI_FAVICON_PROVIDERS=scraper,google,ddg,yandex,faviconso,vemetric,favicondev,faviconkit,faviconrun,twentyicons,ryanjc,logodev,brandfetch
+# UI_APP_ICON_PROVIDERS=selfhst,dashboardicons,lobehub,svgl,thesvg
 
 # URL shown and copied in every favicon card (meta row + click on icon).
 # proxy = local proxy URL (default); source = upstream provider URL.
@@ -143,7 +147,7 @@ BRANDFETCH_CLIENT_ID=
 # If omitted, the built-in fallback order is used (scraper first). Default = scraper.
 # Valid values: scraper, google, googlev2, duckduckgo, yandex,
 #               faviconso, vemetric, favicondev, faviconkit, faviconrun, twentyicons, ryanjc, logodev,
-#               brandfetch, selfhst, dashboardicons, lobehub, svgl
+#               brandfetch, selfhst, dashboardicons, lobehub, svgl, thesvg
 # Note: logodev requires LOGODEV_TOKEN; brandfetch requires BRANDFETCH_CLIENT_ID.
 DEFAULT_PROVIDER=scraper
 
@@ -358,6 +362,7 @@ https://your-host/scraper/github.com
 https://your-host/google/64/png/github.com
 https://your-host/selfhst/128/png/jellyfin
 https://your-host/svgl/0/svg/github
+https://your-host/thesvg/0/svg/github
 ```
 
 Full endpoint list, JSON discovery, and caching headers: [API reference](api-reference.md).
@@ -396,14 +401,15 @@ Look up an icon by app/service name (e.g. `jellyfin`). All support `?variant=col
 | [Dashboard Icons](https://github.com/homarr-labs/dashboard-icons) | `/dashboardicons/{size}/{service}` | `/di/` |
 | [LobeHub icons](https://github.com/lobehub/lobe-icons)            | `/lobehub/{size}/{service}`        | `/lb/` |
 | [SVGL](https://github.com/pheralb/svgl)                           | `/svgl/{size}/{service}`           | `/sv/` |
+| [theSVG](https://thesvg.org/)                                     | `/thesvg/{size}/{service}`         | `/ts/` |
 
 
 ### Sizes
 
-- **128×128 is the site default** — the Web UI, service-icon catalogs, LobeHub, SVGL, and the API v1 CDN all standardize on **128** when no size is specified. It sits in the middle of the supported range: large enough to stay sharp on dashboards, bookmark tiles, and password-manager entries (including on retina displays when shown smaller), yet small enough to keep responses fast and cache-friendly. **128** is also a safe minimum icon size when you need a guaranteed baseline that most providers can satisfy without upscaling a tiny source into a blurry icon.
+- **128×128 is the site default** — the Web UI, service-icon catalogs, LobeHub, SVGL, theSVG, and the API v1 CDN all standardize on **128** when no size is specified. It sits in the middle of the supported range: large enough to stay sharp on dashboards, bookmark tiles, and password-manager entries (including on retina displays when shown smaller), yet small enough to keep responses fast and cache-friendly. **128** is also a safe minimum icon size when you need a guaranteed baseline that most providers can satisfy without upscaling a tiny source into a blurry icon.
 - **Resized server-side** providers and catalogs accept sizes **16, 32, 64, 128, 256**.
 - **Brandfetch** SVG routes use size **0** in the path; raster routes use native upstream sizes **16, 32, 64, 128, 256, 512** (via Brandfetch's `/h/{size}/w/{size}/icon.png` path).
-- **LobeHub** and **SVGL** use sizes **64, 128, 256** (default **128**).
+- **LobeHub**, **SVGL**, and **theSVG** use sizes **64, 128, 256** (default **128**).
 - A few resize-only domain providers (DuckDuckGo, Yandex, Favicon.so, Favicon Extractor) default their sizeless proxy URLs to **64** instead — their upstream icons are often small, and 64 avoids serving an upscaled, soft image when you omit the size segment.
 - Legacy short aliases also accept the original sizeless form (e.g. `/sh/{service}`, `/d/{domain}`).
 
@@ -578,7 +584,7 @@ The tables below cover the most-used variables. For the complete list — includ
 
 | Variable                   | Default                         | Description                                                                                                                                                                                                                                                                          |
 | -------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `DEFAULT_PROVIDER`         | `scraper`                       | Preferred provider for `/{domain}` (gets the head-start). Values: `scraper`, `google`, `googlev2`, `duckduckgo`, `yandex`, `faviconso`, `vemetric`, `favicondev`, `faviconkit`, `faviconrun`, `twentyicons`, `ryanjc`, `logodev`, `brandfetch`, `selfhst`, `dashboardicons`, `lobehub`, `svgl`. `logodev` requires `LOGODEV_TOKEN`; `brandfetch` requires `BRANDFETCH_CLIENT_ID`. |
+| `DEFAULT_PROVIDER`         | `scraper`                       | Preferred provider for `/{domain}` (gets the head-start). Values: `scraper`, `google`, `googlev2`, `duckduckgo`, `yandex`, `faviconso`, `vemetric`, `favicondev`, `faviconkit`, `faviconrun`, `twentyicons`, `ryanjc`, `logodev`, `brandfetch`, `selfhst`, `dashboardicons`, `lobehub`, `svgl`, `thesvg`. `logodev` requires `LOGODEV_TOKEN`; `brandfetch` requires `BRANDFETCH_CLIENT_ID`. |
 | `PICK_HEAD_START_MS`       | `150`                           | Head-start (ms) for `DEFAULT_PROVIDER` on `/{domain}` before other providers start.                                                                                                                                                                                                  |
 | `LOGODEV_TOKEN`            | *(unset)*                       | [logo.dev](https://www.logo.dev/) publishable key. Enables `/logodev/{size}/{domain}`; without it the route returns 503.                                                                                                                                                             |
 | `BRANDFETCH_CLIENT_ID`     | *(unset)*                       | [Brandfetch](https://docs.brandfetch.com/logo-api/overview) Logo API client ID. Enables `/brandfetch/{size}/{ext}/{domain}`; without it the route returns 503.                                                                                                                             |

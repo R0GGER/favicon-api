@@ -216,27 +216,30 @@ For each domain it calls:
 |---|---|---|
 | Standard API | `GET /{domain}` | Best-pick provider cache (memory + disk) — same as the homepage API example. Stored under `best_{domain}` at the winning provider's native/best resolution (scraper output is capped at `SCRAPER_MAX_ICON_SIZE`). |
 | API v1 | `GET /api/v1/favicon?url=https://{domain}` | Normalized 128×128 PNG under `API_CACHE_DIR`, served via `/cdn/favicons/{domain}.png` |
-| Extra sizes *(optional, `--sizes`)* | `GET /scraper/{size}/{domain}` | Resized scraper PNGs (`scraper_{size}_{domain}`) for each requested size — 16, 32, 64, 128, 256 |
+| Scraper sizes *(default)* | `GET /scraper/{size}/{domain}` | Resized scraper PNGs (`scraper_{size}_{domain}`) for **16, 32, 64, 128, 256, 512**. Override with `--sizes`, or skip with `--skip-sizes`. |
 
-By default only the standard best-pick and the 128×128 v1 PNG are cached. Other
-sizes are generated on demand when a client requests them; pass `--sizes` to
-warm them up front (see options below).
+By default each domain warms the standard best-pick, the 128×128 v1 PNG, **and**
+all six scraper sizes. That multiplies requests per domain — use `--skip-sizes`
+or a smaller `--sizes` list if you only need the best-pick / v1 caches.
 
 See [API v1](api-v1.md) for authentication and quota rules on the v1 endpoint.
 
 #### Domain source (`--source`)
 
-By default the script uses the **Chrome UX Report (CrUX)** most-visited ranking,
-which is based on real Chrome page visits — so pure infrastructure domains
-(CDN/DNS/tracking backends) and dead sites do not appear. Four sources are
-available via `--source`:
+By default the script uses
+[DataForSEO's free "Top 1000 Websites By Ranking Keywords"](https://dataforseo.com/free-seo-stats/top-1000-websites)
+list — sites ranked by how many keywords they rank for on Google (worldwide or
+per country). Two sources are available via `--source`:
 
 | Source | Ordering | Notes |
 |---|---|---|
-| `crux` *(default)* | High→low by CrUX popularity **tier**, with **Tranco rank as a within-tier tiebreaker** | CrUX only ranks in coarse magnitude tiers (1000/10K/100K/1M) with random order *within* a tier; the Tranco tiebreaker restores a fine high→low order (google, youtube, facebook, …). Downloaded from `crux-top-lists` (`current.csv.gz`, refreshed monthly). |
-| `verified` | Tranco rank order | [Tranco](https://tranco-list.eu/) ranking, kept **only** for domains that also appear in CrUX (proves real visits). |
-| `tranco` | Tranco rank order | Raw Tranco DNS/traffic ranking. |
+| `dataforseo` *(default)* | DataForSEO rank order | [DataForSEO](https://dataforseo.com/free-seo-stats/top-1000-websites) top-1000 (most Google organic keywords). Max ~1000 domains. |
 | `file` | File order | Local list via `--domains-file path/to/list.txt` (one domain per line). Implied when `--domains-file` is set. |
+
+The `dataforseo` source accepts `--location` to target a specific country
+(default: **Worldwide**, which is DataForSEO location ID `0`). Examples:
+`--location 0`, `--location Worldwide`, `--location Netherlands`,
+`--location "United States"`, or `--location 2528`.
 
 All sources apply two normalizations:
 
@@ -269,6 +272,14 @@ docker compose exec favicon-api node scripts/preload-top-sites.js \
 ```bash
 docker exec favicon-api node scripts/preload-top-sites.js \
   --base-url http://127.0.0.1:3000 --limit 500 --concurrency 2
+
+# Explicit worldwide ranking (same as the default; 0 = Worldwide)
+docker exec favicon-api node scripts/preload-top-sites.js \
+  --base-url http://127.0.0.1:3000 --limit 500 --concurrency 2 --location 0
+
+# Country ranking (name or numeric DataForSEO ID)
+docker exec favicon-api node scripts/preload-top-sites.js \
+  --base-url http://127.0.0.1:3000 --limit 500 --concurrency 2 --location Netherlands
 ```
 
 When `API_REQUIRE_KEY=true`, pass a key for the v1 calls:
@@ -298,13 +309,15 @@ docker exec favicon-api node scripts/preload-top-sites.js \
 | Option | Default | Description |
 |---|---|---|
 | `--base-url` | `http://127.0.0.1:3000` (inside container) | FaviconAPI base URL |
-| `--source` | `crux` | Domain source: `crux`, `verified`, `tranco`, or `file` (see above) |
-| `--limit` | `500` | Number of domains to preload |
+| `--source` | `dataforseo` | Domain source: `dataforseo` or `file` (see above) |
+| `--location` | `Worldwide` (`0`) | DataForSEO country — name or numeric ID (`0` / `Worldwide`, `Netherlands`, `"United States"`, `2528`, …) |
+| `--limit` | `500` | Number of domains to preload (max ~1000) |
 | `--concurrency` | `4` | Parallel domain workers — use **`2`** (or **`1`** on a small VPS) for scheduled runs |
 | `--api-key` | `PRELOAD_API_KEY` / `API_KEY` env | Bearer key for `/api/v1/favicon` |
 | `--domains-file` | — | Local domain list (one domain per line); sets `--source file` |
 | `--no-filter` | — | Keep known service/infra domains (CDN, DNS, tracking) instead of dropping them |
-| `--sizes` | — | Also warm extra icon sizes via `/scraper/{size}/{domain}`. Comma-separated (e.g. `16,32,64,128,256`); bare `--sizes` warms all five. Multiplies requests per domain. |
+| `--sizes` | `16,32,64,128,256,512` | Scraper sizes to warm via `/scraper/{size}/{domain}`. Pass a comma-separated subset to override. |
+| `--skip-sizes` | — | Skip scraper size warming |
 | `--skip-standard` | — | Skip `GET /{domain}` |
 | `--skip-v1` | — | Skip `/api/v1/favicon` |
 | `--timeout` | `30000` | Per-request timeout (ms) — use **`60000`** for weekly cron |
@@ -312,15 +325,14 @@ docker exec favicon-api node scripts/preload-top-sites.js \
 
 #### Expectations
 
-- **Duration.** The full top 500 typically takes **30–60 minutes**, depending on
-  concurrency, upstream latency, and scraper settings. Start with `--limit 50` to
-  validate before running the full list.
-- **Failures.** With the default `crux` source, most pure-infrastructure
-  domains (e.g. `gtld-servers.net`) are already excluded, so failure rates are
-  low. Any remaining domain with no usable favicon may still yield
-  `422 favicon_not_found` on API v1 while the standard API returns a fallback
-  icon — that is normal and does not stop the script. Use `--source tranco` to
-  see the higher failure rate of the raw DNS/traffic ranking.
+- **Duration.** The full top 500 with all six scraper sizes typically takes
+  longer than a best-pick/v1-only run (plan on roughly **1–2 hours**, depending
+  on concurrency, upstream latency, and scraper settings). Start with
+  `--limit 50` to validate before running the full list.
+- **Failures.** Service/infra domains (CDN, DNS, tracking) are filtered out by
+  default, so failure rates stay low. Any remaining domain with no usable
+  favicon may still yield `422 favicon_not_found` on API v1 while the standard
+  API returns a fallback icon — that is normal and does not stop the script.
 - **Load.** Each domain triggers upstream fetches on a cold cache. Run during
   off-peak hours or lower `--concurrency` if upstreams rate-limit you.
 - **Persistence.** Preloaded data is written to the same `CACHE_DIR` /
@@ -409,7 +421,7 @@ Do not disable the timeout or set it very high (e.g. several minutes) with
 - **Full path to `docker`** — cron's `PATH` is minimal; run `which docker` on the host.
 - **Container name** — match `docker ps` (e.g. `favicon-api` or `maflplus-favicon-api`).
 - **Logging** — redirect stdout/stderr to a log file; configure logrotate so it does not grow unbounded.
-- **Image version** — the script ships in the image from v2.8.10 onward (`scripts/preload-top-sites.js`). The CrUX default source, registrable-domain deduplication, and `--sizes` are available from v2.14.0.
+- **Image version** — the script ships in the image from v2.8.10 onward (`scripts/preload-top-sites.js`). Registrable-domain deduplication and `--sizes` are available from v2.14.0; DataForSEO as the sole ranking source (no CrUX/Tranco) lands in the release after v2.14.0.
 
 Weekly preload plus the [recommended `.env`](#recommended-env-for-weekly-preload)
 above keeps standard, scraper, and v1 caches warm through the week without daily
