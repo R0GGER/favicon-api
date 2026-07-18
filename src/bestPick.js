@@ -15,6 +15,7 @@ const {
   fetchDashboardIcons,
   fetchLobehub,
   fetchSvgl,
+  fetchThesvg,
   fetchScraper,
 } = require('./providers');
 const cache = require('./cache');
@@ -25,7 +26,7 @@ const { notFoundEntry } = require('./notFoundPlaceholder');
 const VALID_DEFAULT_PROVIDERS = new Set([
   'scraper', 'google', 'googlev2', 'duckduckgo', 'yandex',
   'faviconso', 'vemetric', 'favicondev', 'faviconkit', 'faviconrun', 'twentyicons', 'ryanjc',
-  'logodev', 'brandfetch', 'selfhst', 'dashboardicons', 'lobehub', 'svgl',
+  'logodev', 'brandfetch', 'selfhst', 'dashboardicons', 'lobehub', 'svgl', 'thesvg',
 ]);
 
 const DEFAULT_PROVIDER = (() => {
@@ -125,6 +126,10 @@ function buildFallbackFetchers(domain) {
       fetchWithCache('svgl', slug, '128_c_v2', () =>
         fetchSvgl(slug, 'color', 128, { strict: true })
       );
+    all.thesvg = () =>
+      fetchWithCache('thesvg', slug, '128_c_v2', () =>
+        fetchThesvg(slug, 'color', 128, { strict: true })
+      );
   }
 
   const defaultOrder = [
@@ -149,9 +154,11 @@ function buildServiceFetchers(service) {
       fetchWithCache('lobehub', service, '128_c_v2', () => fetchLobehub(service, 'color', 128)),
     svgl: () =>
       fetchWithCache('svgl', service, '128_c_v2', () => fetchSvgl(service, 'color', 128)),
+    thesvg: () =>
+      fetchWithCache('thesvg', service, '128_c_v2', () => fetchThesvg(service, 'color', 128)),
   };
 
-  const defaultOrder = ['selfhst', 'dashboardicons', 'svgl', 'lobehub'];
+  const defaultOrder = ['selfhst', 'dashboardicons', 'svgl', 'thesvg', 'lobehub'];
   if (DEFAULT_PROVIDER && all[DEFAULT_PROVIDER]) {
     const rest = defaultOrder.filter((k) => k !== DEFAULT_PROVIDER);
     return [DEFAULT_PROVIDER, ...rest].map((k) => all[k]);

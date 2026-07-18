@@ -36,6 +36,7 @@ const PROFILE_PROVIDERS = [
   'dashboardicons',
   'lobehub',
   'svgl',
+  'thesvg',
 ];
 
 const PROFILE_PROVIDER_SET = new Set(PROFILE_PROVIDERS);

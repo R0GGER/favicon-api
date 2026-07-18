@@ -14,13 +14,13 @@
  * Optional `source` pins which catalog serves the icon. When set, that catalog
  * is tried first and the remaining catalogs act as fallback (so a missing match
  * never drops the branded override). When omitted, the default order
- * (selfhst → dashboardicons → svgl) is used. Valid values: 'selfhst',
- * 'dashboardicons', 'svgl'; any other value is ignored and the default order
- * applies.
+ * (selfhst → dashboardicons → svgl → thesvg) is used. Valid values: 'selfhst',
+ * 'dashboardicons', 'svgl', 'thesvg'; any other value is ignored and the default
+ * order applies.
  * 
  * Optional: 
  * { domain: 'azure.microsoft.com', iconTag: 'microsoft-azure', source: 'selfhst' }
- * source: selfhst, dashboardicons, svgl, lobehub
+ * source: selfhst, dashboardicons, svgl, thesvg, lobehub
  *
  * Lookup runs before automatic rules in serviceSlugFromDomain.js.
  */
