@@ -6,9 +6,9 @@
  *   1. Standard API  — GET /{domain}  (best-pick, same as the homepage API example)
  *   2. API v1        — GET /api/v1/favicon?url=https://{domain}
  *
- * Domains come from the Chrome UX Report (CrUX) most-visited ranking by
- * default (--source crux); Tranco and local files are also supported. Origins
- * are deduplicated to their registrable domain via the Public Suffix List.
+ * Domains come from DataForSEO's free "Top 1000 Websites By Ranking Keywords"
+ * list by default (--source dataforseo); a local file is also supported.
+ * Origins are deduplicated to their registrable domain via the Public Suffix List.
  *
  * Example:
  *   docker compose exec favicon-api node scripts/preload-top-sites.js --base-url http://127.0.0.1:3000
@@ -16,14 +16,34 @@
 
 const fs = require('fs');
 const https = require('https');
-const zlib = require('zlib');
 
-const TRANCO_LATEST_URL = 'https://tranco-list.eu/latest_list';
-// Chrome UX Report top-million, cached monthly from Google BigQuery. Ranked by
-// real Chrome page visits, so pure infrastructure (CDN/DNS/tracking backends)
-// and dead sites do not appear — unlike Tranco's DNS/traffic-based ranking.
-const CRUX_LATEST_URL =
-  'https://raw.githubusercontent.com/zakird/crux-top-lists/main/data/global/current.csv.gz';
+// DataForSEO "Top 1000 Websites By Ranking Keywords" free tool. Backed by their
+// WordPress admin-ajax endpoint (action=dfs_ranked_domains), it returns a fine
+// 1..1000 ranking of the sites with the most Google organic keywords, worldwide
+// (location=0) or per country.
+// See https://dataforseo.com/free-seo-stats/top-1000-websites
+const DATAFORSEO_AJAX_URL = 'https://dataforseo.com/wp-admin/admin-ajax.php';
+// Country name -> DataForSEO location ID (0 = Worldwide). Mirrors the country
+// picker on the free-tool page. Used to translate a friendly --location name.
+const DATAFORSEO_LOCATIONS = {
+  Worldwide: 0, Algeria: 2012, Angola: 2024, Argentina: 2032, Armenia: 2051,
+  Australia: 2036, Austria: 2040, Bahrain: 2048, Bangladesh: 2050, Belgium: 2056,
+  Bolivia: 2068, Brazil: 2076, Bulgaria: 2100, Canada: 2124, Chile: 2152,
+  Colombia: 2170, 'Costa Rica': 2188, Croatia: 2191, Cyprus: 2196, Czechia: 2203,
+  Denmark: 2208, Ecuador: 2218, Egypt: 2818, 'El Salvador': 2222, Estonia: 2233,
+  Finland: 2246, France: 2250, Germany: 2276, Greece: 2300, Guatemala: 2320,
+  Hungary: 2348, India: 2356, Indonesia: 2360, Ireland: 2372, Israel: 2376,
+  Italy: 2380, Japan: 2392, Jordan: 2400, Kenya: 2404, Latvia: 2428,
+  Lithuania: 2440, Malaysia: 2458, Malta: 2470, Mexico: 2484, Morocco: 2504,
+  Netherlands: 2528, 'New Zealand': 2554, Nicaragua: 2558, Nigeria: 2566,
+  Norway: 2578, Pakistan: 2586, Paraguay: 2600, Peru: 2604, Poland: 2616,
+  Portugal: 2620, Romania: 2642, Russia: 2643, 'Saudi Arabia': 2682, Serbia: 2688,
+  Singapore: 2702, Slovakia: 2703, Slovenia: 2705, 'South Africa': 2710,
+  Spain: 2724, 'Sri Lanka': 2144, Sweden: 2752, Switzerland: 2756, Thailand: 2764,
+  Tunisia: 2788, Turkiye: 2792, Ukraine: 2804, 'United Arab Emirates': 2784,
+  'United Kingdom': 2826, 'United States': 2840, Uruguay: 2858, Venezuela: 2862,
+  Vietnam: 2704,
+};
 // Mozilla Public Suffix List — used to collapse origins to their registrable
 // domain (eTLD+1), e.g. pt.xhamster.com -> xhamster.com, form.kemkes.go.id ->
 // kemkes.go.id. Fetched at runtime to keep this script dependency-free.
@@ -156,11 +176,9 @@ function registrableDomain(host, psl) {
 
 /**
  * Dedupe (collapsing to registrable domain), drop service domains, and cap to
- * `limit`. When `cruxSet` is provided, only domains present in the Chrome UX
- * Report are kept (proves real browser visits — excludes dead / infra-only
- * domains). `psl` enables correct eTLD+1 deduplication.
+ * `limit`. `psl` enables correct eTLD+1 deduplication.
  */
-function applyFilters(rawDomains, { filterServices, limit, cruxSet = null, psl = null }) {
+function applyFilters(rawDomains, { filterServices, limit, psl = null }) {
   const out = [];
   const seen = new Set();
   for (const raw of rawDomains) {
@@ -170,7 +188,6 @@ function applyFilters(rawDomains, { filterServices, limit, cruxSet = null, psl =
     if (!domain || !domain.includes('.')) continue;
     if (seen.has(domain)) continue;
     if (filterServices && isServiceDomain(domain)) continue;
-    if (cruxSet && !cruxSet.has(domain)) continue;
     seen.add(domain);
     out.push(domain);
     if (out.length >= limit) break;
@@ -200,7 +217,7 @@ function parseArgs(argv) {
 
 function usage(code = 0) {
   const msg = [
-    'Preload favicon caches for the most-visited websites (CrUX by default).',
+    'Preload favicon caches for the most-visited websites (DataForSEO by default).',
     'Origins are deduplicated to their registrable domain (eTLD+1) via the',
     'Public Suffix List (e.g. pt.xhamster.com -> xhamster.com).',
     '',
@@ -210,24 +227,21 @@ function usage(code = 0) {
     'Options:',
     '  --base-url URL       FaviconAPI base URL',
     '                       (default: PRELOAD_BASE_URL or http://localhost:3100)',
-    '  --source NAME        Domain source: crux (default), verified, tranco, or file',
-    '                       crux     = Chrome UX Report, ranked by real page visits.',
-    '                                  Ordered high→low by CrUX popularity tier, with',
-    '                                  Tranco rank as within-tier tiebreaker. Excludes',
-    '                                  dead sites.',
-    '                       verified = Tranco ranking, kept only if the site also',
-    '                                  appears in CrUX (fine ordering + real visits)',
-    '                       tranco   = raw Tranco DNS/traffic ranking',
-    '                       file     = local list (requires --domains-file)',
-    '  --limit N            Number of domains to preload (default: 500)',
+    '  --source NAME        Domain source: dataforseo (default) or file',
+    '                       dataforseo = DataForSEO top-1000 keyword ranking',
+    '                       file       = local list (requires --domains-file)',
+    '  --location LOC       DataForSEO country: name or numeric ID (default: Worldwide).',
+    '                       E.g. --location Netherlands, --location "United States", 2528',
+    '  --limit N            Number of domains to preload (default: 500, max ~1000)',
     '  --concurrency N      Parallel domain workers (default: 4)',
     '  --api-key KEY        API key for /api/v1/favicon',
     '                       (or PRELOAD_API_KEY / API_KEY env var)',
     '  --domains-file PATH  Local domain list (one domain per line); sets --source file',
     '  --no-filter          Do NOT drop known service/infra domains (CDN, DNS, etc.)',
-    '  --sizes LIST         Also warm extra icon sizes via /scraper/{size}/{domain}.',
-    '                       Comma-separated; valid: 16,32,64,128,256. Bare --sizes',
-    '                       warms all five. Multiplies requests per domain.',
+    '  --sizes LIST         Scraper sizes to warm via /scraper/{size}/{domain}',
+    '                       (default: 16,32,64,128,256,512). Comma-separated subset',
+    '                       to override. Multiplies requests per domain.',
+    '  --skip-sizes         Skip scraper size warming',
     '  --skip-standard      Skip GET /{domain}',
     '  --skip-v1            Skip GET /api/v1/favicon',
     '  --timeout MS         Per-request timeout in ms (default: 30000)',
@@ -236,7 +250,7 @@ function usage(code = 0) {
     'Examples:',
     '  node scripts/preload-top-sites.js',
     '  node scripts/preload-top-sites.js --limit 1000',
-    '  node scripts/preload-top-sites.js --source tranco --limit 100',
+    '  node scripts/preload-top-sites.js --location Netherlands --limit 200',
     '  docker compose exec favicon-api node scripts/preload-top-sites.js --base-url http://127.0.0.1:3000',
     '',
   ].join('\n');
@@ -244,11 +258,18 @@ function usage(code = 0) {
   process.exit(code);
 }
 
-function httpsRequest(url, { method = 'GET', headers = {}, timeoutMs = 30000, maxRedirects = 5 } = {}) {
+function httpsRequest(
+  url,
+  { method = 'GET', headers = {}, timeoutMs = 30000, maxRedirects = 5, body = null } = {},
+) {
   return new Promise((resolve, reject) => {
+    const finalHeaders = { 'User-Agent': USER_AGENT, ...headers };
+    if (body != null && finalHeaders['Content-Length'] === undefined) {
+      finalHeaders['Content-Length'] = Buffer.byteLength(body);
+    }
     const req = https.request(
       url,
-      { method, headers: { 'User-Agent': USER_AGENT, ...headers }, timeout: timeoutMs },
+      { method, headers: finalHeaders, timeout: timeoutMs },
       (res) => {
         if (
           maxRedirects > 0 &&
@@ -258,6 +279,7 @@ function httpsRequest(url, { method = 'GET', headers = {}, timeoutMs = 30000, ma
         ) {
           const nextUrl = new URL(res.headers.location, url).href;
           res.resume();
+          // Follow redirects as GET without re-sending the body (per HTTP norms).
           httpsRequest(nextUrl, { method: 'GET', headers, timeoutMs, maxRedirects: maxRedirects - 1 })
             .then(resolve)
             .catch(reject);
@@ -277,6 +299,7 @@ function httpsRequest(url, { method = 'GET', headers = {}, timeoutMs = 30000, ma
     );
     req.on('timeout', () => req.destroy(new Error(`Timeout after ${timeoutMs}ms`)));
     req.on('error', reject);
+    if (body != null) req.write(body);
     req.end();
   });
 }
@@ -301,76 +324,81 @@ async function fetchWithTimeout(url, { timeoutMs, headers = {} }) {
   }
 }
 
-async function resolveTrancoListId(timeoutMs) {
-  const res = await httpsRequest(TRANCO_LATEST_URL, {
-    method: 'GET',
-    timeoutMs,
-    maxRedirects: 0,
-  });
-  const location = res.headers.location || res.headers.Location;
-  if (!location) {
-    throw new Error('Could not resolve latest Tranco list ID (missing redirect).');
+/**
+ * Resolve a raw --location value (numeric DataForSEO ID or country name) into
+ * `{ id, name }`. Defaults to Worldwide (0). Throws on an unknown country name.
+ */
+function resolveLocation(raw) {
+  if (raw === undefined || raw === null || raw === '' || raw === true) {
+    return { id: 0, name: 'Worldwide' };
   }
-  const match = String(location).match(/\/list\/([^/]+)/);
+  const str = String(raw).trim();
+  if (/^\d+$/.test(str)) {
+    const id = parseInt(str, 10);
+    const name = Object.keys(DATAFORSEO_LOCATIONS).find((k) => DATAFORSEO_LOCATIONS[k] === id);
+    return { id, name: name || `location ${id}` };
+  }
+  const key = str.toLowerCase();
+  const match = Object.keys(DATAFORSEO_LOCATIONS).find((k) => k.toLowerCase() === key);
   if (!match) {
-    throw new Error(`Unexpected Tranco redirect location: ${location}`);
+    throw new Error(
+      `Unknown --location "${str}". Use a numeric DataForSEO location ID or a ` +
+        'country name (e.g. "Netherlands", "United States", "Worldwide").',
+    );
   }
-  return match[1];
-}
-
-async function fetchTrancoDomains(limit, timeoutMs, { filterServices, cruxSet = null, psl = null }) {
-  const listId = await resolveTrancoListId(timeoutMs);
-  // Over-fetch so filtering (service drop + optional CrUX intersection) still
-  // leaves at least `limit` domains.
-  const factor = cruxSet ? 6 : filterServices ? 3 : 1;
-  const rawLimit = Math.min(Math.max(limit * factor, limit), 1000000);
-  const csvUrl = `https://tranco-list.eu/download/${listId}/${rawLimit}`;
-  const res = await httpsRequest(csvUrl, { timeoutMs });
-  if (res.status !== 200) {
-    throw new Error(`Tranco download failed (${res.status}) for ${csvUrl}`);
-  }
-
-  const raw = [];
-  for (const line of res.body.toString('utf8').split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    const comma = trimmed.indexOf(',');
-    raw.push(comma >= 0 ? trimmed.slice(comma + 1) : trimmed);
-  }
-
-  const domains = applyFilters(raw, { filterServices, limit, cruxSet, psl });
-  if (domains.length === 0) {
-    throw new Error('Tranco list was empty after filtering.');
-  }
-  return { listId, domains };
+  return { id: DATAFORSEO_LOCATIONS[match], name: match };
 }
 
 /**
- * Fetch Tranco as a Map of registrable domain -> rank (1 = most popular). Used
- * only as a within-tier tiebreaker to give CrUX a fine high→low ordering.
+ * Fetch the raw DataForSEO top-1000 ranking for a location as an array of
+ * `{ position, domain, count, etv }`, sorted by ascending rank (1 = top).
  */
-async function fetchTrancoRankMap(count, timeoutMs, psl) {
-  const listId = await resolveTrancoListId(timeoutMs);
-  const rawLimit = Math.min(Math.max(count, 1), 1000000);
-  const csvUrl = `https://tranco-list.eu/download/${listId}/${rawLimit}`;
-  const res = await httpsRequest(csvUrl, { timeoutMs });
+async function fetchDataForSeoRanked(locationId, timeoutMs) {
+  const body = `action=dfs_ranked_domains&location=${encodeURIComponent(locationId)}`;
+  const res = await httpsRequest(DATAFORSEO_AJAX_URL, {
+    method: 'POST',
+    timeoutMs,
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'X-Requested-With': 'XMLHttpRequest',
+      Accept: 'application/json',
+    },
+    body,
+  });
   if (res.status !== 200) {
-    throw new Error(`Tranco download failed (${res.status}) for ${csvUrl}`);
+    throw new Error(`DataForSEO request failed (HTTP ${res.status}).`);
   }
+  let json;
+  try {
+    json = JSON.parse(res.body.toString('utf8'));
+  } catch {
+    throw new Error('DataForSEO returned invalid JSON.');
+  }
+  if (!Array.isArray(json) || json.length === 0) {
+    throw new Error(
+      'DataForSEO returned no ranked domains (service may be temporarily unavailable).',
+    );
+  }
+  json.sort((a, b) => (a.position || 0) - (b.position || 0));
+  return json;
+}
 
-  const rankByDomain = new Map();
-  let rank = 0;
-  for (const line of res.body.toString('utf8').split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    const comma = trimmed.indexOf(',');
-    rank += 1;
-    const host = normalizeHost(comma >= 0 ? trimmed.slice(comma + 1) : trimmed);
-    if (!host || !host.includes('.')) continue;
-    const domain = registrableDomain(host, psl);
-    if (domain && !rankByDomain.has(domain)) rankByDomain.set(domain, rank);
+/**
+ * DataForSEO top-1000 as a domain list in rank order, after service-drop and
+ * eTLD+1 dedup.
+ */
+async function fetchDataForSeoDomains(
+  limit,
+  timeoutMs,
+  { filterServices, psl = null, locationId = 0 },
+) {
+  const ranked = await fetchDataForSeoRanked(locationId, timeoutMs);
+  const raw = ranked.map((r) => r.domain).filter(Boolean);
+  const domains = applyFilters(raw, { filterServices, limit, psl });
+  if (domains.length === 0) {
+    throw new Error('DataForSEO list was empty after filtering.');
   }
-  return { listId, rankByDomain };
+  return { domains };
 }
 
 /** Download and parse the Public Suffix List; returns null on failure. */
@@ -388,57 +416,6 @@ async function loadPublicSuffixList(timeoutMs) {
     );
     return null;
   }
-}
-
-/**
- * Download and decompress the CrUX top-million list.
- *
- * CrUX ranks sites in coarse popularity buckets (1000, 10000, …) rather than a
- * fine 1..N order, and does not sort within a bucket. That makes it a great
- * membership signal ("is this a real, currently-visited site?") but a poor
- * source of ordered top-N results — hence it is used to verify Tranco's order.
- *
- * Returns:
- *   tierByDomain — Map of registrable domain -> best (smallest) CrUX rank tier,
- *                  in first-seen file order. Its keys double as the membership
- *                  set of every real, currently-visited site.
- */
-async function loadCrux(timeoutMs, psl) {
-  const res = await httpsRequest(CRUX_LATEST_URL, { timeoutMs });
-  if (res.status !== 200) {
-    throw new Error(`CrUX download failed (${res.status}) for ${CRUX_LATEST_URL}`);
-  }
-
-  let csv;
-  try {
-    csv = zlib.gunzipSync(res.body).toString('utf8');
-  } catch (err) {
-    throw new Error(`Could not decompress CrUX list: ${err.message || err}`);
-  }
-
-  const tierByDomain = new Map();
-  const lines = csv.split(/\r?\n/);
-  for (let i = 0; i < lines.length; i += 1) {
-    const line = lines[i].trim();
-    if (!line) continue;
-    const comma = line.indexOf(',');
-    const origin = comma >= 0 ? line.slice(0, comma) : line;
-    // CrUX CSV header is "origin,rank".
-    if (i === 0 && origin.toLowerCase() === 'origin') continue;
-    const tier = comma >= 0 ? parseInt(line.slice(comma + 1), 10) : Number.MAX_SAFE_INTEGER;
-    const host = normalizeHost(origin);
-    if (!host || !host.includes('.')) continue;
-    const domain = registrableDomain(host, psl);
-    if (!domain || !domain.includes('.')) continue;
-    const existing = tierByDomain.get(domain);
-    // Keep the most popular tier seen for this registrable domain.
-    if (existing === undefined || tier < existing) tierByDomain.set(domain, tier);
-  }
-
-  if (tierByDomain.size === 0) {
-    throw new Error('CrUX list was empty.');
-  }
-  return { tierByDomain };
 }
 
 function loadDomainsFromFile(filePath, limit, filterServices, psl) {
@@ -562,39 +539,47 @@ async function main() {
   const apiKey = String(args['api-key'] || process.env.PRELOAD_API_KEY || process.env.API_KEY || '').trim();
   const skipStandard = !!args['skip-standard'];
   const skipV1 = !!args['skip-v1'];
+  const skipSizes = !!args['skip-sizes'];
   const dryRun = !!args['dry-run'];
   const filterServices = !args['no-filter'];
 
-  // Extra icon sizes to warm via the scraper's sized route (/scraper/{size}/{domain}).
-  const VALID_SIZES = [16, 32, 64, 128, 256];
-  const sizesArg = args.sizes === true ? String(VALID_SIZES.join(',')) : String(args.sizes || '');
-  const sizes = sizesArg
-    .split(',')
-    .map((s) => parseInt(s.trim(), 10))
-    .filter((n) => VALID_SIZES.includes(n));
-  if (sizesArg.trim() && sizes.length === 0) {
-    throw new Error(`Invalid --sizes; choose from ${VALID_SIZES.join(', ')}.`);
+  // Scraper sizes to warm via /scraper/{size}/{domain}. Default: all valid sizes.
+  const VALID_SIZES = [16, 32, 64, 128, 256, 512];
+  let sizes = [];
+  if (!skipSizes) {
+    const sizesArg =
+      args.sizes === undefined || args.sizes === true
+        ? String(VALID_SIZES.join(','))
+        : String(args.sizes || '');
+    sizes = sizesArg
+      .split(',')
+      .map((s) => parseInt(s.trim(), 10))
+      .filter((n) => VALID_SIZES.includes(n));
+    if (sizesArg.trim() && sizes.length === 0) {
+      throw new Error(`Invalid --sizes; choose from ${VALID_SIZES.join(', ')}.`);
+    }
   }
   const source = String(
-    args.source || (args['domains-file'] ? 'file' : 'crux'),
+    args.source || (args['domains-file'] ? 'file' : 'dataforseo'),
   ).toLowerCase();
 
   if (skipStandard && skipV1 && sizes.length === 0) {
     throw new Error(
-      'Nothing to do: both --skip-standard and --skip-v1 are set (and no --sizes).',
+      'Nothing to do: --skip-standard, --skip-v1, and --skip-sizes are all set.',
     );
   }
-  if (!['verified', 'crux', 'tranco', 'file'].includes(source)) {
+  if (!['dataforseo', 'file'].includes(source)) {
     throw new Error(
-      `Unknown --source "${source}" (expected: verified, crux, tranco, or file).`,
+      `Unknown --source "${source}" (expected: dataforseo or file).`,
     );
   }
+
+  const location = resolveLocation(args.location);
 
   // Public Suffix List lets us dedupe origins to their registrable domain
   // (eTLD+1) so pt.xhamster.com and xhamster.com collapse to one entry.
   const psl = await loadPublicSuffixList(timeoutMs);
 
-  let listId = null;
   let domains;
   if (source === 'file' || args['domains-file']) {
     if (!args['domains-file']) {
@@ -602,60 +587,15 @@ async function main() {
     }
     domains = loadDomainsFromFile(args['domains-file'], limit, filterServices, psl);
     console.log(`Loaded ${domains.length} domains from ${args['domains-file']}`);
-  } else if (source === 'tranco') {
-    console.log(`Fetching top ${limit} domains from Tranco…`);
-    const tranco = await fetchTrancoDomains(limit, timeoutMs, { filterServices, psl });
-    listId = tranco.listId;
-    domains = tranco.domains;
-    console.log(`Tranco list ${listId}: ${domains.length} domains`);
-  } else if (source === 'crux') {
-    console.log('Fetching most-visited sites from CrUX (ordered high→low)…');
-    const { tierByDomain } = await loadCrux(timeoutMs, psl);
-    // CrUX only ranks in coarse tiers (1000/10K/100K/1M) with random order
-    // within a tier, so we use Tranco's fine rank as a within-tier tiebreaker.
-    const trancoCount = Math.min(Math.max(limit * 5, 50000), 1000000);
-    let trancoRank = new Map();
-    try {
-      ({ rankByDomain: trancoRank } = await fetchTrancoRankMap(trancoCount, timeoutMs, psl));
-    } catch (err) {
-      console.warn(
-        `Warning: Tranco tiebreaker unavailable (${err.message || err}); ` +
-          'order within a CrUX tier stays as-is.',
-      );
-    }
-
-    const entries = [];
-    for (const [domain, tier] of tierByDomain) {
-      if (filterServices && isServiceDomain(domain)) continue;
-      entries.push({ domain, tier, rank: trancoRank.get(domain) ?? Infinity });
-    }
-    // Sort by CrUX tier (popularity magnitude) then Tranco rank; Array.sort is
-    // stable, so equal-tier/equal-rank domains keep CrUX file order.
-    entries.sort((a, b) => {
-      if (a.tier !== b.tier) return a.tier - b.tier;
-      if (a.rank !== b.rank) return a.rank - b.rank;
-      return 0;
-    });
-    domains = entries.slice(0, limit).map((e) => e.domain);
-    listId = 'CrUX-current';
-    console.log(
-      `CrUX list (${listId}): ${domains.length} domains, ordered by popularity ` +
-        `tier then rank${trancoRank.size ? '' : ' (no tiebreaker)'}.`,
-    );
   } else {
-    // verified: Tranco order, kept only if the site really appears in CrUX.
-    console.log(`Fetching most-visited sites (Tranco order, verified via CrUX)…`);
-    const { tierByDomain } = await loadCrux(timeoutMs, psl);
-    const domainSet = new Set(tierByDomain.keys());
-    const tranco = await fetchTrancoDomains(limit, timeoutMs, {
+    console.log(`Fetching top ${limit} domains from DataForSEO (${location.name})…`);
+    const dfs = await fetchDataForSeoDomains(limit, timeoutMs, {
       filterServices,
-      cruxSet: domainSet,
       psl,
+      locationId: location.id,
     });
-    listId = `${tranco.listId} (CrUX-verified)`;
-    domains = tranco.domains;
-    console.log(`Verified list ${listId}: ${domains.length} domains`);
-    console.log('Dead sites and service-only domains excluded (not in CrUX).');
+    domains = dfs.domains;
+    console.log(`DataForSEO list (DataForSEO ${location.name}): ${domains.length} domains`);
   }
   if (filterServices) {
     console.log('Service/infra domains (CDN, DNS, tracking) filtered out.');
