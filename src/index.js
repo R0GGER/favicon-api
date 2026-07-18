@@ -27,6 +27,7 @@ const {
   fetchDashboardIcons,
   fetchLobehub,
   fetchSvgl,
+  fetchThesvg,
   fetchScraper,
   fetchScraperAsset,
   fetchScraperAllIcons,
@@ -46,7 +47,9 @@ const {
   ensureSelfhstIndex,
   ensureLobehubIndex,
   ensureSvglIndex,
+  ensureThesvgIndex,
   getSvglVariantAvailability,
+  getThesvgVariantAvailability,
 } = require('./serviceAliases');
 const { serviceSlugFromDomain, listDomainIconTags } = require('./serviceSlugFromDomain');
 const {
@@ -85,6 +88,53 @@ const UI_INCLUDE_APP_ICONS = (() => {
   if (raw === '') return true;
   return !['false', '0', 'no', 'off'].includes(raw);
 })();
+
+// Homepage result cards: which favicon / CDN icon providers to show.
+// Empty / unset = all. Comma/space/semicolon-separated; unknown names ignored.
+const UI_FAVICON_PROVIDER_IDS = [
+  'scraper', 'google', 'ddg', 'yandex', 'faviconso', 'vemetric',
+  'favicondev', 'faviconkit', 'faviconrun', 'twentyicons', 'ryanjc',
+  'logodev', 'brandfetch',
+];
+const UI_APP_ICON_PROVIDER_IDS = [
+  'selfhst', 'dashboardicons', 'lobehub', 'svgl', 'thesvg',
+];
+const UI_PROVIDER_ALIASES = {
+  duckduckgo: 'ddg',
+  googlev2: 'google',
+  faviconextractor: 'favicondev',
+  'favicon-extractor': 'favicondev',
+  dashboardicon: 'dashboardicons',
+  'dashboard-icons': 'dashboardicons',
+};
+
+function parseUiProviderList(raw, allowed, aliases = {}) {
+  const allowedSet = new Set(allowed);
+  const text = String(raw ?? '').trim();
+  if (!text) return [...allowed];
+  const seen = new Set();
+  const out = [];
+  for (const part of text.split(/[,;\s]+/)) {
+    const key = part.trim().toLowerCase();
+    if (!key) continue;
+    const id = aliases[key] || key;
+    if (!allowedSet.has(id) || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+  }
+  return out;
+}
+
+const UI_FAVICON_PROVIDERS = parseUiProviderList(
+  process.env.UI_FAVICON_PROVIDERS,
+  UI_FAVICON_PROVIDER_IDS,
+  UI_PROVIDER_ALIASES
+);
+const UI_APP_ICON_PROVIDERS = parseUiProviderList(
+  process.env.UI_APP_ICON_PROVIDERS,
+  UI_APP_ICON_PROVIDER_IDS,
+  UI_PROVIDER_ALIASES
+);
 
 const UI_CARD_URL = (() => {
   const raw = String(process.env.UI_CARD_URL ?? '').trim().toLowerCase();
@@ -354,6 +404,7 @@ const VALID_SELFHST_VARIANTS = new Set(['color', 'light', 'dark']);
 const VALID_DASHBOARDICONS_VARIANTS = new Set(['color', 'light', 'dark']);
 const VALID_LOBEHUB_VARIANTS = new Set(['color', 'light', 'dark']);
 const VALID_SVGL_VARIANTS = new Set(['color', 'light', 'dark']);
+const VALID_THESVG_VARIANTS = new Set(['color', 'light', 'dark']);
 const VALID_CATALOG_FORMATS = new Set(['png', 'svg']);
 const VALID_FAVICONRUN_SIZES = new Set([16, 32, 64, 128, 256]);
 const FAVICONRUN_SIZES_ARRAY = [16, 32, 64, 128, 256];
@@ -363,8 +414,10 @@ const VALID_BRANDFETCH_SIZES = new Set([16, 32, 64, 128, 256, 512]);
 const BRANDFETCH_SIZES_ARRAY = [16, 32, 64, 128, 256, 512];
 const VALID_LOBEHUB_SIZES = new Set([64, 128, 256]);
 const VALID_SVGL_SIZES = new Set([64, 128, 256]);
+const VALID_THESVG_SIZES = new Set([64, 128, 256]);
 const DEFAULT_LOBEHUB_SIZE = 128;
 const DEFAULT_SVGL_SIZE = 128;
+const DEFAULT_THESVG_SIZE = 128;
 
 // Uniform proxy-URL scheme: baseurl/{provider}/{size}/{ext}/{domain}. Providers
 // without a native upstream size accept the path size segment and are resized
@@ -394,6 +447,7 @@ const FAVICONKIT_SIZES_ARRAY = [16, 32, 64, 128, 256];
 const VEMETRIC_SIZES_ARRAY = [16, 32, 64, 128, 256];
 const LOBEHUB_SIZES_ARRAY = [64, 128, 256];
 const SVGL_SIZES_ARRAY = [64, 128, 256];
+const THESVG_SIZES_ARRAY = [64, 128, 256];
 // Default size for each provider's top-level `proxy` URL. Native providers
 // default to 128; the resize-based domain providers default to 64 to avoid
 // upscaling their typically small source icons.
@@ -539,6 +593,12 @@ function svglCacheKey(variant, format, size) {
   return `${size}_${v}_png_v4`;
 }
 
+function thesvgCacheKey(variant, format, size) {
+  const v = variant === 'color' ? 'c' : variant;
+  if (format === 'svg') return `${v}_svg_v4`;
+  return `${size}_${v}_png_v4`;
+}
+
 // Canonical path extension for raster domain providers (output is always PNG).
 function resolvePngPathExtension(req) {
   if (req.params.ext != null && String(req.params.ext).trim() !== '') {
@@ -605,10 +665,16 @@ async function buildServiceCatalogEndpoints(
   selfhstServiceSlug,
   dashboardServiceSlug,
   lobehubServiceSlug,
-  svglServiceSlug
+  svglServiceSlug,
+  thesvgServiceSlug
 ) {
-  const [selfhstAvailability, dashboardAvailability, lobehubAvailability, svglAvailability] =
-    await Promise.all([
+  const [
+    selfhstAvailability,
+    dashboardAvailability,
+    lobehubAvailability,
+    svglAvailability,
+    thesvgAvailability,
+  ] = await Promise.all([
     selfhstServiceSlug
       ? getSelfhstVariantAvailability(selfhstServiceSlug)
       : Promise.resolve(null),
@@ -620,6 +686,9 @@ async function buildServiceCatalogEndpoints(
       : Promise.resolve(null),
     svglServiceSlug
       ? Promise.resolve(getSvglVariantAvailability(svglServiceSlug))
+      : Promise.resolve(null),
+    thesvgServiceSlug
+      ? Promise.resolve(getThesvgVariantAvailability(thesvgServiceSlug))
       : Promise.resolve(null),
   ]);
 
@@ -672,7 +741,19 @@ async function buildServiceCatalogEndpoints(
   );
   const svgl = svglBlock ? { ...svglBlock, query } : emptyCatalogProvider();
 
-  return { selfhst, dashboardicons, lobehub, svgl };
+  const thesvgBlock = buildCatalogBlock(
+    host,
+    'thesvg',
+    thesvgServiceSlug,
+    PROVIDERS.thesvg,
+    thesvgAvailability,
+    THESVG_SIZES_ARRAY,
+    DEFAULT_THESVG_SIZE,
+    'svg'
+  );
+  const thesvg = thesvgBlock ? { ...thesvgBlock, query } : emptyCatalogProvider();
+
+  return { selfhst, dashboardicons, lobehub, svgl, thesvg };
 }
 
 // Downscale an icon to `size` only when its source is larger. Upscaling a small
@@ -1651,6 +1732,80 @@ app.get('/sv/:service', async (req, res) => {
   }
 });
 
+// theSVG icons (service-name based). Native sizes 64, 128, 256.
+//   Canonical: /thesvg/:size/:ext/:service[?variant=color|light|dark]
+//   Legacy:    /thesvg/:size/:service, /ts/:size/:service, /ts/:service
+async function thesvgSizedHandler(req, res) {
+  const service = extractService(req.params.service);
+  if (!service) return res.status(400).json({ error: 'Invalid service name.' });
+
+  const formatResult = resolveCatalogFormat(req);
+  if (formatResult.error) return res.status(400).json({ error: formatResult.error });
+  const { format } = formatResult;
+
+  const size = parseInt(req.params.size, 10);
+  const sizeError = catalogRouteSizeError(size, format, VALID_THESVG_SIZES, '64, 128, or 256');
+  if (sizeError) return res.status(400).json({ error: sizeError });
+
+  const variant = (req.query.variant || 'color').toString().toLowerCase();
+  if (!VALID_THESVG_VARIANTS.has(variant)) {
+    return res.status(400).json({ error: 'Invalid variant. Use color, light, or dark.' });
+  }
+
+  const rasterSize = format === 'svg' ? DEFAULT_THESVG_SIZE : size;
+
+  try {
+    const cacheKey = thesvgCacheKey(variant, format, rasterSize);
+    const entry = await fetchWithCache(
+      'thesvg',
+      service,
+      cacheKey,
+      () => fetchThesvg(service, variant, rasterSize, { format })
+    );
+    if (!entry) return res.status(404).json({ error: 'Service icon not found.' });
+    sendFavicon(res, entry);
+  } catch (err) {
+    console.error('theSVG proxy error:', err.message);
+    res.status(500).json({ error: 'Internal error.' });
+  }
+}
+app.get(['/thesvg/:size/:ext/:service', '/ts/:size/:ext/:service'], thesvgSizedHandler);
+app.get(['/thesvg/:size/:service', '/ts/:size/:service'], thesvgSizedHandler);
+
+app.get('/ts/:service', async (req, res) => {
+  const service = extractService(req.params.service);
+  if (!service) return res.status(400).json({ error: 'Invalid service name.' });
+
+  const variant = (req.query.variant || 'color').toString().toLowerCase();
+  if (!VALID_THESVG_VARIANTS.has(variant)) {
+    return res.status(400).json({ error: 'Invalid variant. Use color, light, or dark.' });
+  }
+
+  const size = parseInt(req.query.size || String(DEFAULT_THESVG_SIZE), 10);
+  if (!VALID_THESVG_SIZES.has(size)) {
+    return res.status(400).json({ error: 'Invalid size. Use 64, 128, or 256.' });
+  }
+
+  const formatResult = resolveCatalogFormat(req);
+  if (formatResult.error) return res.status(400).json({ error: formatResult.error });
+  const { format } = formatResult;
+
+  try {
+    const cacheKey = thesvgCacheKey(variant, format, size);
+    const entry = await fetchWithCache(
+      'thesvg',
+      service,
+      cacheKey,
+      () => fetchThesvg(service, variant, size, { format })
+    );
+    if (!entry) return res.status(404).json({ error: 'Service icon not found.' });
+    sendFavicon(res, entry);
+  } catch (err) {
+    console.error('theSVG proxy error:', err.message);
+    res.status(500).json({ error: 'Internal error.' });
+  }
+});
+
 // Provider availability/config: /providers
 app.get('/providers', (req, res) => {
   res.set('Cache-Control', 'no-store');
@@ -1660,6 +1815,8 @@ app.get('/providers', (req, res) => {
     brandfetch: !!process.env.BRANDFETCH_CLIENT_ID,
     defaultProvider: (process.env.DEFAULT_PROVIDER || '').trim().toLowerCase() || null,
     includeAppIcons: UI_INCLUDE_APP_ICONS,
+    faviconProviders: UI_FAVICON_PROVIDERS,
+    appIconProviders: UI_APP_ICON_PROVIDERS,
     urlMode: UI_CARD_URL,
     docsEnabled: UI_ENABLE_DOCS,
     scraperMaxIconSize: getScraperMaxIconSize(),
@@ -1685,13 +1842,14 @@ app.get('/:domain/json', async (req, res) => {
 
     try {
       const matches = await resolveServiceMatches(service);
-      const { selfhst, dashboardicons, lobehub, svgl } = await buildServiceCatalogEndpoints(
+      const { selfhst, dashboardicons, lobehub, svgl, thesvg } = await buildServiceCatalogEndpoints(
         host,
         service,
         matches.providers.selfhst.resolved,
         matches.providers.dashboardicons.resolved,
         matches.providers.lobehub.resolved,
-        matches.providers.svgl.resolved
+        matches.providers.svgl.resolved,
+        matches.providers.thesvg.resolved
       );
 
       res.set('Cache-Control', JSON_CACHE_CONTROL);
@@ -1710,6 +1868,7 @@ app.get('/:domain/json', async (req, res) => {
           dashboardicons,
           lobehub,
           svgl,
+          thesvg,
         },
       });
     } catch (err) {
@@ -1727,6 +1886,7 @@ app.get('/:domain/json', async (req, res) => {
     ensureSelfhstIndex(),
     ensureLobehubIndex(),
     ensureSvglIndex(),
+    ensureThesvgIndex(),
   ]);
 
   // www-fallback: when scraper finds no icons for a bare domain, try www.domain.
@@ -1819,6 +1979,7 @@ app.get('/:domain/json', async (req, res) => {
   let dashboardServiceSlug = null;
   let lobehubServiceSlug = null;
   let svglServiceSlug = null;
+  let thesvgServiceSlug = null;
   if (serviceSlug) {
     // serviceSlug comes from the domain label (not a user-typed query), so
     // resolve it strictly to avoid advertising fuzzily-matched, unrelated
@@ -1828,15 +1989,17 @@ app.get('/:domain/json', async (req, res) => {
     dashboardServiceSlug = matches.providers.dashboardicons.resolved;
     lobehubServiceSlug = matches.providers.lobehub.resolved;
     svglServiceSlug = matches.providers.svgl.resolved;
+    thesvgServiceSlug = matches.providers.thesvg.resolved;
   }
 
-  const { selfhst, dashboardicons, lobehub, svgl } = await buildServiceCatalogEndpoints(
+  const { selfhst, dashboardicons, lobehub, svgl, thesvg } = await buildServiceCatalogEndpoints(
     host,
     serviceSlug,
     selfhstServiceSlug,
     dashboardServiceSlug,
     lobehubServiceSlug,
-    svglServiceSlug
+    svglServiceSlug,
+    thesvgServiceSlug
   );
 
   res.set('Cache-Control', JSON_CACHE_CONTROL);
@@ -1942,6 +2105,7 @@ app.get('/:domain/json', async (req, res) => {
       dashboardicons,
       lobehub,
       svgl,
+      thesvg,
     },
   });
 });
