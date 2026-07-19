@@ -2392,6 +2392,10 @@
       .nav-mobile-only:not([hidden]) { display: inline-flex !important; }
     }
 
+    @media (max-width: 1180px) {
+      .tip { display: none !important; }
+    }
+
     .top-nav-btn {
       color: #5b2e7e;
       background: transparent;
@@ -2607,13 +2611,21 @@
       .results.visible.view-grid { grid-template-columns: minmax(0, 1fr); }
       .site-logo { width: 34px; height: 34px; }
       .site-brand h1 { font-size: 1.55rem; }
-      .site-header-top {
-        flex-wrap: wrap;
-        gap: 0.65rem 1rem;
+      .site-header {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
       }
+      .site-header-top {
+        display: contents;
+      }
+      .site-brand { order: 1; }
+      .subtitle { order: 2; }
       .top-nav {
+        order: 3;
         gap: 0.85rem;
       }
+      .intro { display: none !important; }
 
       .top-nav-btn {
         display: none;
@@ -2630,9 +2642,6 @@
       #profile-builder-btn {
         display: none !important;
       }
-
-      /* Hide Tip box on mobile */
-      .tip { display: none !important; }
 
       /* Make the API Endpoint button responsive: allow URL to wrap */
       .json-button-wrap { text-align: left; }
