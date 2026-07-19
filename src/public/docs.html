@@ -105,6 +105,40 @@
     .nav-desktop-only { display: inline-flex; }
     .nav-mobile-only { display: none !important; }
 
+    .nav-hamburger {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      width: 40px;
+      height: 40px;
+      margin: 0;
+      padding: 0;
+      border: 1px solid #d9c2e6;
+      border-radius: 8px;
+      background: #fff;
+      color: #5b2e7e;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: color 0.15s, background 0.15s, border-color 0.15s;
+    }
+
+    .nav-hamburger:hover {
+      color: #7b3fa8;
+      background: rgba(91, 46, 126, 0.06);
+      border-color: #c4a8d8;
+    }
+
+    .nav-hamburger svg {
+      display: block;
+      width: 20px;
+      height: 20px;
+      fill: currentColor;
+    }
+
+    .nav-hamburger .icon-close { display: none; }
+    .nav-hamburger[aria-expanded="true"] .icon-menu { display: none; }
+    .nav-hamburger[aria-expanded="true"] .icon-close { display: block; }
+
     .top-nav-about {
       color: #5b2e7e;
       background: none;
@@ -1252,15 +1286,53 @@
       .site-logo { width: 34px; height: 34px; }
       .site-brand h1 { font-size: 1.55rem; }
       .site-header-top {
-        flex-wrap: wrap;
-        gap: 0.65rem 1rem;
+        position: relative;
+        z-index: 50;
+        margin-bottom: 0;
+      }
+      .nav-hamburger {
+        display: inline-flex;
       }
       .top-nav {
-        gap: 0.85rem;
-      }
-
-      .top-nav-btn {
         display: none;
+        position: absolute;
+        top: calc(100% + 0.4rem);
+        right: 0;
+        left: auto;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.15rem;
+        min-width: 12rem;
+        padding: 0.4rem;
+        background: #fff;
+        border: 1px solid #ece6de;
+        border-radius: 10px;
+        box-shadow: 0 12px 32px rgba(45, 42, 38, 0.16);
+      }
+      .top-nav.is-open {
+        display: flex;
+      }
+      .top-nav a:not(.nav-desktop-only),
+      .top-nav .top-nav-about {
+        display: flex !important;
+        width: 100%;
+        justify-content: flex-start;
+        gap: 0.5rem;
+        padding: 0.7rem 0.85rem;
+        border-radius: 7px;
+        border: none;
+        background: transparent;
+        box-sizing: border-box;
+        text-decoration: none;
+      }
+      .top-nav a:not(.nav-desktop-only):hover,
+      .top-nav .top-nav-about:hover {
+        background: rgba(91, 46, 126, 0.06);
+        text-decoration: none;
+      }
+      .top-nav .top-nav-btn,
+      .top-nav a[href="/api"] {
+        display: none !important;
       }
 
       .docs-main { padding: 1.25rem 1rem; }
@@ -1553,7 +1625,11 @@
         <img src="/logo.svg" alt="" class="site-logo">
         <h1>FaviconAPI</h1>
       </a>
-      <nav class="top-nav">
+      <button type="button" class="nav-hamburger" id="nav-hamburger" aria-label="Open menu" aria-expanded="false" aria-controls="top-nav" onclick="toggleMobileNav()">
+        <svg class="icon-menu" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0 4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0 4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5z"/></svg>
+        <svg class="icon-close" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.646 3.646a.5.5 0 0 1 .708 0L8 7.293l3.646-3.647a.5.5 0 0 1 .708.708L8.707 8l3.647 3.646a.5.5 0 0 1-.708.708L8 8.707l-3.646 3.647a.5.5 0 0 1-.708-.708L7.293 8 3.646 4.354a.5.5 0 0 1 0-.708z"/></svg>
+      </button>
+      <nav class="top-nav" id="top-nav">
         <button type="button" class="top-nav-btn" id="tools-offcanvas-btn" onclick="openToolsOffcanvas()" aria-expanded="false" aria-controls="tools-offcanvas"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 2.5A1.5 1.5 0 012.5 1h3A1.5 1.5 0 017 2.5v3A1.5 1.5 0 015.5 7h-3A1.5 1.5 0 011 5.5v-3zM2.5 2a.5.5 0 00-.5.5v3a.5.5 0 00.5.5h3a.5.5 0 00.5-.5v-3a.5.5 0 00-.5-.5h-3zm6.5.5A1.5 1.5 0 0110.5 1h3A1.5 1.5 0 0115 2.5v3A1.5 1.5 0 0113.5 7h-3A1.5 1.5 0 019 5.5v-3zm1.5-.5a.5.5 0 00-.5.5v3a.5.5 0 00.5.5h3a.5.5 0 00.5-.5v-3a.5.5 0 00-.5-.5h-3zM1 10.5A1.5 1.5 0 012.5 9h3A1.5 1.5 0 017 10.5v3A1.5 1.5 0 015.5 15h-3A1.5 1.5 0 011 13.5v-3zm1.5-.5a.5.5 0 00-.5.5v3a.5.5 0 00.5.5h3a.5.5 0 00.5-.5v-3a.5.5 0 00-.5-.5h-3zm6.5.5A1.5 1.5 0 0110.5 9h3a1.5 1.5 0 011.5 1.5v3a1.5 1.5 0 01-1.5 1.5h-3A1.5 1.5 0 019 13.5v-3zm1.5-.5a.5.5 0 00-.5.5v3a.5.5 0 00.5.5h3a.5.5 0 00.5-.5v-3a.5.5 0 00-.5-.5h-3z"/></svg>Tools</button>
         <a href="/"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.5 14.5v-3.505c0-.245.25-.495.5-.495h2c.25 0 .5.25.5.5v3.5a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.146-.354L13 5.793V2.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.293L8.354 1.146a.5.5 0 0 0-.708 0l-6 6A.5.5 0 0 0 1.5 7.5v7a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5z"/></svg>Home</a>
         <a href="/api"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.854 4.854a.5.5 0 1 0-.708-.708l-3.5 3.5a.5.5 0 0 0 0 .708l3.5 3.5a.5.5 0 0 0 .708-.708L2.707 8l3.147-3.146zm4.292 0a.5.5 0 0 1 .708-.708l3.5 3.5a.5.5 0 0 1 0 .708l-3.5 3.5a.5.5 0 0 1-.708-.708L13.293 8l-3.147-3.146z"/></svg>API</a>
@@ -1646,6 +1722,34 @@
       }
     }
 
+    function setMobileNavOpen(open) {
+      const btn = document.getElementById('nav-hamburger');
+      const nav = document.getElementById('top-nav');
+      if (!btn || !nav) return;
+      nav.classList.toggle('is-open', open);
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      btn.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    function toggleMobileNav() {
+      const nav = document.getElementById('top-nav');
+      setMobileNavOpen(!nav?.classList.contains('is-open'));
+    }
+
+    function closeMobileNav() {
+      setMobileNavOpen(false);
+    }
+
+    document.addEventListener('click', (e) => {
+      const headerTop = document.querySelector('.site-header-top');
+      if (!headerTop || headerTop.contains(e.target)) return;
+      closeMobileNav();
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeMobileNav();
+    });
+
     function setupCodeCopyButtons(root) {
       (root || document).querySelectorAll('pre').forEach((pre) => {
         if (pre.closest('.code-block')) return;
@@ -1690,6 +1794,7 @@
     }
 
     function openAboutModal() {
+      closeMobileNav();
       closeToolsOffcanvas();
       const modal = document.getElementById('about-modal');
       if (!modal) return;
@@ -1747,6 +1852,7 @@
     function openSearchModal() { toggleToolDetails('search', { forceOpen: true }); }
 
     function openToolsOffcanvas() {
+      closeMobileNav();
       const panel = document.getElementById('tools-offcanvas');
       const btn = document.getElementById('tools-offcanvas-btn');
       if (!panel) return;
