@@ -5,6 +5,12 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.15.1] — 2026-07-19
+
+### Changed
+
+- **Web UI — smartphone header and navigation** — on screens ≤700px the top nav collapses into a hamburger menu in the top-right (Home + About only; Tools and API are hidden). The homepage also hides the long intro paragraph on smartphones and places the site subtitle under the logo row. The Tips box is hidden on screens ≤1180px. Same hamburger behaviour on Home, API and Docs.
+
 ## [2.15.0] — 2026-07-19
 
 ### Added
