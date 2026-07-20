@@ -5,6 +5,13 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.15.4] — 2026-07-20
+
+### Fixed
+
+- **`/scraper/512/…` returned a 128×128 PNG when `SCRAPER_MAX_ICON_SIZE=128`** — catalog overrides/fallbacks (e.g. `proton.me` → selfh.st `proton`) measured the *capped* proxy buffer and advertised `128×128` in discovery. Sized routes then skipped the full-res fetch (`largestWidth < size`) and fell through to the never-upscale path, so `/scraper/512/png/proton.me` served 128px. Discovery now uses `originalBuffer` (native catalog size); SVG catalog hits advertise `512`; the sized fallthrough prefers `originalBuffer` when present.
+- **Sized scraper resize skipped for near-square sources (e.g. selfh.st `513×512`)** — downscale used `min(width, height) > size`, so a 513×512 catalog PNG was left unchanged for `/scraper/512/…`. It now uses the longer side, producing an exact `512×512` PNG.
+
 ## [2.15.3] — 2026-07-20
 
 ### Fixed
