@@ -1708,27 +1708,35 @@ async function fetchScraperAllIcons(domain) {
     try {
       const fb = await fetchScraperCatalogFallback(domain);
       if (fb && fb.url) {
-        const dims = await readImageDimensions(fb.buffer, {
+        // Measure the uncapped source. normalizeFallbackResult applies
+        // SCRAPER_MAX_ICON_SIZE to fb.buffer for the unsized proxy, but sized
+        // routes (/scraper/512/…) must know the real catalog resolution so
+        // serveSizedScraperIcon can re-fetch and downscale from full-res.
+        const sourceBuffer = fb.originalBuffer || fb.buffer;
+        const dims = await readImageDimensions(sourceBuffer, {
           contentType: fb.contentType,
           url: fb.url,
         }).catch(() => null);
-        const width = dims
-          ? Math.max(dims.width || 0, dims.height || 0)
-          : scraperMaxIconSizeEnabled()
-            ? SCRAPER_MAX_ICON_SIZE
-            : MIN_SOURCE_SIZE;
-        if (width >= MIN_SOURCE_SIZE) {
-          const format = /\.svg(?:$|[?#])/i.test(fb.url)
+        const format = /\.svg(?:$|[?#])/i.test(fb.url)
+          ? 'svg'
+          : (fb.contentType || '').includes('svg') || looksLikeSvg(sourceBuffer)
             ? 'svg'
-            : (fb.contentType || '').includes('svg')
-              ? 'svg'
-              : 'png';
+            : 'png';
+        const width =
+          format === 'svg'
+            ? SVG_DISPLAY_SIZE
+            : dims
+              ? Math.max(dims.width || 0, dims.height || 0)
+              : // Catalog PNGs are typically ≥512; never advertise the proxy cap
+                // as native size or /scraper/512/… will skip the full-res fetch.
+                SVG_DISPLAY_SIZE;
+        if (width >= MIN_SOURCE_SIZE) {
           const catalogIcon = {
             url: fb.url,
             width,
             height: width,
             format,
-            bytes: fb.buffer ? fb.buffer.length : 0,
+            bytes: sourceBuffer ? sourceBuffer.length : 0,
           };
           if (overrideWithCatalog) {
             // The curated icon is authoritative: it is the only icon we expose,
@@ -2285,6 +2293,11 @@ async function normalizeFallbackResult(entry, provider) {
       buffer: displayed.buffer,
       contentType: displayed.contentType,
       provider,
+      // Keep the vector source so sized scraper routes can rasterize crisply
+      // after the unsized proxy buffer has been capped to SCRAPER_MAX_ICON_SIZE.
+      ...(displayed.originalSvgBuffer
+        ? { originalSvgBuffer: displayed.originalSvgBuffer }
+        : {}),
     });
   } catch {
     return capScraperProxyOutput({ ...entry, provider });
