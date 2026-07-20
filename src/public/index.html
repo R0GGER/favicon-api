@@ -7907,13 +7907,17 @@ document.getElementById('sf').addEventListener('submit',function(e){
       return scraperIcons.reduce((max, icon) => Math.max(max, scraperIconPixelSize(icon)), 0);
     }
 
-    // Fast proxy at scraperMaxIconSize uses /scraper/{domain} server-side downscale.
-    // The proxy only truly downscales when the source icon is at least as large;
-    // when icons are known but all smaller, the proxy cannot deliver scraperMaxIconSize.
+    // Whether a size button / load is offerable. SCRAPER_MAX_ICON_SIZE only caps
+    // the unsized fast-proxy embed (`/scraper/{domain}`); explicit
+    // `/scraper/{size}/…` routes (and the JSON `sizes` map) stay available —
+    // including via catalog/SVG fallback — even when discovered bitmaps are
+    // smaller than the requested size (e.g. cached scraper_512_* files).
     function scraperCanDownscaleTo(size) {
+      if (!(size > 0)) return false;
       const largest = scraperLargestDiscoveredSize();
-      if (size > 0 && scraperMaxIconSize > 0 && size === scraperMaxIconSize && largest === 0) return true;
-      return size > 0 && largest >= size;
+      if (scraperMaxIconSize > 0 && size === scraperMaxIconSize && largest === 0) return true;
+      if (scraperAvailableSizes && scraperAvailableSizes[String(size)]) return true;
+      return largest >= size;
     }
 
     function pickScraperIconIndex(min, max) {
@@ -8343,20 +8347,20 @@ document.getElementById('sf').addEventListener('submit',function(e){
         sortSize: Math.max(icon.width || 0, icon.height || icon.width || 0),
       }));
       const largestDiscovered = scraperLargestDiscoveredSize();
+      // Fast-proxy pill at SCRAPER_MAX_ICON_SIZE (links to /{domain}). Distinct
+      // from the same numeric size under /scraper/{size}/… — both may show "128".
       if (scraperMaxIconSize > 0 && (largestDiscovered === 0 || largestDiscovered >= scraperMaxIconSize)) {
         entries.push({ type: 'proxy', sortSize: scraperMaxIconSize });
       }
       const existingSizes = new Set(entries.map((e) => e.sortSize));
-      const maxSource = scraperMaxIconSize || Infinity;
+      // List every size from /{domain}/json. Do not cap at SCRAPER_MAX_ICON_SIZE —
+      // that env only limits the unsized proxy; disk cache may already have
+      // scraper_256_* / scraper_512_* from preload or earlier requests.
       for (const sizeStr of Object.keys(scraperAvailableSizes)) {
         const size = Number(sizeStr);
-        if (
-          size > 0 &&
-          size <= maxSource &&
-          scraperCanDownscaleTo(size) &&
-          !existingSizes.has(size)
-        ) {
+        if (size > 0 && scraperCanDownscaleTo(size) && !existingSizes.has(size)) {
           entries.push({ type: 'proxySize', size, sortSize: size });
+          existingSizes.add(size);
         }
       }
       entries.sort((a, b) => {
