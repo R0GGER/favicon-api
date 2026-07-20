@@ -771,7 +771,11 @@ async function downscaleEntryToSize(entry, size) {
       contentType,
       url: entry.url,
     });
-    const side = dims ? Math.min(dims.width || 0, dims.height || dims.width || 0) : 0;
+    // Use the longer side: a 513×512 catalog PNG must still downscale for /512
+    // (min would be 512 and skip resize, leaving a non-square 513×512 response).
+    const side = dims
+      ? Math.max(dims.width || 0, dims.height || dims.width || 0)
+      : 0;
     if (side > size) {
       const resized = await resizeIcon(buffer, size);
       return { ...entry, buffer: resized, contentType: 'image/png' };
@@ -1356,6 +1360,18 @@ async function renderScraperEntryToSize(entry, domain, size) {
     }
   }
 
+  // Unsized /scraper/{domain} caches may store a SCRAPER_MAX_ICON_SIZE-capped
+  // buffer while originalBuffer still holds the full catalog/source PNG. Prefer
+  // that when rendering /scraper/{size}/… so we do not serve a 128px icon for a
+  // 512 request after serveSizedScraperIcon falls through.
+  if (
+    entry?.originalBuffer?.length &&
+    entry.originalBuffer !== entry.buffer &&
+    entry.originalBuffer.length >= (entry.buffer?.length || 0)
+  ) {
+    entry = { ...entry, buffer: entry.originalBuffer };
+  }
+
   return renderIconToSize(entry, size);
 }
 
@@ -1436,7 +1452,10 @@ async function serveSizedScraperIcon(domain, size) {
     contentType: fullRes.contentType,
     url: iconUrl,
   });
-  const side = dims ? Math.min(dims.width || 0, dims.height || dims.width || 0) : 0;
+  // Longer side: 513×512 selfh.st assets must resize for an exact 512×512 PNG.
+  const side = dims
+    ? Math.max(dims.width || 0, dims.height || dims.width || 0)
+    : 0;
   if (side > size) {
     const buf = await resizeIcon(fullRes.buffer, size);
     return { buffer: buf, contentType: 'image/png', provider: 'scraper', url: iconUrl };
