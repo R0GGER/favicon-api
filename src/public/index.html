@@ -6482,9 +6482,13 @@ document.getElementById('sf').addEventListener('submit',function(e){
     }
 
     function toggleServiceCards() {
+      // App-name search already is a CDN lookup. Do not call
+      // setServiceCardsVisible(true): that resurrects empty unmatched cards.
+      // Do not re-run startServiceIconLoads either: hideOnError could drop the
+      // one card that already matched (e.g. theSVG for "2fas").
       if (currentMode === 'service') {
-        setServiceCardsVisible(true);
         updateServiceIconsDivider();
+        scheduleNoIconNoticeCheck();
         return;
       }
 
@@ -6631,7 +6635,9 @@ document.getElementById('sf').addEventListener('submit',function(e){
       showCardsByType('service');
 
       resetFaviconCard('brandfetch');
-      setServiceCardsVisible(true);
+      // Do not setServiceCardsVisible(true) first — that briefly shows every CDN
+      // card (including empty unmatched ones). startServiceIconLoads shows only
+      // providers with matches and hides the rest.
       startServiceIconLoads(resolveData, true);
       scheduleNoIconNoticeCheck();
       scheduleResultsTableSync();
