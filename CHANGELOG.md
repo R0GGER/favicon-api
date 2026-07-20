@@ -5,6 +5,12 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.15.3] — 2026-07-20
+
+### Fixed
+
+- **Web UI — “Also include CDN icon lookups” no longer shows empty catalog cards for app-name searches** — toggling the checkbox after a service search (e.g. `2fas`) called `setServiceCardsVisible(true)`, which resurfaced CDN provider cards (selfh.st, dashboardicons, SVGL, …) that had no catalog match. App-name searches already are CDN lookups, so the toggle is now a no-op for card visibility in that mode; Fetch still shows only providers with a match. Also skip the pre-show-all step before `startServiceIconLoads` so unmatched empty shells do not flash on search.
+
 ## [2.15.2] — 2026-07-20
 
 ### Fixed
