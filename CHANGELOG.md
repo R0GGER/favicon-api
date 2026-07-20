@@ -5,6 +5,14 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.15.2] — 2026-07-20
+
+### Fixed
+
+- **HTML Scraper — sized icons now persist on disk** — `GET /scraper/{size}/{domain}` (and `/png/` variants) write `scraper_{size}_{domain}` (+ `.meta`) via `fetchWithCache`, matching preload/`tweaks` docs. Previously only the unsized `scraper_{domain}` entry was stored; resized PNGs were recomputed on every request. `?refresh=1` / `?nocache=1` clears the unsized entry and all standard size files (16–512), plus the requested size if outside that set.
+- **Web UI — size strip no longer capped by `SCRAPER_MAX_ICON_SIZE`** — that env only limits the unsized fast-proxy embed (`/scraper/{domain}` / `/{domain}`). The HTML Scraper card now lists every size from `/{domain}/json` (`sizes`, including 256 and 512) so preloaded/cached sized files are reachable from the UI.
+- **Web UI — standard size buttons available immediately** — on search, the scraper card seeds 16 / 32 / 64 / 128 / 256 / 512 at once so clicks hit the sized image cache without waiting for `GET /{domain}/json` discovery. Discovery may still refine native icon variants afterward; the blocking “Discovering other icon sizes…” skeleton is gone.
+
 ## [2.15.1] — 2026-07-19
 
 ### Changed
