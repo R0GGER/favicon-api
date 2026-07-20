@@ -1258,6 +1258,27 @@ app.get('/s-asset', async (req, res) => {
 //   Canonical: /scraper/:size/:ext/:domain   (sized, ext=png)
 //              /scraper/:domain               (auto / largest available)
 //   Legacy:    /scraper/:size/:domain, /s/:size/:domain, /s/:domain
+// Drop the unsized scraper entry plus every known/requested size file
+// (`scraper_{domain}`, `scraper_{size}_{domain}`) so ?refresh=1 does not leave
+// stale resized PNGs behind after discovery re-runs.
+async function invalidateScraperImageCaches(domain, extraSize) {
+  const sizes = new Set(SCRAPER_SIZES_ARRAY);
+  if (extraSize) sizes.add(extraSize);
+  await cache.del('scraper', domain, null);
+  await Promise.all([...sizes].map((size) => cache.del('scraper', domain, size)));
+}
+
+// Build (and disk-cache) a single sized scraper PNG. Persists as
+// `scraper_{size}_{domain}` so preload / repeat hits skip resize work.
+async function buildSizedScraperIcon(domain, size) {
+  const served = await serveSizedScraperIcon(domain, size);
+  if (served) return served;
+
+  const entry = await fetchWithCache('scraper', domain, null, () => fetchScraper(domain));
+  if (!entry) return null;
+  return renderScraperEntryToSize(entry, domain, size);
+}
+
 // `?refresh=1` (or `?nocache=1`) bypasses + invalidates the caches.
 async function scraperHandler(req, res) {
   if (req.params.ext != null && String(req.params.ext).trim() !== '') {
@@ -1280,22 +1301,20 @@ async function scraperHandler(req, res) {
 
   try {
     if (refresh) {
-      await cache.del('scraper', domain, null);
+      await invalidateScraperImageCaches(domain, sizeParam || null);
       invalidateScraperDomainCaches(domain);
     }
 
     if (sizeParam) {
-      const served = await serveSizedScraperIcon(domain, sizeParam);
-      if (served) return sendFavicon(res, served);
+      const sized = await fetchWithCache('scraper', domain, sizeParam, () =>
+        buildSizedScraperIcon(domain, sizeParam)
+      );
+      if (!sized) return res.status(502).json({ error: 'Could not scrape favicon.' });
+      return sendFavicon(res, sized);
     }
 
     const entry = await fetchWithCache('scraper', domain, null, () => fetchScraper(domain));
     if (!entry) return res.status(502).json({ error: 'Could not scrape favicon.' });
-
-    if (sizeParam) {
-      const rendered = await renderScraperEntryToSize(entry, domain, sizeParam);
-      return sendFavicon(res, rendered);
-    }
 
     // Enforce SCRAPER_MAX_ICON_SIZE at serve time too, not just when the icon is
     // first fetched/cached. A cache entry written before the cap was configured
