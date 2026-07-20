@@ -3004,14 +3004,7 @@
           <div class="scraper-sizes-loading" id="scraper-sizes-loading" style="display:none" aria-live="polite" aria-busy="false">
             <div class="scraper-sizes-loading-inner">
               <div class="spinner scraper-sizes-spinner" aria-hidden="true"></div>
-              <span class="scraper-sizes-loading-text">Discovering other icon sizes…</span>
-            </div>
-            <div class="scraper-sizes-skeleton" aria-hidden="true">
-              <span class="skeleton-pill"></span>
-              <span class="skeleton-pill"></span>
-              <span class="skeleton-pill"></span>
-              <span class="skeleton-pill"></span>
-              <span class="skeleton-pill"></span>
+              <span class="scraper-sizes-loading-text">Checking for native icon sizes…</span>
             </div>
           </div>
         </div>
@@ -7843,19 +7836,29 @@ document.getElementById('sf').addEventListener('submit',function(e){
       return proxyBtn;
     }
 
+    // Advertise standard /scraper/{size}/… routes immediately. Those hit the
+    // sized image cache (scraper_{size}_{domain}) — no need to wait for
+    // /{domain}/json discovery before the size strip is usable.
+    function seedScraperAvailableSizes(domain) {
+      const origin = location.origin;
+      const encoded = encodeURIComponent(domain);
+      scraperAvailableSizes = Object.fromEntries(
+        SCRAPER_PROXY_SIZE_STEPS.map((size) => [
+          String(size),
+          {
+            proxy: `${origin}/scraper/${size}/png/${encoded}`,
+            source: null,
+          },
+        ])
+      );
+    }
+
     function renderScraperEarlySizes(domain) {
       const proxySize = configuredScraperProxySize();
-      if (!proxySize) return;
-
       scraperMaxIconSize = proxySize;
-      currentScraperSelection = 'proxy';
-
-      const sizesEl = document.getElementById('scraper-sizes');
-      sizesEl.innerHTML = '';
-      sizesEl.appendChild(createScraperProxyButton(true));
-
-      const toolbar = document.getElementById('scraper-sizes-toolbar');
-      if (toolbar) toolbar.style.display = '';
+      seedScraperAvailableSizes(domain);
+      currentScraperSelection = proxySize > 0 ? 'proxy' : 'proxySize-128';
+      renderScraperSizes();
     }
 
     function scraperUsesProxySizes() {
@@ -8209,8 +8212,10 @@ document.getElementById('sf').addEventListener('submit',function(e){
       wwwNotice.style.display = 'none';
       wwwNotice.innerHTML = '';
 
+      // Size buttons (16–512) first — they use the disk image cache. Discovery
+      // may still refine native icon variants in the background without blocking.
       renderScraperEarlySizes(domain);
-      setScraperSizesLoading(true);
+      setScraperSizesLoading(false);
       loadScraperParallelPreview(domain, refresh);
       loadScraperSizes(domain, refresh);
     }
