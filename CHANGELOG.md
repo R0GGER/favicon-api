@@ -5,6 +5,12 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.15.6] — 2026-07-21
+
+### Fixed
+
+- **SVG → PNG rasterization failed for large viewBoxes (e.g. SVGL Google Analytics)** — icons whose SVG `viewBox` is thousands of units wide (Google Analytics ≈ 2200×2430) exceeded sharp’s input pixel limit when rasterized at `density = size × 4`, so `/svgl/128/png/…` and `/svgl/256/png/…` returned 500 and alternative-match thumbs stayed empty. `rasterizeSvgToSize` now pins the SVG root to an explicit pixel size before rasterizing, then downscales to the requested size.
+
 ## [2.15.5] — 2026-07-21
 
 ### Changed
