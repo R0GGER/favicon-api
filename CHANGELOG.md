@@ -5,6 +5,12 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.15.5] — 2026-07-21
+
+### Changed
+
+- **HTML Scraper — duplicate sizes collapsed to the best icon** — when discovery finds multiple icons with the same pixel dimensions (e.g. three `512×512` URLs), `fetchScraperAllIcons` keeps only one per size. Preference is higher format quality (`svg` > `png` > `webp` > `ico`), then larger byte size. Applies to the size-strip UI, `/{domain}/json`, and sized `/scraper/{size}/…` source selection; existing memory/disk icon caches are cleaned on read.
+
 ## [2.15.4] — 2026-07-20
 
 ### Fixed
