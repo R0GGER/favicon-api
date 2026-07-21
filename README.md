@@ -36,11 +36,11 @@ FaviconAPI is a self-hosted favicon proxy with a browser-based UI that fetches w
 
 FaviconAPI started out of a very practical need. While building my own dashboards with [Mafl+ (`R0GGER/maflplus`)](https://github.com/R0GGER/maflplus), I wanted a hassle-free way to fetch favicons and logos and link them to the services on my dashboard - without manually downloading and hosting an image for every single tile.
 
-In practice that turned out to be surprisingly painful. To get decent coverage I always ended up combining **multiple sources**, and time and again I noticed that the "different" tools I was using were really just reaching for the **same underlying providers** behind the scenes - mostly Google and DuckDuckGo. When one of those came back with a blank, low-resolution, or generic placeholder icon, I had no fallback and was stuck.
+In practice that turned out to be surprisingly painful. To get decent coverage I always ended up combining multiple sources, and time and again I noticed that the "different" tools I was using were really just reaching for the same underlying providers behind the scenes - mostly Google and DuckDuckGo. When one of those came back with a blank, low-resolution, or generic placeholder icon, I had no fallback and was stuck.
 
-What I was missing was a single tool that treats favicon lookup as a **first-class problem**: one that knows about many independent sources, queries them together, and intelligently picks the best result instead of betting everything on one upstream. No tool offered that kind of complete, source-aware solution where different providers are connected and complement each other.
+What I was missing was a tool dedicated entirely to favicon lookup-one that aggregates independent sources, queries them together, and intelligently picks the best result instead of betting on a single upstream. Existing tools simply didn't offer that kind of integrated, multi-source solution.
 
-So I built it. FaviconAPI brings 10+ favicon providers and four service-icon catalogs together behind one consistent API. It **races providers in parallel**, **normalizes and caches** the results, and returns the highest-quality icon it can find - with the others available as explicit fallbacks. It grew from a helper for my own dashboards into a self-hosted favicon proxy that anyone can run.
+So I built it. FaviconAPI brings 10+ favicon providers and 5 CDN-icon catalogs together behind one consistent API. It races providers in parallel, normalizes and caches the results, and returns the highest-quality icon it can find - with the others available as explicit fallbacks. It grew from a helper for my own dashboards into a self-hosted favicon proxy that anyone can run.
 
 ---
 
