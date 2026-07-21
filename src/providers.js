@@ -1262,6 +1262,36 @@ function formatScore(format) {
   return 10;
 }
 
+// Among icons that share the same pixel dimensions, keep only the highest
+// quality: better format (svg > png > webp > ico), then larger byte size.
+function dedupeIconsByDimensions(icons) {
+  if (!Array.isArray(icons) || icons.length <= 1) return icons || [];
+
+  const quality = (icon) => formatScore(icon.format) * 1e9 + (icon.bytes || 0);
+  const dimKey = (icon) => {
+    const w = icon.width || 0;
+    const h = icon.height || w;
+    return `${w}x${h}`;
+  };
+
+  const bestByDim = new Map();
+  for (const icon of icons) {
+    const key = dimKey(icon);
+    const prev = bestByDim.get(key);
+    if (!prev || quality(icon) > quality(prev)) bestByDim.set(key, icon);
+  }
+
+  const seen = new Set();
+  const out = [];
+  for (const icon of icons) {
+    const key = dimKey(icon);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(bestByDim.get(key));
+  }
+  return out;
+}
+
 
 async function fetchManifestIcons(manifestUrl, referer) {
   if (manifestFetchCache.has(manifestUrl)) {
@@ -1593,12 +1623,20 @@ async function probeIconMetadata(href, referer) {
 // /:domain/json icons array shown as the size-button strip on the UI.
 async function fetchScraperAllIcons(domain) {
   const cached = scraperIconsCache.get(domain);
-  if (Array.isArray(cached) && cached.length > 0) return cached;
+  if (Array.isArray(cached) && cached.length > 0) {
+    const deduped = dedupeIconsByDimensions(cached);
+    if (deduped.length !== cached.length) scraperIconsCache.set(domain, deduped);
+    return deduped;
+  }
 
   const diskIcons = await scraperDiskCache.getIcons(domain);
   if (Array.isArray(diskIcons) && diskIcons.length > 0) {
-    scraperIconsCache.set(domain, diskIcons);
-    return diskIcons;
+    const deduped = dedupeIconsByDimensions(diskIcons);
+    scraperIconsCache.set(domain, deduped);
+    if (deduped.length !== diskIcons.length) {
+      scraperDiskCache.setIcons(domain, deduped);
+    }
+    return deduped;
   }
 
   const referer = `https://${domain}/`;
@@ -1751,6 +1789,8 @@ async function fetchScraperAllIcons(domain) {
       /* catalog reflection is best-effort */
     }
   }
+
+  sorted = dedupeIconsByDimensions(sorted);
 
   scraperIconsCache.set(domain, sorted);
   if (sorted.length > 0) {
