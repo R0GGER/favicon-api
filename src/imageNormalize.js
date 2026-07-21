@@ -5,8 +5,6 @@ const crypto = require('crypto');
 const TARGET_SIZE = 128;
 // Minimum acceptable source image size (applies to ICO frames and raster images).
 const MIN_SOURCE_SIZE = 128;
-// 4x default 96 dpi so SVGs rasterize crisply at TARGET_SIZE (128px).
-const SVG_DENSITY = 192;
 // When converting a scraped SVG to a display PNG, rasterize at the largest
 // standard icon size so on-demand ?size= downsizing preserves quality.
 const SVG_DISPLAY_SIZE = 512;
@@ -56,13 +54,80 @@ function preprocessSvgForRaster(buffer) {
   );
 }
 
+function parseSvgLength(value) {
+  if (value == null) return null;
+  const match = String(value).trim().match(/^([+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?)(px|pt|em|rem|%)?$/i);
+  if (!match) return null;
+  const num = Number(match[1]);
+  if (!Number.isFinite(num) || num <= 0) return null;
+  const unit = (match[2] || 'px').toLowerCase();
+  if (unit === '%') return null;
+  if (unit === 'pt') return num * (96 / 72);
+  return num;
+}
+
+function svgIntrinsicSize(svg) {
+  const viewBox = svg.match(/viewBox\s*=\s*["']([^"']+)["']/i);
+  if (viewBox) {
+    const parts = viewBox[1].trim().split(/[\s,]+/).map(Number);
+    if (parts.length === 4 && parts[2] > 0 && parts[3] > 0) {
+      return { width: parts[2], height: parts[3] };
+    }
+  }
+
+  const root = svg.match(/<svg\b([^>]*)>/i);
+  if (!root) return null;
+  const attrs = root[1];
+  const widthMatch = attrs.match(/\bwidth\s*=\s*["']([^"']+)["']/i);
+  const heightMatch = attrs.match(/\bheight\s*=\s*["']([^"']+)["']/i);
+  const width = widthMatch ? parseSvgLength(widthMatch[1]) : null;
+  const height = heightMatch ? parseSvgLength(heightMatch[1]) : null;
+  if (width && height) return { width, height };
+  return null;
+}
+
+// Pin the SVG root to an explicit pixel size before sharp/librsvg rasterizes.
+// Large viewBox units (e.g. Google Analytics ~2200×2430) × density=size×4 can
+// exceed sharp's input pixel limit and 500 on /svgl/128|256/png/….
+function scaleSvgForRaster(buffer, maxEdge) {
+  if (!buffer || buffer.length === 0 || !maxEdge) return buffer;
+  const svg = buffer.toString('utf8');
+  if (!/<svg\b/i.test(svg)) return buffer;
+
+  const intrinsic = svgIntrinsicSize(svg);
+  let width = maxEdge;
+  let height = maxEdge;
+  if (intrinsic) {
+    const aspect = intrinsic.width / intrinsic.height;
+    if (aspect >= 1) {
+      width = maxEdge;
+      height = Math.max(1, Math.round(maxEdge / aspect));
+    } else {
+      height = maxEdge;
+      width = Math.max(1, Math.round(maxEdge * aspect));
+    }
+  }
+
+  let replaced = false;
+  const scaled = svg.replace(/<svg\b([^>]*)>/i, (_, attrs) => {
+    replaced = true;
+    const cleaned = attrs
+      .replace(/\s*width\s*=\s*("[^"]*"|'[^']*')/gi, '')
+      .replace(/\s*height\s*=\s*("[^"]*"|'[^']*')/gi, '');
+    return `<svg${cleaned} width="${width}" height="${height}">`;
+  });
+
+  return replaced ? Buffer.from(scaled, 'utf8') : buffer;
+}
+
 async function rasterizeSvg(buffer) {
   return rasterizeSvgToSize(buffer, TARGET_SIZE);
 }
 
 async function rasterizeSvgToSize(buffer, size = TARGET_SIZE) {
-  const density = Math.max(72, size * 4);
-  return sharp(preprocessSvgForRaster(buffer), { density })
+  const renderEdge = Math.max(size * 4, size);
+  const prepared = scaleSvgForRaster(preprocessSvgForRaster(buffer), renderEdge);
+  return sharp(prepared)
     .resize(size, size, resizeOptions())
     .png()
     .toBuffer();
