@@ -1701,6 +1701,22 @@
       transition: opacity 0.15s ease, visibility 0.15s ease, transform 0.15s ease;
     }
 
+    .proxy-tip-meta {
+      position: absolute;
+      top: 0.4rem;
+      right: 0.55rem;
+      max-width: 45%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 0.6rem;
+      font-weight: 500;
+      line-height: 1.2;
+      letter-spacing: 0.02em;
+      color: #9a92a0;
+      text-align: right;
+    }
+
     .size-btn.size-btn-proxy .proxy-tip::after {
       content: '';
       position: absolute;
@@ -1723,6 +1739,7 @@
       display: flex;
       align-items: center;
       gap: 0.4rem;
+      padding-right: 4.75rem;
       color: #5b2e7e;
       font-weight: 600;
       font-size: 0.76rem;
@@ -8383,6 +8400,50 @@ document.getElementById('sf').addEventListener('submit',function(e){
       return entries;
     }
 
+    function formatFromContentType(contentType, url) {
+      try {
+        return extensionFromContent({ type: '' }, contentType, url);
+      } catch {
+        const ct = String(contentType || '').toLowerCase();
+        if (ct.includes('svg')) return 'svg';
+        if (ct.includes('webp')) return 'webp';
+        if (ct.includes('png')) return 'png';
+        if (ct.includes('jpeg') || ct.includes('jpg')) return 'jpg';
+        if (ct.includes('gif')) return 'gif';
+        if (ct.includes('ico') || ct.includes('x-icon')) return 'ico';
+        return null;
+      }
+    }
+
+    async function fillProxyTipMeta(tip, embedUrl) {
+      const metaEl = tip.querySelector('.proxy-tip-meta');
+      if (!metaEl || !embedUrl) return;
+      try {
+        let bytes = 0;
+        let contentType = '';
+        const head = await fetch(embedUrl, {
+          method: 'HEAD',
+          credentials: 'same-origin',
+        });
+        if (head.ok) {
+          bytes = parseInt(head.headers.get('Content-Length'), 10) || 0;
+          contentType = head.headers.get('Content-Type') || '';
+        }
+        if (!head.ok || bytes <= 0) {
+          const res = await fetch(embedUrl, { credentials: 'same-origin' });
+          if (!res.ok) return;
+          const blob = await res.blob();
+          bytes = blob.size;
+          contentType = res.headers.get('Content-Type') || blob.type || contentType;
+        }
+        const fmt = (formatFromContentType(contentType, embedUrl) || 'png').toUpperCase();
+        const size = formatBytes(bytes);
+        metaEl.textContent = size ? `${fmt} · ${size}` : fmt;
+      } catch {
+        metaEl.textContent = '';
+      }
+    }
+
     function attachScraperProxyTooltip(btn, maxSize, embedUrl) {
       const sizeLabel = `${maxSize}\u00d7${maxSize}`;
       btn.setAttribute(
@@ -8395,6 +8456,7 @@ document.getElementById('sf').addEventListener('submit',function(e){
       tip.className = 'proxy-tip';
       tip.setAttribute('role', 'tooltip');
       tip.innerHTML =
+        '<span class="proxy-tip-meta" aria-hidden="true"></span>' +
         '<span class="proxy-tip-head">' +
         '<iconify-icon icon="f7:hare-fill" aria-hidden="true"></iconify-icon>' +
         '<span>Fast proxy URL</span>' +
@@ -8402,6 +8464,7 @@ document.getElementById('sf').addEventListener('submit',function(e){
         `<span class="proxy-tip-body">Optimized for ${escapeHtml(sizeLabel)} for faster page loads and smaller downloads. Embed with <code>/{domain}</code>.</span>` +
         `<span class="proxy-tip-url" data-tip="${escapeHtml(embedUrl)}">${escapeHtml(embedUrl)}</span>`;
       btn.appendChild(tip);
+      fillProxyTipMeta(tip, embedUrl);
     }
 
     function renderScraperSizes() {
