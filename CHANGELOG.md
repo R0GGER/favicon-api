@@ -5,6 +5,23 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.15.9] — 2026-07-22
+
+### Changed
+
+- **`SCRAPER_MAX_ICON_SIZE` — smaller icons via near-lossless palette PNG** — `encodeLosslessPng` now encodes both a truecolor and an indexed/palette PNG and keeps the smaller one. Real favicons are anti-aliased and carry 500-2000 colors, so a bit-exact palette is rare; instead the palette variant is accepted when its perceptual PSNR (alpha-premultiplied) vs. the source meets `SCRAPER_PNG_MIN_PSNR` (default `40` dB ≈ visually lossless). Measured savings: github.com −25% (66.9 dB), netflix.com −26% (65.3 dB), reddit.com −53% (50.5 dB), all still `image/png`. This affects all scraper output through `capScraperProxyOutput` (`/scraper/{domain}` and serve-time re-cap).
+
+### Added
+
+- **`SCRAPER_PNG_PALETTE`** (default `true`) — enable/disable the near-lossless palette PNG pass for capped scraper output. Set `false` to force strict truecolor PNG.
+- **`SCRAPER_PNG_MIN_PSNR`** (default `40`) — minimum perceptual PSNR (dB) the palette PNG must reach to be used instead of the truecolor PNG. `0` = always take the smaller file; raise toward strict lossless (`50`+ is visually indistinguishable, `<35` starts to show).
+
+## [2.15.8] — 2026-07-22
+
+### Fixed
+
+- **HTML Scraper — duplicate size labels in the size strip** — after discovery the strip could show the same number twice when a native icon matched `SCRAPER_MAX_ICON_SIZE` (e.g. two `128` buttons: discovered icon + Fast proxy). The Fast proxy keeps that slot; the redundant native button is omitted. Client-side discovery also collapses same `width×height` icons to the highest-quality format (then largest bytes), matching the server-side rule from 2.15.5.
+
 ## [2.15.7] — 2026-07-22
 
 ### Changed
