@@ -228,7 +228,9 @@ MANIFEST_PROBE_MAX=12
 
 # Max width/height (px) for images returned by GET /scraper/:domain only. The scraper
 # still picks the largest source icon; if that image exceeds this limit it is
-# downscaled with "contain" and re-encoded as PNG before caching/sending.
+# downscaled with "contain". When the cap is active, output is also re-encoded as
+# a lossless PNG (max compression, alpha preserved) so responses stay small without
+# quality loss; already-capped icons are re-encoded only when that shrinks the file.
 # Does not change /:domain/json — the UI size strip still lists every variant
 # at full resolution (via /s-asset or upstream URLs). Set to 0 to disable the
 # cap and serve native resolution (default). Example: 128 keeps /scraper/ responses
@@ -598,7 +600,7 @@ The tables below cover the most-used variables. For the complete list — includ
 | `SCRAPER_DISK_CACHE`       | `false`                         | When `true`, persist scraper discovery (HTML, icon lists, besticon JSON, manifests, probes) under `{CACHE_DIR}/scraper-discovery`. Survives restarts; shared across workers.                                                                                                         |
 | `SCRAPER_DISK_CACHE_DIR`   | `{CACHE_DIR}/scraper-discovery` | Directory for that discovery cache. Only used when `SCRAPER_DISK_CACHE=true`.                                                                                                                                                                                                        |
 | `MANIFEST_PROBE_MAX`       | `12`                            | Max manifest URLs to probe per domain when HTML does not link one directly.                                                                                                                                                                                                          |
-| `SCRAPER_MAX_ICON_SIZE`    | `0`                             | Max output dimension for `/scraper/{domain}`. Larger sources are downscaled; `0` = native resolution.                                                                                                                                                                                |
+| `SCRAPER_MAX_ICON_SIZE`    | `0`                             | Max output dimension for `/scraper/{domain}`. Larger sources are downscaled; when set, output is also lossless PNG-compressed (alpha preserved). `0` = native resolution.                                                                                                               |
 
 
 ### API v1 & quotas

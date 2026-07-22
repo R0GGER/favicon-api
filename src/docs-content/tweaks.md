@@ -146,7 +146,8 @@ Memory caches are **per worker**, so total RAM scales with `WORKERS`.
 
 For dashboard use cases you rarely need icons larger than 128px. Capping the
 output of `/scraper/{domain}` produces smaller PNGs — less to encode, cache,
-transfer, and decode in the browser:
+transfer, and decode in the browser. When the cap is set, responses are also
+re-encoded as lossless PNG (max compression, transparency preserved):
 
 ```bash
 SCRAPER_MAX_ICON_SIZE=128
