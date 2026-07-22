@@ -1323,8 +1323,9 @@ async function scraperHandler(req, res) {
     // Enforce SCRAPER_MAX_ICON_SIZE at serve time too, not just when the icon is
     // first fetched/cached. A cache entry written before the cap was configured
     // (e.g. a full 512px source) would otherwise keep being served at full size;
-    // capScraperProxyOutput downscales it (and is a no-op when already within the
-    // cap or when the cap is disabled).
+    // capScraperProxyOutput downscales and lossless-PNG-compresses it (and is a
+    // no-op when the cap is disabled, for unrasterized SVGs, or when a within-cap
+    // re-encode would not shrink the file).
     sendFavicon(res, await capScraperProxyOutput(entry));
   } catch (err) {
     console.error('Scraper proxy error:', err.message);
@@ -2175,11 +2176,19 @@ app.get('/:domain', async (req, res) => {
   if (!parsed) return res.status(400).json({ error: 'Invalid domain or service name.' });
 
   try {
-    const entry = parsed.type === 'domain'
+    let entry = parsed.type === 'domain'
       ? await pickBest(parsed.value)
       : await pickBestService(parsed.value);
     if (entry.notFound) {
       res.status(404);
+    } else if (
+      parsed.type === 'domain' &&
+      String(entry.provider || '').startsWith('scraper')
+    ) {
+      // Same serve-time cap as /scraper/{domain}: stale best_* cache entries
+      // written before SCRAPER_MAX_ICON_SIZE / SVG-cap fixes would otherwise
+      // keep serving full-resolution scraper icons (e.g. 512px from favicon.svg).
+      entry = await capScraperProxyOutput(entry);
     }
     sendFavicon(res, entry);
   } catch (err) {

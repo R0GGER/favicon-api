@@ -8,6 +8,7 @@ const {
   looksLikeSvg,
   isBlankFavicon,
   isUnusableIcon,
+  encodeLosslessPng,
   MIN_SOURCE_SIZE,
   SVG_DISPLAY_SIZE,
   resizeIcon,
@@ -274,6 +275,13 @@ function scraperMaxIconSizeEnabled() {
 async function capScraperProxyOutput(entry) {
   if (!entry?.buffer || !scraperMaxIconSizeEnabled()) return entry;
 
+  // Leave unrasterized SVGs alone — do not force them through PNG here.
+  // Check the buffer itself, not the URL: after toDisplayPng the buffer is
+  // already a (often 512px) PNG while url may still end in .svg.
+  if (looksLikeSvg(entry.buffer)) return entry;
+  const contentType = String(entry.contentType || '').toLowerCase();
+  if (contentType.includes('svg') && !contentType.includes('png')) return entry;
+
   const dims = await readImageDimensions(entry.buffer, {
     contentType: entry.contentType,
     url: entry.url,
@@ -281,17 +289,20 @@ async function capScraperProxyOutput(entry) {
   if (!dims || dims.width <= 0) return entry;
 
   const side = Math.min(dims.width, dims.height || dims.width);
-  if (side <= SCRAPER_MAX_ICON_SIZE) return entry;
+  const needsResize = side > SCRAPER_MAX_ICON_SIZE;
 
   try {
     const originalBuffer = entry.originalBuffer || entry.buffer;
-    const buffer = await sharp(entry.buffer)
-      .resize(SCRAPER_MAX_ICON_SIZE, SCRAPER_MAX_ICON_SIZE, {
+    let pipeline = sharp(entry.buffer);
+    if (needsResize) {
+      pipeline = pipeline.resize(SCRAPER_MAX_ICON_SIZE, SCRAPER_MAX_ICON_SIZE, {
         fit: 'contain',
         background: { r: 0, g: 0, b: 0, alpha: 0 },
-      })
-      .png()
-      .toBuffer();
+      });
+    }
+    const buffer = await encodeLosslessPng(pipeline);
+    // Re-encode only pays off when we resized or the lossless PNG is smaller.
+    if (!needsResize && buffer.length >= entry.buffer.length) return entry;
     return {
       ...entry,
       buffer,

@@ -445,6 +445,21 @@ async function isUnusableIcon(buffer, meta = {}) {
   return false;
 }
 
+// Lossless PNG encode: max zlib compression, keep alpha. Accepts a Buffer or
+// an existing sharp pipeline (e.g. after resize). No palette quantization.
+// Note: do not enable adaptiveFiltering — for flat/simple icons it often
+// increases size vs default filters (e.g. github.com 8.5 KB vs 6.1 KB).
+async function encodeLosslessPng(input) {
+  const pipeline =
+    input && typeof input.ensureAlpha === 'function' ? input : sharp(input);
+  return pipeline
+    .ensureAlpha()
+    .png({
+      compressionLevel: 9,
+    })
+    .toBuffer();
+}
+
 // Keep legacy export name for compatibility
 const toPng256 = toPng;
 
@@ -456,6 +471,7 @@ module.exports = {
   entryLooksLikeIco,
   readImageDimensions,
   resizeIcon,
+  encodeLosslessPng,
   isBlankFavicon,
   isUnusableIcon,
   looksLikeIco,
