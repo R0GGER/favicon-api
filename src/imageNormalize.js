@@ -9,6 +9,23 @@ const MIN_SOURCE_SIZE = 128;
 // standard icon size so on-demand ?size= downsizing preserves quality.
 const SVG_DISPLAY_SIZE = 512;
 
+// Near-lossless indexed/palette PNG for capped scraper output. Real favicons are
+// anti-aliased and carry 500-2000 colors, so a strictly bit-identical palette is
+// almost never possible; allowing a ≤256-color quantization typically shrinks the
+// file 25-55% with no perceptible change. The palette result is only used when it
+// meets SCRAPER_PNG_MIN_PSNR (perceptual, alpha-premultiplied) AND is smaller.
+const PNG_PALETTE_ENABLED = !/^(0|false|no|off)$/i.test(
+  String(process.env.SCRAPER_PNG_PALETTE ?? 'true').trim()
+);
+// Minimum PSNR (dB) the palette PNG must reach vs. the source to be accepted.
+// ∞ = bit-identical; ~50+ = visually indistinguishable; <35 starts to show.
+// Default 40 = "visually lossless" while still capturing typical savings. Lower
+// it to compress harder, raise it toward strict lossless. 0 = always take smaller.
+const PNG_MIN_PSNR = (() => {
+  const v = parseFloat(process.env.SCRAPER_PNG_MIN_PSNR);
+  return Number.isFinite(v) && v >= 0 ? v : 40;
+})();
+
 function transparentBackground() {
   return { r: 0, g: 0, b: 0, alpha: 0 };
 }
@@ -445,19 +462,79 @@ async function isUnusableIcon(buffer, meta = {}) {
   return false;
 }
 
-// Lossless PNG encode: max zlib compression, keep alpha. Accepts a Buffer or
-// an existing sharp pipeline (e.g. after resize). No palette quantization.
+// Perceptual PSNR (dB) between two raw RGBA buffers. Alpha is premultiplied so
+// that differences in the (invisible) RGB under fully-transparent pixels — which
+// libimagequant/libwebp freely rewrite — do not drag the score down. Returns
+// Infinity when the visible result is bit-identical.
+function rgbaPsnr(a, b) {
+  if (!a || !b || a.length !== b.length || a.length === 0) return 0;
+  let sum = 0;
+  let n = 0;
+  for (let i = 0; i < a.length; i += 4) {
+    const aa = a[i + 3];
+    const ba = b[i + 3];
+    for (let c = 0; c < 3; c++) {
+      const av = Math.round((a[i + c] * aa) / 255);
+      const bv = Math.round((b[i + c] * ba) / 255);
+      const d = av - bv;
+      sum += d * d;
+      n++;
+    }
+    const da = aa - ba;
+    sum += da * da;
+    n++;
+  }
+  const mse = sum / n;
+  if (mse === 0) return Infinity;
+  return 10 * Math.log10((255 * 255) / mse);
+}
+
+// Compact PNG encode for capped scraper output: max zlib compression, keep alpha.
+// Accepts a Buffer or an existing sharp pipeline (e.g. after resize).
+//
+// Strategy: encode both a truecolor PNG and an indexed/palette PNG, then keep the
+// smaller one. Real favicons are anti-aliased (500-2000 colors), so a bit-exact
+// palette is rare; instead the palette variant is accepted when its perceptual
+// PSNR vs. the source meets SCRAPER_PNG_MIN_PSNR (default 40 dB ≈ visually
+// lossless). Set SCRAPER_PNG_PALETTE=false to force strict truecolor PNG, or
+// SCRAPER_PNG_MIN_PSNR higher (toward strict lossless) / lower (harder compression).
+//
 // Note: do not enable adaptiveFiltering — for flat/simple icons it often
 // increases size vs default filters (e.g. github.com 8.5 KB vs 6.1 KB).
 async function encodeLosslessPng(input) {
   const pipeline =
     input && typeof input.ensureAlpha === 'function' ? input : sharp(input);
-  return pipeline
+
+  // Materialize the (already-resized) source once as raw RGBA so we can try
+  // multiple encoders and score the palette result against these exact pixels.
+  const { data: rawSource, info } = await pipeline
     .ensureAlpha()
-    .png({
-      compressionLevel: 9,
-    })
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const rawOpts = {
+    raw: { width: info.width, height: info.height, channels: 4 },
+  };
+
+  const truecolor = await sharp(rawSource, rawOpts)
+    .png({ compressionLevel: 9 })
     .toBuffer();
+
+  let best = truecolor;
+  if (PNG_PALETTE_ENABLED) {
+    try {
+      const paletted = await sharp(rawSource, rawOpts)
+        .png({ palette: true, colors: 256, dither: 0, effort: 10, compressionLevel: 9 })
+        .toBuffer();
+      if (paletted.length < best.length) {
+        const decoded = await sharp(paletted).ensureAlpha().raw().toBuffer();
+        if (rgbaPsnr(rawSource, decoded) >= PNG_MIN_PSNR) best = paletted;
+      }
+    } catch {
+      /* keep the truecolor PNG */
+    }
+  }
+
+  return best;
 }
 
 // Keep legacy export name for compatibility
