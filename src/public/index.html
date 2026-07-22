@@ -7928,6 +7928,48 @@ document.getElementById('sf').addEventListener('submit',function(e){
       return Math.max(icon?.width || 0, icon?.height || icon?.width || 0);
     }
 
+    function scraperFormatScore(format) {
+      if (!format) return 0;
+      const f = String(format).toLowerCase();
+      if (f === 'svg' || f === 'svg+xml') return 50;
+      if (f === 'png') return 40;
+      if (f === 'webp') return 35;
+      if (f === 'ico' || f === 'x-icon') return 20;
+      return 10;
+    }
+
+    function scraperIconQuality(icon) {
+      return scraperFormatScore(icon?.format) * 1e9 + (icon?.bytes || 0);
+    }
+
+    // Same rule as server-side dedupeIconsByDimensions: one icon per WxH,
+    // keeping the highest-quality format (then largest bytes).
+    function dedupeScraperIconsByDimensions(icons) {
+      if (!Array.isArray(icons) || icons.length <= 1) return icons || [];
+      const dimKey = (icon) => {
+        const w = icon.width || 0;
+        const h = icon.height || w;
+        return `${w}x${h}`;
+      };
+      const bestByDim = new Map();
+      for (const icon of icons) {
+        const key = dimKey(icon);
+        const prev = bestByDim.get(key);
+        if (!prev || scraperIconQuality(icon) > scraperIconQuality(prev)) {
+          bestByDim.set(key, icon);
+        }
+      }
+      const seen = new Set();
+      const out = [];
+      for (const icon of icons) {
+        const key = dimKey(icon);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push(bestByDim.get(key));
+      }
+      return out;
+    }
+
     function scraperLargestDiscoveredSize() {
       if (!scraperIcons.length) return 0;
       return scraperIcons.reduce((max, icon) => Math.max(max, scraperIconPixelSize(icon)), 0);
@@ -8363,21 +8405,40 @@ document.getElementById('sf').addEventListener('submit',function(e){
         return;
       }
 
-      scraperIcons = sorted;
+      scraperIcons = dedupeScraperIconsByDimensions(sorted);
       renderScraperSizes();
       loadInitialScraperSelection(domain, refresh);
     }
 
     function buildScraperSizeEntries() {
-      const entries = scraperIcons.map((icon, idx) => ({
+      // One button per pixel size. Prefer higher-quality discovered icons when
+      // several share the same max(width,height) display size.
+      const bestIdxBySize = new Map();
+      scraperIcons.forEach((icon, idx) => {
+        const sortSize = scraperIconPixelSize(icon);
+        if (sortSize <= 0) return;
+        const prevIdx = bestIdxBySize.get(sortSize);
+        if (
+          prevIdx === undefined ||
+          scraperIconQuality(icon) > scraperIconQuality(scraperIcons[prevIdx])
+        ) {
+          bestIdxBySize.set(sortSize, idx);
+        }
+      });
+      const entries = [...bestIdxBySize.entries()].map(([sortSize, idx]) => ({
         type: 'icon',
         idx,
-        sortSize: Math.max(icon.width || 0, icon.height || icon.width || 0),
+        sortSize,
       }));
+
       const largestDiscovered = scraperLargestDiscoveredSize();
-      // Fast-proxy pill at SCRAPER_MAX_ICON_SIZE (links to /{domain}). Distinct
-      // from the same numeric size under /scraper/{size}/… — both may show "128".
+      // Fast-proxy pill at SCRAPER_MAX_ICON_SIZE (links to /{domain}). When a
+      // discovered icon already occupies that size, keep the Fast proxy and
+      // drop the native button so the strip never shows two identical labels.
       if (scraperMaxIconSize > 0 && (largestDiscovered === 0 || largestDiscovered >= scraperMaxIconSize)) {
+        for (let i = entries.length - 1; i >= 0; i--) {
+          if (entries[i].sortSize === scraperMaxIconSize) entries.splice(i, 1);
+        }
         entries.push({ type: 'proxy', sortSize: scraperMaxIconSize });
       }
       const existingSizes = new Set(entries.map((e) => e.sortSize));
