@@ -229,13 +229,30 @@ MANIFEST_PROBE_MAX=12
 # Max width/height (px) for images returned by GET /scraper/:domain only. The scraper
 # still picks the largest source icon; if that image exceeds this limit it is
 # downscaled with "contain". When the cap is active, output is also re-encoded as
-# a lossless PNG (max compression, alpha preserved) so responses stay small without
-# quality loss; already-capped icons are re-encoded only when that shrinks the file.
-# Does not change /:domain/json — the UI size strip still lists every variant
-# at full resolution (via /s-asset or upstream URLs). Set to 0 to disable the
-# cap and serve native resolution (default). Example: 128 keeps /scraper/ responses
-# small for dashboards while the JSON API still exposes larger sources.
+# a compact PNG so responses stay small; already-capped icons are re-encoded only
+# when that shrinks the file. The encoder builds both a truecolor and an
+# indexed/palette PNG and keeps the smaller one (see SCRAPER_PNG_* below). Does not
+# change /:domain/json — the UI size strip still lists every variant at full
+# resolution (via /s-asset or upstream URLs). Set to 0 to disable the cap and serve
+# native resolution (default). Example: 128 keeps /scraper/ responses small for
+# dashboards while the JSON API still exposes larger sources.
 SCRAPER_MAX_ICON_SIZE=128
+
+# Palette (indexed) PNG pass for the capped /scraper/ output. Real favicons are
+# anti-aliased (500-2000 colors), so a strictly bit-identical palette is rare;
+# quantizing to <=256 colors typically shrinks the file 25-55% with no perceptible
+# change. When true (default), the palette variant is used if it is smaller AND
+# meets SCRAPER_PNG_MIN_PSNR. Set to false to always keep the truecolor PNG.
+SCRAPER_PNG_PALETTE=true
+
+# Minimum perceptual quality (PSNR in dB, alpha-premultiplied) the palette PNG must
+# reach vs. the source to be used instead of the truecolor PNG. Higher = stricter
+# (closer to lossless), lower = harder compression. Default 40 ≈ "visually
+# lossless"; 50+ is indistinguishable, below ~35 artifacts start to show. Set to 0
+# to always take the smaller file regardless of quality. Ignored when
+# SCRAPER_PNG_PALETTE=false. (Measured at default: github.com -25% @66.9dB,
+# netflix.com -26% @65.3dB, reddit.com -53% @50.5dB.)
+SCRAPER_PNG_MIN_PSNR=40
 
 # When true, the scraper prefers curated service-icon catalogs over direct
 # HTML scraping for domains that map to a known service slug (e.g.
@@ -600,7 +617,9 @@ The tables below cover the most-used variables. For the complete list — includ
 | `SCRAPER_DISK_CACHE`       | `false`                         | When `true`, persist scraper discovery (HTML, icon lists, besticon JSON, manifests, probes) under `{CACHE_DIR}/scraper-discovery`. Survives restarts; shared across workers.                                                                                                         |
 | `SCRAPER_DISK_CACHE_DIR`   | `{CACHE_DIR}/scraper-discovery` | Directory for that discovery cache. Only used when `SCRAPER_DISK_CACHE=true`.                                                                                                                                                                                                        |
 | `MANIFEST_PROBE_MAX`       | `12`                            | Max manifest URLs to probe per domain when HTML does not link one directly.                                                                                                                                                                                                          |
-| `SCRAPER_MAX_ICON_SIZE`    | `0`                             | Max output dimension for `/scraper/{domain}`. Larger sources are downscaled; when set, output is also lossless PNG-compressed (alpha preserved). `0` = native resolution.                                                                                                               |
+| `SCRAPER_MAX_ICON_SIZE`    | `0`                             | Max output dimension for `/scraper/{domain}`. Larger sources are downscaled; when set, output is also PNG-recompressed (truecolor vs. palette — whichever is smaller, see `SCRAPER_PNG_*`). `0` = native resolution.                                                                    |
+| `SCRAPER_PNG_PALETTE`      | `true`                          | Enable the near-lossless indexed/palette PNG pass for capped scraper output (typically 25-55% smaller). `false` forces strict truecolor PNG.                                                                                                                                         |
+| `SCRAPER_PNG_MIN_PSNR`     | `40`                            | Minimum perceptual PSNR (dB, alpha-premultiplied) the palette PNG must reach to be used over truecolor. Higher = closer to lossless; `0` = always take the smaller file. Ignored when `SCRAPER_PNG_PALETTE=false`.                                                                    |
 
 
 ### API v1 & quotas

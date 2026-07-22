@@ -147,11 +147,26 @@ Memory caches are **per worker**, so total RAM scales with `WORKERS`.
 For dashboard use cases you rarely need icons larger than 128px. Capping the
 output of `/scraper/{domain}` produces smaller PNGs — less to encode, cache,
 transfer, and decode in the browser. When the cap is set, responses are also
-re-encoded as lossless PNG (max compression, transparency preserved):
+recompressed (transparency preserved):
 
 ```bash
 SCRAPER_MAX_ICON_SIZE=128
 ```
+
+The encoder builds both a truecolor and an indexed/palette PNG and keeps the
+smaller one. Real favicons are anti-aliased (500-2000 colors), so a bit-exact
+palette is rare; instead the palette variant is accepted when its perceptual
+quality vs. the source is high enough — controlled by `SCRAPER_PNG_MIN_PSNR`:
+
+```bash
+SCRAPER_PNG_PALETTE=true    # enable the palette pass (default)
+SCRAPER_PNG_MIN_PSNR=40     # min PSNR (dB) to accept palette; 0 = always smallest
+```
+
+At the default `40` dB (≈ visually lossless) this shrinks typical icons 25-55%
+while staying `image/png`: github.com −25% (66.9 dB), netflix.com −26% (65.3 dB),
+reddit.com −53% (50.5 dB). Raise `SCRAPER_PNG_MIN_PSNR` toward strict lossless, or
+set `SCRAPER_PNG_PALETTE=false` to always keep the truecolor PNG.
 
 This only affects `/scraper/{domain}`; `/{domain}/json` still lists every
 variant at full resolution.
