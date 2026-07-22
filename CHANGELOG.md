@@ -5,6 +5,18 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.15.7] — 2026-07-22
+
+### Changed
+
+- **`SCRAPER_MAX_ICON_SIZE` — lossless PNG compression** — when the cap is active, `/scraper/{domain}` (and serve-time re-cap) re-encodes output as PNG with max zlib compression (`compressionLevel: 9`) and `ensureAlpha`, so file size shrinks without quality loss and transparency is preserved. Icons already within the pixel cap are re-encoded only when the result is smaller than the source. (`adaptiveFiltering` is left off — it can inflate flat icons.)
+- **Web UI — Fast proxy tooltip shows file type and size** — the lavender Fast proxy URL popup now shows a small `PNG · 5.9 KB`-style badge in the top-right, fetched from the embed URL (`/{domain}`).
+
+### Fixed
+
+- **`/{domain}` ignored `SCRAPER_MAX_ICON_SIZE` for cached scraper wins** — best-pick served stale `best_*` cache entries at full resolution (e.g. github.com at 512×512) while `/scraper/{domain}` correctly capped to 128. The best-pick route now re-applies `capScraperProxyOutput` at serve time when the winning provider is scraper.
+- **`/scraper/{domain}` skipped the size cap for SVG-sourced icons** — after rasterizing an SVG to PNG, `capScraperProxyOutput` still saw `.svg` in the original URL and returned early, so sites like github.com were served at 512×512 instead of `SCRAPER_MAX_ICON_SIZE`. The skip now depends on the buffer/content-type actually being SVG.
+
 ## [2.15.6] — 2026-07-21
 
 ### Fixed
