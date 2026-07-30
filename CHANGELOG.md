@@ -5,6 +5,12 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.15.11] — 2026-07-30
+
+### Fixed
+
+- **`/{domain}` kept serving broken Google product logos after the SVG viewBox fix** — best-pick caches (`best_*`) still held the underfilled corner-glyph PNGs, and `?refresh=1` was ignored on `/{domain}` (only `/scraper/…` honored it). Underfilled rasters (visible ink filling < 35% of a ≥64px canvas) are now rejected by `isUnusableIcon`, so stale entries self-heal on the next request. `?refresh=1` / `?nocache=1` on `/{domain}` also clears best-pick + scraper caches.
+
 ## [2.15.10] — 2026-07-30
 
 ### Fixed
