@@ -401,11 +401,13 @@ async function isBlankFavicon(buffer, { contentType = '', url = '' } = {}) {
 const UNDERFILLED_MIN_EDGE = 64;
 const UNDERFILLED_MAX_FILL = 0.35;
 
-async function isUnderfilledRaster(buffer, { contentType = '', url = '' } = {}) {
+async function isUnderfilledRaster(buffer, _meta = {}) {
   if (!buffer || buffer.length === 0) return false;
 
-  const hint = `${contentType} ${url}`.toLowerCase();
-  if (looksLikeSvg(buffer) || hint.includes('svg')) return false;
+  // Only skip actual SVG bytes. Cached scraper/best entries often keep a .svg
+  // source URL (and sometimes image/svg+xml) after toDisplayPng converted the
+  // buffer to PNG — those broken corner-glyph PNGs must still be detected.
+  if (looksLikeSvg(buffer)) return false;
 
   try {
     const { data, info } = await sharp(buffer)
