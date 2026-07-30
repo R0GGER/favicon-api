@@ -194,6 +194,26 @@
 
     .tip code:hover { background: rgba(0,0,0,0.12); }
 
+    .tip a.tip-external {
+      display: inline-flex;
+      align-items: center;
+      margin-left: 0.2rem;
+      color: inherit;
+      text-decoration: none;
+      vertical-align: baseline;
+      position: relative;
+      top: -0.35em;
+      line-height: 1;
+    }
+
+    .tip a.tip-external[hidden] { display: none; }
+
+    .tip a.tip-external iconify-icon {
+      font-size: 0.95em;
+    }
+
+    .tip a.tip-external:hover { opacity: 0.75; }
+
     .tip button.tip-link {
       background: none;
       border: none;
@@ -2903,7 +2923,7 @@
     <div class="tip">
       <strong><span class="icon">&#9881;</span> Tips</strong>
       <ul>
-        <li>Use an icon directly via <code id="api-example" onclick="copyApiUrl()">https://&lt;this-host&gt;/{domain-or-appname}</code> (e.g. reddit.com, jellyfin, immich). Click any image to copy its URL.</li>
+        <li>Use an icon directly via <code id="api-example" onclick="copyApiUrl()">https://&lt;this-host&gt;/{domain-or-appname}</code><a id="api-example-open" class="tip-external" href="#" target="_blank" rel="noopener noreferrer" aria-label="Open URL in new tab" hidden><iconify-icon icon="line-md:external-link" aria-hidden="true"></iconify-icon></a> (e.g. reddit.com, jellyfin, immich). Click any image to copy its URL.</li>
       </ul>
     </div>
 
@@ -3660,7 +3680,17 @@
   </div>
 
   <script>
-    document.getElementById('api-example').textContent = `${location.origin}/{domain-or-appname}`;
+    function setApiExample(url) {
+      const code = document.getElementById('api-example');
+      const open = document.getElementById('api-example-open');
+      if (code) code.textContent = url;
+      if (open) {
+        open.href = url;
+        open.hidden = url.includes('{domain-or-appname}');
+      }
+    }
+
+    setApiExample(`${location.origin}/{domain-or-appname}`);
 
     function toggleToolDetails(section, opts) {
       const target = document.getElementById(`tool-details-${section}`);
@@ -5905,7 +5935,7 @@ document.getElementById('sf').addEventListener('submit',function(e){
         history.replaceState(null, '', location.pathname);
       }
 
-      document.getElementById('api-example').textContent = `${location.origin}/{domain-or-appname}`;
+      setApiExample(`${location.origin}/{domain-or-appname}`);
       document.getElementById('json-button-wrap').classList.remove('visible');
       hideNoIconNotice();
 
@@ -6557,7 +6587,7 @@ document.getElementById('sf').addEventListener('submit',function(e){
       DOMAIN_FAVICON_PROVIDERS.forEach(resetFaviconCard);
       hideNoIconNotice();
 
-      document.getElementById('api-example').textContent = `${location.origin}/${domain}`;
+      setApiExample(`${location.origin}/${domain}`);
       const jsonUrl = `${location.origin}/${domain}/json`;
       document.getElementById('json-link').href = jsonUrl;
       document.getElementById('json-link-url').textContent = jsonUrl;
@@ -6639,8 +6669,7 @@ document.getElementById('sf').addEventListener('submit',function(e){
       hideNoIconNotice();
 
       const serviceQuery = resolveData.input || slug;
-      document.getElementById('api-example').textContent =
-        `${location.origin}/${encodeURIComponent(serviceQuery)}`;
+      setApiExample(`${location.origin}/${encodeURIComponent(serviceQuery)}`);
       const jsonUrl = `${location.origin}/${encodeURIComponent(serviceQuery)}/json`;
       document.getElementById('json-link').href = jsonUrl;
       document.getElementById('json-link-url').textContent = jsonUrl;
