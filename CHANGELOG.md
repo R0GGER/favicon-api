@@ -5,6 +5,12 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.15.12] — 2026-07-30
+
+### Fixed
+
+- **Underfilled SVG→PNG cache entries were never auto-invalidated** — `isUnderfilledRaster` skipped any entry whose source URL/content-type mentioned `svg`, but best/scraper caches keep the `.svg` URL after converting to PNG. Broken Google product logos (tiny corner glyph) therefore stayed in `best_*` until a manual `?refresh=1`. Detection now keys off the buffer only.
+
 ## [2.15.11] — 2026-07-30
 
 ### Fixed
