@@ -5,6 +5,12 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.15.10] — 2026-07-30
+
+### Fixed
+
+- **SVG → PNG — Google product logos rendered as a tiny icon in the corner** — Google Workspace productlogos (Drive, Calendar, Meet, …) ship SVGs with `width`/`height` but no `viewBox`. `scaleSvgForRaster` enlarged the canvas without scaling path coordinates, so `/drive.google.com` and `/scraper/…` showed a ~16px triangle in the corner of a black 128×128 frame. SVGs without a `viewBox` now get `viewBox="0 0 {w} {h}"` from their intrinsic size before the pixel size is pinned.
+
 ## [2.15.9] — 2026-07-22
 
 ### Changed
