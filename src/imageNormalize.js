@@ -394,6 +394,52 @@ async function isBlankFavicon(buffer, { contentType = '', url = '' } = {}) {
   }
 }
 
+// True when visible ink only fills a tiny corner of a large canvas — the classic
+// symptom of rasterizing an SVG that had width/height but no viewBox (content
+// stays at the original user-space size while the canvas grows). Real favicons
+// at ≥64px almost always fill well over a third of the frame.
+const UNDERFILLED_MIN_EDGE = 64;
+const UNDERFILLED_MAX_FILL = 0.35;
+
+async function isUnderfilledRaster(buffer, { contentType = '', url = '' } = {}) {
+  if (!buffer || buffer.length === 0) return false;
+
+  const hint = `${contentType} ${url}`.toLowerCase();
+  if (looksLikeSvg(buffer) || hint.includes('svg')) return false;
+
+  try {
+    const { data, info } = await sharp(buffer)
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    const w = info.width || 0;
+    const h = info.height || 0;
+    if (w < UNDERFILLED_MIN_EDGE || h < UNDERFILLED_MIN_EDGE) return false;
+
+    let opaque = 0;
+    let minX = w;
+    let minY = h;
+    let maxX = 0;
+    let maxY = 0;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        if (data[(y * w + x) * 4 + 3] <= 10) continue;
+        opaque++;
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+      }
+    }
+    if (opaque === 0) return true;
+
+    const fill = Math.max((maxX - minX + 1) / w, (maxY - minY + 1) / h);
+    return fill < UNDERFILLED_MAX_FILL;
+  } catch {
+    return false;
+  }
+}
+
 function providerHint(meta = {}) {
   return `${meta.provider || ''} ${meta.url || ''}`.toLowerCase();
 }
@@ -464,6 +510,7 @@ function isRyanjcPlaceholder(buffer, meta = {}) {
 
 async function isUnusableIcon(buffer, meta = {}) {
   if (await isBlankFavicon(buffer, meta)) return true;
+  if (await isUnderfilledRaster(buffer, meta)) return true;
   if (isFaviconSoPlaceholder(buffer, meta)) return true;
   if (isVemetricPlaceholder(buffer, meta)) return true;
   if (isRyanjcPlaceholder(buffer, meta)) return true;

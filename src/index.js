@@ -2175,7 +2175,19 @@ app.get('/:domain', async (req, res) => {
   const parsed = parseDomainOrService(req.params.domain);
   if (!parsed) return res.status(400).json({ error: 'Invalid domain or service name.' });
 
+  const refresh = req.query.refresh === '1' || req.query.nocache === '1';
+
   try {
+    if (refresh && parsed.type === 'domain') {
+      // Drop best-pick + scraper image caches and discovery so a re-pick cannot
+      // resurrect a stale underfilled SVG→PNG (or other bad) entry.
+      await cache.del('best', parsed.value, null);
+      await invalidateScraperImageCaches(parsed.value, null);
+      invalidateScraperDomainCaches(parsed.value);
+    } else if (refresh && parsed.type === 'service') {
+      await cache.del('best-service', parsed.value, null);
+    }
+
     let entry = parsed.type === 'domain'
       ? await pickBest(parsed.value)
       : await pickBestService(parsed.value);
