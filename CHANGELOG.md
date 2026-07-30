@@ -5,6 +5,12 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.15.13] — 2026-07-31
+
+### Added
+
+- **Web UI — open tip example URL in a new tab** — after a domain or app-name search, the Tips example URL shows a `line-md:external-link` icon that opens the resolved `/{domain-or-appname}` URL in a new tab. The icon stays hidden while the placeholder is shown.
+
 ## [2.15.12] — 2026-07-30
 
 ### Fixed
