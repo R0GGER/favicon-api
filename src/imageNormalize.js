@@ -106,6 +106,9 @@ function svgIntrinsicSize(svg) {
 // Pin the SVG root to an explicit pixel size before sharp/librsvg rasterizes.
 // Large viewBox units (e.g. Google Analytics ~2200×2430) × density=size×4 can
 // exceed sharp's input pixel limit and 500 on /svgl/128|256/png/….
+// SVGs with width/height but no viewBox (e.g. Google productlogos Drive/Calendar)
+// must also get a viewBox: changing only width/height leaves path coordinates in
+// the original user space, so content stays tiny in the corner of a larger canvas.
 function scaleSvgForRaster(buffer, maxEdge) {
   if (!buffer || buffer.length === 0 || !maxEdge) return buffer;
   const svg = buffer.toString('utf8');
@@ -128,10 +131,15 @@ function scaleSvgForRaster(buffer, maxEdge) {
   let replaced = false;
   const scaled = svg.replace(/<svg\b([^>]*)>/i, (_, attrs) => {
     replaced = true;
+    const hasViewBox = /\bviewBox\s*=/i.test(attrs);
+    const viewBoxAttr =
+      !hasViewBox && intrinsic
+        ? ` viewBox="0 0 ${intrinsic.width} ${intrinsic.height}"`
+        : '';
     const cleaned = attrs
       .replace(/\s*width\s*=\s*("[^"]*"|'[^']*')/gi, '')
       .replace(/\s*height\s*=\s*("[^"]*"|'[^']*')/gi, '');
-    return `<svg${cleaned} width="${width}" height="${height}">`;
+    return `<svg${cleaned}${viewBoxAttr} width="${width}" height="${height}">`;
   });
 
   return replaced ? Buffer.from(scaled, 'utf8') : buffer;
