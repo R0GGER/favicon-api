@@ -5,6 +5,12 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.15.15] — 2026-08-06
+
+### Added
+
+- **HTML scraper — `og:image` / `twitter:image` / `msapplication-TileImage`** — `parseIconCandidatesFromHtml` now also extracts these meta images as icon candidates (e.g. `123accu.nl`'s Facebook logo). Near-square images only (aspect ≤ 1.4) so widescreen social share cards are skipped; real `<link rel="icon">` / apple-touch / manifest icons still win once they are ≥ 128px. The v1 API adds an `og-image` source tier after `png` and before catalog fallbacks.
+
 ## [2.15.14] — 2026-08-06
 
 ### Fixed
