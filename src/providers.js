@@ -418,12 +418,25 @@ async function probeScraperCandidates(candidates, referer, limit = 16) {
 
   let best = null;
   let bestScore = -1;
+  let bestIsMeta = false;
 
-  function updateBest(result, width, format) {
+  function updateBest(result, width, format, isMeta = false) {
+    // Prefer real <link>/manifest icons once they meet MIN_SOURCE_SIZE so a
+    // large og:image logo does not override an apple-touch-icon / app icon.
+    if (isMeta && best && !bestIsMeta && (best.sourceWidth || 0) >= MIN_SOURCE_SIZE) {
+      return;
+    }
+    if (!isMeta && best && bestIsMeta && width >= MIN_SOURCE_SIZE) {
+      bestScore = width * 100 + formatScore(format);
+      best = { ...result, provider: 'scraper', sourceWidth: width };
+      bestIsMeta = false;
+      return;
+    }
     const score = width * 100 + formatScore(format);
     if (score > bestScore) {
       bestScore = score;
       best = { ...result, provider: 'scraper', sourceWidth: width };
+      bestIsMeta = !!isMeta;
     }
   }
 
@@ -437,12 +450,15 @@ async function probeScraperCandidates(candidates, referer, limit = 16) {
     });
     if (!dims || dims.width <= 0) return null;
 
+    const isMeta = isMetaImageRel(candidate.rel);
+    if (isMeta && !isNearSquareIcon(dims.width, dims.height)) return null;
+
     let width = Math.min(dims.width, dims.height || dims.width);
     const format = dims.format || '';
     const isSvg = format === 'svg' || looksLikeSvg(result.buffer)
       || (result.contentType || '').toLowerCase().includes('svg');
     if (isSvg) width = Math.max(width, 512);
-    return { result, width, format };
+    return { result, width, format, isMeta };
   }
 
   // Variant groups: probe every declared size, then drop a suspiciously large
@@ -474,12 +490,12 @@ async function probeScraperCandidates(candidates, referer, limit = 16) {
     [...variantGroups.values()].map(processGroup)
   );
   for (const hits of groupResults) {
-    for (const hit of hits) updateBest(hit.result, hit.width, hit.format);
+    for (const hit of hits) updateBest(hit.result, hit.width, hit.format, hit.isMeta);
   }
 
   // Loose candidates: probe in parallel batches.
   const looseHits = await runInBatches(loose, SCRAPER_PROBE_BATCH_SIZE, probeOne);
-  for (const hit of looseHits) updateBest(hit.result, hit.width, hit.format);
+  for (const hit of looseHits) updateBest(hit.result, hit.width, hit.format, hit.isMeta);
 
   if (!best) return null;
 
@@ -1279,6 +1295,40 @@ function parseSizesAttr(sizes) {
   return max;
 }
 
+// Social / tile meta images (og:image, twitter:image, …) are useful logo
+// fallbacks but often widescreen share cards. Only keep near-square ones.
+const META_IMAGE_MAX_ASPECT = 1.4;
+
+function isMetaImageRel(rel) {
+  const r = String(rel || '').toLowerCase();
+  return (
+    r === 'og-image' ||
+    r === 'twitter-image' ||
+    r === 'msapplication-tileimage'
+  );
+}
+
+function isNearSquareIcon(width, height) {
+  const w = Number(width) || 0;
+  const h = Number(height) || 0;
+  if (w <= 0 || h <= 0) return false;
+  return Math.max(w, h) / Math.min(w, h) <= META_IMAGE_MAX_ASPECT;
+}
+
+function metaImageRelFromKey(key) {
+  const k = String(key || '').toLowerCase().trim();
+  if (k === 'og:image' || k === 'og:image:url' || k === 'og:image:secure_url') {
+    return 'og-image';
+  }
+  if (k === 'twitter:image' || k === 'twitter:image:src') {
+    return 'twitter-image';
+  }
+  if (k === 'msapplication-tileimage') {
+    return 'msapplication-tileimage';
+  }
+  return null;
+}
+
 function formatScore(format) {
   if (!format) return 0;
   const f = format.toLowerCase();
@@ -1719,7 +1769,14 @@ async function fetchScraperAllIcons(domain) {
     const probed = await runInBatches(
       dedupeCandidates(pageLinkCandidates),
       SCRAPER_PROBE_BATCH_SIZE,
-      (c) => probeIconMetadata(c.href, referer)
+      async (c) => {
+        const p = await probeIconMetadata(c.href, referer);
+        if (!p) return null;
+        if (isMetaImageRel(c.rel) && !isNearSquareIcon(p.width, p.height)) {
+          return null;
+        }
+        return p;
+      }
     );
     for (const p of probed) {
       if (p && p.url && !byUrl.has(p.url)) byUrl.set(p.url, p);
@@ -2128,6 +2185,34 @@ function parseIconCandidatesFromHtml(html, finalBaseUrl, domain = null) {
         href: new URL(href, resolveBase).toString(),
         sizes: $(el).attr('sizes') || '',
         type: $(el).attr('type') || '',
+        rel,
+      });
+    } catch {
+      /* ignore invalid URLs */
+    }
+  });
+
+  // Open Graph / Twitter / Windows tile images — often a brand logo when the
+  // site only exposes a tiny favicon. Widescreen share cards are filtered out
+  // later via isNearSquareIcon during probing.
+  const seenMetaHrefs = new Set(linkCandidates.map((c) => c.href));
+  $('meta[property], meta[name]').each((_, el) => {
+    const property = ($(el).attr('property') || '').trim();
+    const name = ($(el).attr('name') || '').trim();
+    const rel = metaImageRelFromKey(property || name);
+    if (!rel) return;
+
+    const content = ($(el).attr('content') || '').trim();
+    if (!content || content.startsWith('data:')) return;
+
+    try {
+      const href = new URL(content, resolveBase).toString();
+      if (seenMetaHrefs.has(href)) return;
+      seenMetaHrefs.add(href);
+      linkCandidates.push({
+        href,
+        sizes: '',
+        type: '',
         rel,
       });
     } catch {

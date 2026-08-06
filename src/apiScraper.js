@@ -22,6 +22,7 @@ const SOURCE_TYPES = [
   'manifest',
   'apple-touch-icon',
   'png',
+  'og-image',
   'selfhst',
   'dashboardicons',
   'lobehub',
@@ -53,6 +54,13 @@ function classifyLinkCandidate(candidate) {
   const href = String(candidate.href || '').toLowerCase();
   const path = href.split('?')[0];
 
+  if (
+    rel === 'og-image' ||
+    rel === 'twitter-image' ||
+    rel === 'msapplication-tileimage'
+  ) {
+    return 'og-image';
+  }
   if (rel.includes('apple-touch-icon')) return 'apple-touch-icon';
   if (type.includes('svg') || path.endsWith('.svg')) return 'svg';
   if (path.endsWith('.ico') || type.includes('ico') || type === 'image/x-icon') {
@@ -84,7 +92,7 @@ function isPreferredSource(hit) {
   return Math.max(hit.sourceWidth, hit.sourceHeight) > MIN_SOURCE_SIZE;
 }
 
-async function tryCandidate(href, referer) {
+async function tryCandidate(href, referer, { requireNearSquare = false } = {}) {
   const result = await fetchScraperAsset(href, referer);
   if (!result || !result.buffer || result.buffer.length === 0) return null;
 
@@ -104,6 +112,11 @@ async function tryCandidate(href, referer) {
     if (!dims) return null;
     sourceWidth = dims.width;
     sourceHeight = dims.height;
+    if (requireNearSquare) {
+      const max = Math.max(sourceWidth, sourceHeight);
+      const min = Math.min(sourceWidth, sourceHeight);
+      if (min <= 0 || max / min > 1.4) return null;
+    }
     if (sourceWidth < MIN_SOURCE_SIZE || sourceHeight < MIN_SOURCE_SIZE) {
       return null;
     }
@@ -119,12 +132,12 @@ async function tryCandidate(href, referer) {
   };
 }
 
-async function evaluateTier(candidates, referer) {
+async function evaluateTier(candidates, referer, { requireNearSquare = false } = {}) {
   const sorted = dedupeByHref([...candidates]).sort(sortBySizeDesc);
   let fallback = null;
 
   for (const candidate of sorted) {
-    const hit = await tryCandidate(candidate.href, referer);
+    const hit = await tryCandidate(candidate.href, referer, { requireNearSquare });
     if (!hit) continue;
     if (isPreferredSource(hit)) return { preferred: hit, fallback: null };
     if (!fallback) fallback = hit;
@@ -144,6 +157,7 @@ async function gatherCandidates(domain) {
     manifest: [],
     'apple-touch-icon': [],
     png: [],
+    'og-image': [],
     ico: [],
     selfhst: [],
     dashboardicons: [],
@@ -321,7 +335,9 @@ async function fetchBySourcePriorityForDomain(domain) {
     const tier = buckets[sourceType];
     if (!tier || tier.length === 0) continue;
 
-    const { preferred, fallback } = await evaluateTier(tier, referer);
+    const { preferred, fallback } = await evaluateTier(tier, referer, {
+      requireNearSquare: sourceType === 'og-image',
+    });
     if (preferred) {
       return {
         buffer: preferred.buffer,
