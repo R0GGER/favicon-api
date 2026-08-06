@@ -5,6 +5,13 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.15.14] — 2026-08-06
+
+### Fixed
+
+- **Web UI — scraper size strip no longer offers undeliverable 256/512 buttons** — `scraperCanDownscaleTo` treated every key in the JSON `sizes` map as available, so domains whose largest source is e.g. 192×192 still showed 256 and 512 (raster is never upscaled; those clicks returned a smaller PNG). Buttons now require a discovered source ≥ the requested size (SVG/catalog icons that advertise 512 still unlock the full strip). Before discovery, only the Fast-proxy size (`SCRAPER_MAX_ICON_SIZE`) is offered.
+- **Web UI — HTML Scraper defaults to the largest discovered icon** — with `SCRAPER_MAX_ICON_SIZE=128`, the card always opened on the capped Fast proxy (`/scraper/{domain}` → 128×128) even when discovery found a larger native source (e.g. nu.nl `android-chrome-192x192.png`). The preview now selects the largest discovered icon first; Fast proxy remains available as an explicit size-strip button.
+
 ## [2.15.13] — 2026-07-31
 
 ### Added
