@@ -73,8 +73,9 @@ The first tier to produce a usable icon ≥ 128px wins. ICO files are excluded (
 2. `manifest`
 3. `apple-touch-icon`
 4. `png`
-5. `selfhst` / `dashboardicons` / `lobehub` / `svgl` / `thesvg` (catalog fallbacks when a slug matches)
-6. `external` (Google faviconV2 as last resort)
+5. `og-image` (`og:image` / `twitter:image` / `msapplication-TileImage`; near-square only)
+6. `selfhst` / `dashboardicons` / `lobehub` / `svgl` / `thesvg` (catalog fallbacks when a slug matches)
+7. `external` (Google faviconV2 as last resort)
 
 Within each tier, larger declared sizes are preferred.
 

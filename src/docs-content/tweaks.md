@@ -41,7 +41,7 @@ A v1 API cache hit is essentially a file stat — no upstream calls, no image
 decoding. The scraper has **two cost centers**, and by default both expire much
 sooner:
 
-1. **Discovery** — fetch the site HTML, parse `<link rel="icon">`, parse the web
+1. **Discovery** — fetch the site HTML, parse `<link rel="icon">`, `og:image` / `twitter:image` meta (near-square only), parse the web
    manifest, and *probe* each candidate icon for its real dimensions. This is by
    far the most expensive step (multiple upstream requests per domain). Cached by
    `SCRAPER_ICONS_CACHE_TTL` (default **3600s / 1 hour**).

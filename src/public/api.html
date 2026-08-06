@@ -1935,7 +1935,7 @@ docker compose exec maflplus-favicon-api npm run keys:revoke -- --prefix fa_abcd
           <tr><td><code>domain</code></td><td>string</td><td>Normalized hostname extracted from the input.</td></tr>
           <tr><td><code>width</code> / <code>height</code></td><td>number</td><td>Always 128 &times; 128.</td></tr>
           <tr><td><code>format</code></td><td>string</td><td>Always <code>"png"</code>.</td></tr>
-          <tr><td><code>sourceType</code></td><td>string</td><td>Where the icon came from, in priority order: <code>svg</code> &gt; <code>manifest</code> &gt; <code>apple-touch-icon</code> &gt; <code>png</code> &gt; <code>ico</code>.</td></tr>
+          <tr><td><code>sourceType</code></td><td>string</td><td>Where the icon came from, in priority order: <code>svg</code> &gt; <code>manifest</code> &gt; <code>apple-touch-icon</code> &gt; <code>png</code> &gt; <code>og-image</code> &gt; catalog fallbacks &gt; <code>external</code>.</td></tr>
           <tr><td><code>cached</code></td><td>boolean</td><td><code>true</code> if served from the 7-day disk cache, <code>false</code> if just generated.</td></tr>
           <tr><td><code>cachedAt</code></td><td>string (ISO-8601)</td><td>Timestamp of when the PNG was stored.</td></tr>
         </tbody>
