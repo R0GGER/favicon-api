@@ -7888,9 +7888,9 @@ document.getElementById('sf').addEventListener('submit',function(e){
       return proxyBtn;
     }
 
-    // Advertise standard /scraper/{size}/… routes immediately. Those hit the
-    // sized image cache (scraper_{size}_{domain}) — no need to wait for
-    // /{domain}/json discovery before the size strip is usable.
+    // Seed proxy URL templates before /{domain}/json returns. The strip still
+    // filters via scraperCanDownscaleTo — only the Fast-proxy size is clickable
+    // until discovery reports a largest source (so 256/512 do not flash early).
     function seedScraperAvailableSizes(domain) {
       const origin = location.origin;
       const encoded = encodeURIComponent(domain);
@@ -8004,16 +8004,19 @@ document.getElementById('sf').addEventListener('submit',function(e){
       return scraperIcons.reduce((max, icon) => Math.max(max, scraperIconPixelSize(icon)), 0);
     }
 
-    // Whether a size button / load is offerable. SCRAPER_MAX_ICON_SIZE only caps
-    // the unsized fast-proxy embed (`/scraper/{domain}`); explicit
-    // `/scraper/{size}/…` routes (and the JSON `sizes` map) stay available —
-    // including via catalog/SVG fallback — even when discovered bitmaps are
-    // smaller than the requested size (e.g. cached scraper_512_* files).
+    // Whether a size button / load is offerable. Raster icons are never
+    // upscaled server-side, so a size is only honest when discovery found a
+    // source >= that size (SVG/catalog hits advertise their native/raster
+    // size in `icons`, e.g. 512). SCRAPER_MAX_ICON_SIZE only caps the unsized
+    // fast-proxy embed — it must NOT unlock 256/512 buttons by itself.
+    // Before discovery (`largest === 0`), allow only the Fast-proxy size so
+    // the strip is usable without advertising undeliverable pixels.
     function scraperCanDownscaleTo(size) {
       if (!(size > 0)) return false;
       const largest = scraperLargestDiscoveredSize();
-      if (scraperMaxIconSize > 0 && size === scraperMaxIconSize && largest === 0) return true;
-      if (scraperAvailableSizes && scraperAvailableSizes[String(size)]) return true;
+      if (largest === 0) {
+        return scraperMaxIconSize > 0 && size === scraperMaxIconSize;
+      }
       return largest >= size;
     }
 
@@ -8220,6 +8223,18 @@ document.getElementById('sf').addEventListener('submit',function(e){
     }
 
     function loadInitialScraperSelection(domain, refresh) {
+      // Prefer the largest discovered native icon. SCRAPER_MAX_ICON_SIZE only
+      // caps the unsized Fast proxy embed (`/scraper/{domain}`); defaulting the
+      // card to that cap (e.g. 128) hid larger real sources (e.g. nu.nl 192).
+      const idx = defaultScraperIconIndex();
+      const iconSize = idx >= 0 ? scraperIconPixelSize(scraperIcons[idx]) : 0;
+      if (idx >= 0 && scraperIcons.length > 0 && sizePassesSizeFilter(iconSize)) {
+        currentScraperSelection = idx;
+        setActiveScraperButton(idx);
+        loadScraperVariant(idx);
+        return;
+      }
+
       if (
         scraperMaxIconSize > 0 &&
         scraperCanDownscaleTo(scraperMaxIconSize) &&
@@ -8228,15 +8243,6 @@ document.getElementById('sf').addEventListener('submit',function(e){
         currentScraperSelection = 'proxy';
         setActiveScraperButton('proxy');
         loadScraperProxyVariant();
-        return;
-      }
-
-      const idx = defaultScraperIconIndex();
-      const iconSize = idx >= 0 ? scraperIconPixelSize(scraperIcons[idx]) : 0;
-      if (idx >= 0 && scraperIcons.length > 0 && sizePassesSizeFilter(iconSize)) {
-        currentScraperSelection = idx;
-        setActiveScraperButton(idx);
-        loadScraperVariant(idx);
         return;
       }
 
@@ -8471,9 +8477,9 @@ document.getElementById('sf').addEventListener('submit',function(e){
         entries.push({ type: 'proxy', sortSize: scraperMaxIconSize });
       }
       const existingSizes = new Set(entries.map((e) => e.sortSize));
-      // List every size from /{domain}/json. Do not cap at SCRAPER_MAX_ICON_SIZE —
-      // that env only limits the unsized proxy; disk cache may already have
-      // scraper_256_* / scraper_512_* from preload or earlier requests.
+      // Standard /scraper/{size}/… steps that we can actually downscale to
+      // (largest discovered source >= size). SCRAPER_MAX_ICON_SIZE does not
+      // unlock larger buttons — only a real source (or SVG/catalog at that size).
       for (const sizeStr of Object.keys(scraperAvailableSizes)) {
         const size = Number(sizeStr);
         if (size > 0 && scraperCanDownscaleTo(size) && !existingSizes.has(size)) {

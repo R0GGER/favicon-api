@@ -79,11 +79,27 @@ const STANDARD_FALLBACKS = [
 ];
 
 // CDN entry points for domains whose homepage HTML may not expose any
-// recognisable icon link (e.g. Reddit's JS-challenge interstitial served to
-// datacenter IPs). The variant-expansion below grows these into 128–512 sizes.
+// recognisable icon link (e.g. Reddit's JS-challenge interstitial, DPG Media
+// privacy-gate pages). Values may be a single URL or an array of URLs. The
+// variant-expansion below grows NxN paths into sibling sizes.
 const STATIC_CDN_HINTS = {
   'reddit.com': 'https://www.redditstatic.com/shreddit/assets/favicon/64x64.png',
   'www.reddit.com': 'https://www.redditstatic.com/shreddit/assets/favicon/64x64.png',
+  // Homepage is a consent wall; favicon assets under /assets/favicon/ stay public.
+  'nu.nl': [
+    'https://www.nu.nl/assets/favicon/android-chrome-192x192.png',
+    'https://www.nu.nl/assets/favicon/apple-touch-icon-180x180.png',
+    'https://www.nu.nl/assets/favicon/favicon-32x32.png',
+    'https://www.nu.nl/assets/favicon/favicon-16x16.png',
+    'https://www.nu.nl/assets/favicon/favicon.ico',
+  ],
+  'www.nu.nl': [
+    'https://www.nu.nl/assets/favicon/android-chrome-192x192.png',
+    'https://www.nu.nl/assets/favicon/apple-touch-icon-180x180.png',
+    'https://www.nu.nl/assets/favicon/favicon-32x32.png',
+    'https://www.nu.nl/assets/favicon/favicon-16x16.png',
+    'https://www.nu.nl/assets/favicon/favicon.ico',
+  ],
 };
 
 // Direct manifest URLs for domains whose homepage HTML does not expose a
@@ -1542,9 +1558,20 @@ function pageUrlsForDomain(domain) {
 function staticHintCandidates(domain) {
   const lower = domain.toLowerCase();
   const bare = lower.replace(/^www\./, '');
-  const href = STATIC_CDN_HINTS[lower] || STATIC_CDN_HINTS[bare];
-  if (!href) return [];
-  return [{ href, sizes: '64x64', type: 'image/png' }];
+  const hint = STATIC_CDN_HINTS[lower] || STATIC_CDN_HINTS[bare];
+  if (!hint) return [];
+  const hrefs = Array.isArray(hint) ? hint : [hint];
+  return hrefs
+    .filter((href) => typeof href === 'string' && href.length > 0)
+    .map((href) => {
+      const m = href.match(/(\d+)x\1\.(?:png|webp|jpe?g)(?:\?|$)/i);
+      const size = m ? parseInt(m[1], 10) : 0;
+      return {
+        href,
+        sizes: size > 0 ? `${size}x${size}` : '',
+        type: href.toLowerCase().endsWith('.ico') ? 'image/x-icon' : 'image/png',
+      };
+    });
 }
 
 // Build extra candidate URLs for a domain by combining:
