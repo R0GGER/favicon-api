@@ -4441,8 +4441,10 @@ document.getElementById('sf').addEventListener('submit',function(e){
     let currentMaxSizeFilter = 512;
     const SIZE_FILTER_MAX_SENTINEL = -1;
     const SIZE_FILTER_STEPS = [16, 32, 64, 128, 180, 256, 512, SIZE_FILTER_MAX_SENTINEL];
-    const DEFAULT_SIZE_FILTER_MIN = 16;
-    const DEFAULT_SIZE_FILTER_MAX = 512;
+    // Overridden by UI_SIZE_FILTER_MIN / UI_SIZE_FILTER_MAX from GET /providers.
+    let DEFAULT_SIZE_FILTER_MIN = 16;
+    let DEFAULT_SIZE_FILTER_MAX = 512;
+    let sizeFilterLoadedFromStorage = false;
     const CATALOG_RASTER_SIZES = [16, 32, 64, 128, 256];
     const SVGL_RASTER_SIZES = [64, 128, 256];
     const THESVG_RASTER_SIZES = [64, 128, 256];
@@ -4469,6 +4471,8 @@ document.getElementById('sf').addEventListener('submit',function(e){
       faviconProviders: ALL_DOMAIN_FAVICON_PROVIDERS,
       appIconProviders: ALL_SERVICE_ICON_PROVIDERS,
       urlMode: 'proxy',
+      sizeFilterMin: 16,
+      sizeFilterMax: 512,
       scraperMaxIconSize: 0,
     };
     let providersReadyResolve;
@@ -4855,7 +4859,8 @@ document.getElementById('sf').addEventListener('submit',function(e){
         if (!raw) {
           currentMinSizeFilter = DEFAULT_SIZE_FILTER_MIN;
           currentMaxSizeFilter = DEFAULT_SIZE_FILTER_MAX;
-          return;
+          sizeFilterLoadedFromStorage = false;
+          return false;
         }
         const data = JSON.parse(raw);
         currentMinSizeFilter = normalizeSizeFilterValue(data?.min);
@@ -4863,10 +4868,28 @@ document.getElementById('sf').addEventListener('submit',function(e){
         if (currentMinSizeFilter > 0 && currentMaxSizeFilter > 0 && currentMinSizeFilter > currentMaxSizeFilter) {
           currentMaxSizeFilter = 0;
         }
+        sizeFilterLoadedFromStorage = true;
+        return true;
       } catch {
         currentMinSizeFilter = DEFAULT_SIZE_FILTER_MIN;
         currentMaxSizeFilter = DEFAULT_SIZE_FILTER_MAX;
+        sizeFilterLoadedFromStorage = false;
+        return false;
       }
+    }
+
+    function applyServerSizeFilterDefaults(cfg) {
+      const hasMin = cfg != null && cfg.sizeFilterMin != null && cfg.sizeFilterMin !== '';
+      const hasMax = cfg != null && cfg.sizeFilterMax != null && cfg.sizeFilterMax !== '';
+      let min = hasMin ? normalizeSizeFilterValue(cfg.sizeFilterMin) : 16;
+      let max = hasMax ? normalizeSizeFilterValue(cfg.sizeFilterMax) : 512;
+      if (min > 0 && max > 0 && min > max) max = min;
+      DEFAULT_SIZE_FILTER_MIN = min;
+      DEFAULT_SIZE_FILTER_MAX = max;
+      if (sizeFilterLoadedFromStorage) return;
+      currentMinSizeFilter = min;
+      currentMaxSizeFilter = max;
+      syncSizeFilterSliders();
     }
 
     function onSizeFilterSliderInput(which) {
@@ -5988,6 +6011,7 @@ document.getElementById('sf').addEventListener('submit',function(e){
           urlMode: normalizeUrlMode(cfg?.urlMode),
         };
         applyUiProviderLists(providersConfig);
+        applyServerSizeFilterDefaults(providersConfig);
         refreshAllAltUrlButtonLabels();
       })
       .catch(() => {})

@@ -141,6 +141,34 @@ const UI_CARD_URL = (() => {
   return raw === 'source' ? 'source' : 'proxy';
 })();
 
+// Homepage Size range filter defaults (steps: 0, 16, 32, 64, 128, 180, 256, 512;
+// max may also be "max" / -1 for the open-ended Max stop).
+const UI_SIZE_FILTER_STEPS = new Set([0, 16, 32, 64, 128, 180, 256, 512]);
+const UI_SIZE_FILTER_MAX_SENTINEL = -1;
+
+function parseUiSizeFilterValue(raw, { allowMax = false, fallback }) {
+  const text = String(raw ?? '').trim().toLowerCase();
+  if (text === '') return fallback;
+  if (allowMax && (text === 'max' || text === '-1')) return UI_SIZE_FILTER_MAX_SENTINEL;
+  const n = parseInt(text, 10);
+  if (!Number.isFinite(n) || !UI_SIZE_FILTER_STEPS.has(n)) return fallback;
+  return n;
+}
+
+const UI_SIZE_FILTER_MIN = parseUiSizeFilterValue(process.env.UI_SIZE_FILTER_MIN, {
+  fallback: 16,
+});
+const UI_SIZE_FILTER_MAX = (() => {
+  let max = parseUiSizeFilterValue(process.env.UI_SIZE_FILTER_MAX, {
+    allowMax: true,
+    fallback: 512,
+  });
+  if (UI_SIZE_FILTER_MIN > 0 && max > 0 && UI_SIZE_FILTER_MIN > max) {
+    max = UI_SIZE_FILTER_MIN;
+  }
+  return max;
+})();
+
 const UI_ENABLE_DOCS = (() => {
   const raw = String(process.env.UI_ENABLE_DOCS ?? '').trim().toLowerCase();
   if (raw === '') return true;
@@ -1923,6 +1951,8 @@ app.get('/providers', (req, res) => {
     faviconProviders: UI_FAVICON_PROVIDERS,
     appIconProviders: UI_APP_ICON_PROVIDERS,
     urlMode: UI_CARD_URL,
+    sizeFilterMin: UI_SIZE_FILTER_MIN,
+    sizeFilterMax: UI_SIZE_FILTER_MAX,
     docsEnabled: UI_ENABLE_DOCS,
     scraperMaxIconSize: getScraperMaxIconSize(),
     upstreamIpv4: true,
