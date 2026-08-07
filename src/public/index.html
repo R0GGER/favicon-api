@@ -1591,6 +1591,30 @@
       100% { background-position: -100% 0; }
     }
 
+    .scraper-sizes-toggle {
+      border: 1px dashed #b79bc6;
+      background: transparent;
+      color: #7a5a92;
+      padding: 0.3rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.15s;
+    }
+
+    .scraper-sizes-toggle:hover {
+      border-color: #5b2e7e;
+      background: #f3eaf7;
+      color: #5b2e7e;
+    }
+
+    .scraper-sizes-toggle.expanded {
+      border-style: solid;
+      border-color: #5b2e7e;
+      color: #5b2e7e;
+    }
+
     .size-buttons-toolbar {
       display: flex;
       flex-wrap: nowrap;
@@ -4920,6 +4944,9 @@ document.getElementById('sf').addEventListener('submit',function(e){
       syncSizeFilterSliders();
       syncCatalogProvidersToSizeFilter();
       syncScraperToSizeFilter();
+      // Rebuild the scraper strip so oversize (>512) buttons appear/disappear as
+      // the upper bound crosses the "Max" (open-ended) stop.
+      if (scraperIcons.length > 0) renderScraperSizes();
       syncNativeCardsToSizeFilter();
       applySizeFilter();
     }
@@ -7829,6 +7856,35 @@ document.getElementById('sf').addEventListener('submit',function(e){
     let scraperSizesPending = false;
     const SCRAPER_PROXY_SIZE_STEPS = [16, 32, 64, 128, 256, 512];
 
+    // Standard scraper sizes shown by default: only the canonical power-of-two
+    // ladder. The odd in-between discovered sizes (76, 120, 144, 180, 192, …)
+    // and oversize share-card images (e.g. 1200×630 og-images) are collapsed
+    // behind a "+N more" toggle so the strip stays tidy.
+    const SCRAPER_STANDARD_SIZES = new Set([16, 32, 64, 128, 256, 512]);
+    let scraperShowIntermediate = false;
+
+    function isScraperStandardSize(size) {
+      return SCRAPER_STANDARD_SIZES.has(Number(size) || 0);
+    }
+
+    // Sizes larger than the standard ladder (e.g. 1200×630 og-images). These are
+    // only offered when the size filter's upper bound is "Max" (open-ended);
+    // otherwise they are omitted entirely.
+    function scraperSizeIsOversize(size) {
+      return (Number(size) || 0) > 512;
+    }
+
+    // "Max" = the open-ended top stop: no positive upper cap (sentinel -1 or 0).
+    function scraperFilterAllowsOversize() {
+      return !(currentMaxSizeFilter > 0);
+    }
+
+    // Non-standard discovered-icon buttons are collapsible; the Fast-proxy and
+    // standard /scraper/{size}/ proxy steps always stay visible.
+    function scraperEntryIsIntermediate(entry) {
+      return entry.type === 'icon' && !isScraperStandardSize(entry.sortSize);
+    }
+
     // In-page cache of the /{domain}/json scraper discovery result, keyed by
     // domain. Lets repeat searches for the same domain render instantly without
     // re-running discovery (no "Discovering other icon sizes…" loader and no
@@ -8443,6 +8499,7 @@ document.getElementById('sf').addEventListener('submit',function(e){
     function applyScraperDiscovery(domain, refresh, scraperEndpoint) {
       const sizesEl = document.getElementById('scraper-sizes');
       const wwwNotice = document.getElementById('scraper-www-fallback');
+      scraperShowIntermediate = false;
 
       const icons = scraperEndpoint?.icons || [];
       scraperMaxIconSize = Number(scraperEndpoint?.maxIconSize) || 0;
@@ -8632,7 +8689,38 @@ document.getElementById('sf').addEventListener('submit',function(e){
       sizesEl.innerHTML = '';
       const frag = document.createDocumentFragment();
 
-      for (const entry of buildScraperSizeEntries()) {
+      const allEntries = buildScraperSizeEntries();
+      // Keep the active button visible even when collapsed: the default post-
+      // discovery selection is often a non-standard size (e.g. 192), so hiding
+      // it would leave the strip without a highlighted button.
+      const isActiveEntry = (entry) =>
+        typeof currentScraperSelection === 'number' &&
+        entry.type === 'icon' &&
+        entry.idx === currentScraperSelection;
+
+      // Drop oversize (>512) discovered sizes unless the size filter is on Max.
+      // The active selection is always kept so it never orphans.
+      const allowOversize = scraperFilterAllowsOversize();
+      const candidateEntries = allEntries.filter((entry) => {
+        if (scraperSizeIsOversize(entry.sortSize) && entry.type === 'icon' && !allowOversize) {
+          return isActiveEntry(entry);
+        }
+        return true;
+      });
+
+      const isCollapsible = (entry) =>
+        scraperEntryIsIntermediate(entry) && !isActiveEntry(entry);
+      const visibleEntries = scraperShowIntermediate
+        ? candidateEntries
+        : candidateEntries.filter((entry) => !isCollapsible(entry));
+      const hiddenCount = scraperShowIntermediate
+        ? 0
+        : candidateEntries.filter(isCollapsible).length;
+      const showToggle = scraperShowIntermediate
+        ? candidateEntries.some(scraperEntryIsIntermediate)
+        : hiddenCount > 0;
+
+      for (const entry of visibleEntries) {
         if (entry.type === 'proxy') {
           const proxyBtn = createScraperProxyButton(currentScraperSelection === 'proxy');
           frag.appendChild(proxyBtn);
@@ -8685,10 +8773,41 @@ document.getElementById('sf').addEventListener('submit',function(e){
         });
         frag.appendChild(btn);
       }
+
+      if (showToggle) {
+        const toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.className =
+          'scraper-sizes-toggle' + (scraperShowIntermediate ? ' expanded' : '');
+        toggle.textContent = scraperShowIntermediate
+          ? '\u2212 less'
+          : `+${hiddenCount} more`;
+        toggle.setAttribute('aria-expanded', scraperShowIntermediate ? 'true' : 'false');
+        toggle.setAttribute(
+          'data-tip',
+          scraperShowIntermediate
+            ? 'Hide in-between sizes'
+            : 'Show all discovered icon sizes'
+        );
+        toggle.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          toggleScraperIntermediateSizes();
+        });
+        frag.appendChild(toggle);
+      }
+
       sizesEl.appendChild(frag);
       const toolbar = document.getElementById('scraper-sizes-toolbar');
       if (toolbar) toolbar.style.display = '';
       syncAllSizeButtonsToFilter();
+    }
+
+    // Expand/collapse the non-standard discovered sizes. The active button (even
+    // an intermediate one) always stays visible, so no reselection is needed.
+    function toggleScraperIntermediateSizes() {
+      scraperShowIntermediate = !scraperShowIntermediate;
+      renderScraperSizes();
     }
 
     function switchScraperProxy() {
@@ -8898,7 +9017,16 @@ document.getElementById('sf').addEventListener('submit',function(e){
         meta.textContent = '';
         clearDisplayUrls(display);
       } else if (spinner) {
-        spinner.style.display = 'none';
+        // Soft load = initial (non-refresh) scraper preview. Keep an already
+        // visible preview on screen (no flash while upgrading to a sized
+        // variant), but on a fresh/blank card show the spinner right away so
+        // there is a loader until the first image appears.
+        if (hadImage) {
+          spinner.style.display = 'none';
+        } else {
+          img.style.display = 'none';
+          spinner.style.display = 'block';
+        }
       }
       scheduleResultsTableSync();
 
