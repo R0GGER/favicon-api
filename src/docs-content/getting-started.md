@@ -107,14 +107,16 @@ CACHE_DIR=/cache
 MEMORY_CACHE_MAX=2000
 
 # In-memory cache entry lifetime (seconds). Default = 3600 (1 hour).
-MEMORY_CACHE_TTL=3600
+# With longer disk TTLs, raising this (e.g. 86400) keeps hot domains in RAM.
+MEMORY_CACHE_TTL=86400
 
 # On-disk cache entry lifetime (seconds). Default = 86400 (24 hours).
-DISK_CACHE_TTL=86400
+# 604800 (7 days) matches the v1 API and maximizes hard-disk reuse.
+DISK_CACHE_TTL=604800
 
 # Maximum total size of the disk cache in MB. When exceeded, the oldest
-# entries (by mtime) are evicted. Set to 0 to disable the size cap (code default). Recommended value: 256.
-CACHE_SIZE_MB=256
+# entries (by mtime) are evicted. Set to 0 to disable the size cap (code default). Recommended value: 512 with 7-day TTLs.
+CACHE_SIZE_MB=512
 
 # Upstream HTTP request timeout (milliseconds). Favicon providers, besticon,
 # and scrape targets are aborted after this duration. Default = 5000.
@@ -200,8 +202,10 @@ BESTICON_SERVER_MODE=redirect
 # Optional: in-memory cache for the enriched scraper icons list returned by
 # /:domain/json. Each entry holds the merged besticon + static-hint + variant
 # probe result for one domain. Avoids reprobing 8+ candidate URLs on every
-# page load of the UI's size-button strip. Default = 3600 (seconds).
-SCRAPER_ICONS_CACHE_TTL=3600
+# page load of the UI's size-button strip. Also used for scraper discovery
+# disk cache TTL when SCRAPER_DISK_CACHE is enabled.
+# Default when unset = DISK_CACHE_TTL. Example below: 7 days.
+SCRAPER_ICONS_CACHE_TTL=604800
 
 # Max number of domains whose icon lists are kept in that scraper-icons cache
 # (LRU). When full, the least recently used domain entry is evicted. Default = 500.
@@ -612,9 +616,9 @@ The tables below cover the most-used variables. For the complete list — includ
 | `BRANDFETCH_CLIENT_ID`     | *(unset)*                       | [Brandfetch](https://docs.brandfetch.com/logo-api/overview) Logo API client ID. Enables `/brandfetch/{size}/{ext}/{domain}`; without it the route returns 503.                                                                                                                             |
 | `BESTICON_URL`             | *(unset)*                       | Base URL of a sidecar [besticon](https://github.com/mat/besticon) instance (e.g. `http://besticon:8080`). `/scraper/{domain}` asks besticon first, then falls back to the built-in scraper.                                                                                          |
 | `SCRAPER_PROBE_BATCH_SIZE` | `4`                             | HTML scraper icon candidates probed in parallel per batch (`/scraper/{domain}` and `/{domain}`).                                                                                                                                                                                     |
-| `SCRAPER_ICONS_CACHE_TTL`  | `3600`                          | TTL (seconds) for the in-memory cache of enriched scraper icon lists (`/{domain}/json`). Also used for scraper discovery disk cache entries when `SCRAPER_DISK_CACHE` is enabled.                                                                                                    |
+| `SCRAPER_ICONS_CACHE_TTL`  | `DISK_CACHE_TTL`                | TTL (seconds) for the in-memory cache of enriched scraper icon lists (`/{domain}/json`). Also used for scraper discovery disk cache entries when `SCRAPER_DISK_CACHE` is enabled. Unset → same as `DISK_CACHE_TTL`.                                                                 |
 | `SCRAPER_ICONS_CACHE_MAX`  | `500`                           | Max domains in that scraper-icons LRU cache.                                                                                                                                                                                                                                         |
-| `SCRAPER_DISK_CACHE`       | `false`                         | When `true`, persist scraper discovery (HTML, icon lists, besticon JSON, manifests, probes) under `{CACHE_DIR}/scraper-discovery`. Survives restarts; shared across workers.                                                                                                         |
+| `SCRAPER_DISK_CACHE`       | `true`                          | When `true`, persist scraper discovery (HTML, icon lists, besticon JSON, manifests, probes) under `{CACHE_DIR}/scraper-discovery`. Survives restarts; shared across workers.                                                                                                         |
 | `SCRAPER_DISK_CACHE_DIR`   | `{CACHE_DIR}/scraper-discovery` | Directory for that discovery cache. Only used when `SCRAPER_DISK_CACHE=true`.                                                                                                                                                                                                        |
 | `MANIFEST_PROBE_MAX`       | `12`                            | Max manifest URLs to probe per domain when HTML does not link one directly.                                                                                                                                                                                                          |
 | `SCRAPER_MAX_ICON_SIZE`    | `0`                             | Max output dimension for `/scraper/{domain}`. Larger sources are downscaled; when set, output is also PNG-recompressed (truecolor vs. palette — whichever is smaller, see `SCRAPER_PNG_*`). `0` = native resolution.                                                                    |

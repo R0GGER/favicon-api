@@ -34,7 +34,7 @@ that store different things**. They do not share a cache.
 |---|---|---|
 | What is cached | The finished product: one normalized **128×128** PNG per domain | Only intermediate discovery data (HTML, icon list, probes) + image bytes |
 | Cost of a cache hit | `fs.stat` + read meta | Discovery may still re-run; images fetched per icon |
-| Default TTL | 7 days (`API_CACHE_TTL`) | 1 hour discovery, 1 day images |
+| Default TTL | 7 days (`API_CACHE_TTL`) | Discovery follows `DISK_CACHE_TTL` when unset; `.env.example` uses 7 days |
 | Browser/CDN caching | `immutable` (long) | `max-age=86400` images, `no-cache` JSON |
 
 A v1 API cache hit is essentially a file stat — no upstream calls, no image
@@ -44,15 +44,16 @@ sooner:
 1. **Discovery** — fetch the site HTML, parse `<link rel="icon">`, `og:image` / `twitter:image` meta (near-square only), parse the web
    manifest, and *probe* each candidate icon for its real dimensions. This is by
    far the most expensive step (multiple upstream requests per domain). Cached by
-   `SCRAPER_ICONS_CACHE_TTL` (default **3600s / 1 hour**).
+   `SCRAPER_ICONS_CACHE_TTL` (unset → same as `DISK_CACHE_TTL`, typically
+   **86400s / 1 day**; `.env.example` uses **604800 / 7 days**).
 2. **Image bytes** — the actual icon files (including assets loaded via the
    `/s-asset` proxy used by the homepage scraper card). Cached on disk by
    `DISK_CACHE_TTL` (default **86400s / 1 day**) and in memory by
    `MEMORY_CACHE_TTL` (default **3600s / 1 hour**).
 
-> Caching only the images is the *smaller half* of the win. If discovery still
-> expires every hour, the scraper keeps re-fetching site HTML and re-probing
-> icons hourly — which is where most of the latency and upstream load lives.
+> Caching only the images is the *smaller half* of the win. Keep discovery TTL
+> aligned with (or longer than) `DISK_CACHE_TTL` — otherwise the scraper keeps
+> re-fetching site HTML and re-probing icons while image bytes are still warm.
 
 ---
 
@@ -383,7 +384,7 @@ API_CACHE_TTL=604800
 |---|---|---|
 | `SCRAPER_DISK_CACHE` | **`true`** | Persists scraper discovery across restarts; shared across cluster workers. `{CACHE_DIR}/scraper-discovery` is the default path — set `SCRAPER_DISK_CACHE_DIR` only if you need a custom location. |
 | `SCRAPER_ICONS_CACHE_MAX` | **`1000`** | Default `500` equals the preload size; the LRU evicts entries as soon as it is full. `1000` leaves room for preloaded domains plus day-to-day lookups. Busy instances can use `2000` (see [§3](#3-right-size-the-in-memory-cache)). |
-| `SCRAPER_ICONS_CACHE_TTL` | **`604800`** (7 days) | Default `3600` (1 hour) — discovery expires before the next weekly run, forcing full re-scrapes. |
+| `SCRAPER_ICONS_CACHE_TTL` | **`604800`** (7 days) | Unset → `DISK_CACHE_TTL`. Older default was `3600` (1 hour). |
 | `DISK_CACHE_TTL` | **`604800`** (7 days) | Default `86400` (1 day) — image bytes expire too soon for weekly preload. |
 | `API_CACHE_TTL` | **`604800`** (7 days) | Already the default. **Do not increase** for weekly preload — seven days matches a Sunday-to-Sunday schedule. Raising it (e.g. to 14 or 30 days) only makes sense if you run preload **less often**; it also lengthens browser/CDN `Cache-Control` on `/cdn/favicons/`. |
 
@@ -478,8 +479,8 @@ change, not an env var.
 
 | Layer | Stores | TTL variable | Default | Scope |
 |---|---|---|---|---|
-| Scraper discovery (memory) | HTML, icon list, probes | `SCRAPER_ICONS_CACHE_TTL` | 3600s | per worker |
-| Scraper discovery (disk) | same as above | `SCRAPER_ICONS_CACHE_TTL` | 3600s | shared (needs `SCRAPER_DISK_CACHE=true`) |
+| Scraper discovery (memory) | HTML, icon list, probes | `SCRAPER_ICONS_CACHE_TTL` | `DISK_CACHE_TTL` if unset | per worker |
+| Scraper discovery (disk) | same as above | `SCRAPER_ICONS_CACHE_TTL` | `DISK_CACHE_TTL` if unset | shared (needs `SCRAPER_DISK_CACHE=true`) |
 | Image bytes (memory) | scraper + `/s-asset` icons | `MEMORY_CACHE_TTL` | 3600s | per worker |
 | Image bytes (disk) | scraper + `/s-asset` icons | `DISK_CACHE_TTL` | 86400s | shared volume |
 | v1 API result | normalized PNG per domain | `API_CACHE_TTL` | 604800s | shared volume |
