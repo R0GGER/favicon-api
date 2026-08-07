@@ -5,6 +5,23 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.15.16] — 2026-08-07
+
+### Fixed
+
+- **Disk cache — prefer cached scraper bytes over re-fetch** — several paths re-scraped or blanked the UI even when icons were already on disk:
+  1. Image cache only stored the display `buffer`; `originalBuffer` / `originalSvgBuffer` are now persisted as `{key}.orig` / `{key}.origsvg` for the full `DISK_CACHE_TTL`.
+  2. `DEFAULT_PROVIDER=scraper` no longer invalidates warm `best_*` entries whose provider is `scraper-fallback:…`.
+  3. Unset `SCRAPER_ICONS_CACHE_TTL` follows `DISK_CACHE_TTL` (was hard-coded 1 hour).
+  4. `buildSizedScraperIcon` resizes from a warm `scraper_{domain}` entry before running discovery; the Web UI keeps the visible preview while a preferred size loads (no spinner flash on e.g. `yelp.com`).
+- **HTML scraper — `og:image` / `twitter:image` in discovery** — widescreen Open Graph images (e.g. GitHub’s homepage `og:image` at 1200×630) were dropped before `/{domain}/json`. Discovery now keeps probed meta images (`source: og-image|twitter-image|…`); the default `/scraper/{domain}` pick still ignores non-square metas when real favicons exist. Parses structured `og:image:width` / `:height` / `:type`. UI prefers non-meta icons for the initial selection.
+- **HTML scraper — Google fallback on the size strip** — domains that only resolve via `scraper-fallback:googlev2` (e.g. `bbb.org`) returned `icons: []`, so the UI showed a single Fast-proxy button despite preload `sizes=6/6`. Discovery now reflects the Google V2 fallback at its native size so all deliverable sizes are selectable.
+- **`/scraper/{size}/…` — max is `max`, not 1024** — dropped the hard `1…1024` ceiling that rejected hi-res / og:image widths (e.g. 1200). Any positive integer is valid; **`max`** serves the largest native source without applying `SCRAPER_MAX_ICON_SIZE`. Invalid values return `Use a positive integer or max.`
+
+### Changed
+
+- **`.env.example` cache defaults** — `DISK_CACHE_TTL` / `SCRAPER_ICONS_CACHE_TTL` = `604800` (7 days), `MEMORY_CACHE_TTL` = `86400`, `CACHE_SIZE_MB` = `512`.
+
 ## [2.15.15] — 2026-08-06
 
 ### Added
