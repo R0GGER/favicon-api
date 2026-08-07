@@ -979,6 +979,13 @@
       margin-bottom: 0.85rem;
     }
 
+    /* The size filter does not apply in list/table view (rows are normalized to
+       the preferred size), so hide the slider and its divider there. */
+    .results.view-table .size-filter-group,
+    .results.view-table .download-toolbar-divider {
+      display: none;
+    }
+
     .results-view-toggle {
       flex: 0 0 auto;
       display: inline-flex;
@@ -1069,6 +1076,21 @@
       color: #6b6560;
       background: #faf8f5;
       white-space: nowrap;
+    }
+
+    .results-table-size-default {
+      display: inline-block;
+      margin-left: 0.3rem;
+      padding: 0.05rem 0.35rem;
+      border-radius: 999px;
+      background: #efe9e2;
+      color: #8a8178;
+      font-size: 0.72rem;
+      font-weight: 600;
+      vertical-align: middle;
+    }
+    .results-table-size-default:empty {
+      display: none;
     }
 
     .results-table tr:last-child td {
@@ -1977,11 +1999,18 @@
     .card-header h3 {
       margin-bottom: 0;
       min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .card-header h3 a {
       color: inherit;
       text-decoration: none;
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .card-header h3 a:hover {
@@ -3029,7 +3058,7 @@
               <th scope="col">Icon</th>
               <th scope="col">Provider</th>
               <th scope="col">Extension</th>
-              <th scope="col">Size</th>
+              <th scope="col">Size <span class="results-table-size-default" id="results-table-size-default"></span></th>
               <th scope="col">Link</th>
               <th scope="col">Source</th>
               <th scope="col">Download</th>
@@ -4621,6 +4650,79 @@ document.getElementById('sf').addEventListener('submit',function(e){
       return origin ? `${origin}${newPath}` : newPath;
     }
 
+    const TABLE_STANDARD_SIZES = [16, 32, 64, 128, 256, 512];
+
+    // Preferred icon size for the list/table view. Uses the configured scraper
+    // cap (SCRAPER_MAX_ICON_SIZE) as the target so every provider row lines up
+    // on the same size; falls back to 128 when the cap is disabled/0.
+    function tablePreferredSize() {
+      return Number(providersConfig.scraperMaxIconSize) || 128;
+    }
+
+    // Standard sizes at or below the preferred size, largest first. For 128
+    // this is [128, 64, 32, 16] (best -> 2nd -> 3rd -> 4th best), never larger
+    // than the preferred size.
+    function tableSizeLadder() {
+      const preferred = tablePreferredSize();
+      return TABLE_STANDARD_SIZES.filter((s) => s <= preferred).sort((a, b) => b - a);
+    }
+
+    // Pick the largest ladder value the provider can deliver without upscaling
+    // (<= native pixels); if the icon is smaller than every candidate, use the
+    // smallest ladder value.
+    function pickTableSize(nativePx) {
+      const ladder = tableSizeLadder();
+      if (ladder.length === 0) return tablePreferredSize();
+      const native = Number(nativePx) || 0;
+      const chosen = ladder.find((s) => s <= native);
+      return chosen != null ? chosen : ladder[ladder.length - 1];
+    }
+
+    // Rewrite the size in a URL to `size`, so the copied/opened URL matches the
+    // size shown in the table. Handles our proxy path form
+    // (/{provider}/{n}/{ext?}/{rest}) and upstream source URLs carrying a
+    // sz / size query param. Returns the URL unchanged when no size is found.
+    function retargetUrlSize(url, size) {
+      if (!url) return url;
+      let path = url;
+      let origin = '';
+      let query = '';
+      if (url.startsWith('http')) {
+        try {
+          const u = new URL(url);
+          path = u.pathname;
+          origin = u.origin;
+          query = u.search;
+        } catch {
+          return url;
+        }
+      } else {
+        const qIdx = url.indexOf('?');
+        if (qIdx >= 0) {
+          path = url.slice(0, qIdx);
+          query = url.slice(qIdx);
+        }
+      }
+
+      const mExt = path.match(/^(\/[^/]+)\/(\d+)\/(png|svg|jpg|jpeg|webp)(\/.*)$/);
+      if (mExt) {
+        const newPath = `${mExt[1]}/${size}/${mExt[3]}${mExt[4]}`;
+        return `${origin}${newPath}${query}`;
+      }
+      const mPlain = path.match(/^(\/[^/]+)\/(\d+)(\/.*)$/);
+      if (mPlain) {
+        const newPath = `${mPlain[1]}/${size}${mPlain[3]}`;
+        return `${origin}${newPath}${query}`;
+      }
+
+      if (query) {
+        const newQuery = query.replace(/([?&](?:sz|size|s))=\d+/i, `$1=${size}`);
+        if (newQuery !== query) return `${origin}${path}${newQuery}`;
+      }
+
+      return url;
+    }
+
     function isVectorIconUrl(...urls) {
       for (const raw of urls) {
         if (!raw) continue;
@@ -5708,7 +5810,8 @@ document.getElementById('sf').addEventListener('submit',function(e){
     function getCardTableRowData(providerId) {
       const card = getProviderCard(providerId);
       if (!card || card.style.display === 'none') return null;
-      if (card.classList.contains('size-filter-hidden')) return null;
+      // The size filter is intentionally ignored in list/table view: every
+      // provider row is shown regardless of the grid's size-range slider.
 
       const img = document.getElementById(`${providerId}-img`);
       const spinner = document.getElementById(`${providerId}-spinner`);
@@ -5750,8 +5853,19 @@ document.getElementById('sf').addEventListener('submit',function(e){
       }
 
       let sizeLabel = '—';
-      if (isVector && (!w || !h)) sizeLabel = 'SVG';
-      else if (w > 0 && h > 0) sizeLabel = `${w}×${h}`;
+      let rowCopyUrl = copyUrl;
+      let rowSourceUrl = sourceUrl;
+      if (isVector && (!w || !h)) {
+        sizeLabel = 'SVG';
+      } else if (w > 0 && h > 0) {
+        // In list view every provider row targets the configured preferred size
+        // (or the largest smaller standard size it can deliver) so the Size
+        // column stays consistent; the copied/opened URL is retargeted to match.
+        const chosen = pickTableSize(Math.max(w, h));
+        sizeLabel = `${chosen}×${chosen}`;
+        rowCopyUrl = retargetUrlSize(copyUrl, chosen);
+        rowSourceUrl = retargetUrlSize(sourceUrl, chosen);
+      }
 
       const extensionChoices = providerSupportsExtensionChoice(providerId)
         ? { current: getCatalogFormat(providerId), formats: ['png', 'svg'] }
@@ -5764,8 +5878,8 @@ document.getElementById('sf').addEventListener('submit',function(e){
         extension: extension || '—',
         extensionChoices,
         sizeLabel,
-        copyUrl,
-        sourceUrl,
+        copyUrl: rowCopyUrl,
+        sourceUrl: rowSourceUrl,
         sourceLabel: alternateUrlLabel(),
         placeholder: false,
       };
@@ -5861,6 +5975,9 @@ document.getElementById('sf').addEventListener('submit',function(e){
       const showTable = getEffectiveResultsView() === 'table' && results.classList.contains('visible');
       wrap.hidden = !showTable;
       if (!showTable) return;
+
+      const sizeDefaultEl = document.getElementById('results-table-size-default');
+      if (sizeDefaultEl) sizeDefaultEl.textContent = String(tablePreferredSize());
 
       const providers = activeFaviconProviders();
       const showAppSection = shouldShowAppIconsTableSection();
