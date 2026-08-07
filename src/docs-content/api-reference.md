@@ -144,6 +144,8 @@ Responses use **`Cache-Control: no-cache`**.
   "faviconProviders": ["scraper", "google", "ddg", "yandex", "faviconso", "vemetric", "favicondev", "faviconkit", "faviconrun", "twentyicons", "ryanjc", "logodev", "brandfetch"],
   "appIconProviders": ["selfhst", "dashboardicons", "lobehub", "svgl", "thesvg"],
   "urlMode": "proxy",
+  "sizeFilterMin": 16,
+  "sizeFilterMax": 512,
   "upstreamIpv4": true,
   "api": {
     "requireKey": false,
@@ -157,6 +159,7 @@ Responses use **`Cache-Control: no-cache`**.
 - `includeAppIcons` — mirrors `UI_INCLUDE_APP_ICONS` (default “Also include CDN icon lookups” checkbox)
 - `faviconProviders` — mirrors `UI_FAVICON_PROVIDERS` (homepage favicon cards; empty env = all)
 - `appIconProviders` — mirrors `UI_APP_ICON_PROVIDERS` (homepage CDN icon cards; empty env = all)
+- `sizeFilterMin` / `sizeFilterMax` — mirrors `UI_SIZE_FILTER_MIN` / `UI_SIZE_FILTER_MAX` (homepage Size slider defaults; steps `0|16|32|64|128|180|256|512`, max may be `-1` for “Max”)
 
 ## Response behavior
 

@@ -88,6 +88,13 @@ UI_INCLUDE_APP_ICONS=true
 # proxy = local proxy URL (default); source = upstream provider URL.
 UI_CARD_URL=proxy
 
+# Default Size range filter on the homepage (dual-handle slider). Used when the
+# visitor has no saved preference in localStorage. Allowed steps: 0 (off), 16,
+# 32, 64, 128, 180, 256, 512. For max, also max / -1 = open-ended "Max" stop.
+# Defaults = 16 and 512 (matches the UI's 16–512px preset).
+UI_SIZE_FILTER_MIN=16
+UI_SIZE_FILTER_MAX=512
+
 # When true (1/yes/on) or unset, the /docs pages and Docs nav link are
 # available. Set to false (or 0/no/off) to hide documentation routes and
 # remove the Docs link from the Web UI. Default = true.
