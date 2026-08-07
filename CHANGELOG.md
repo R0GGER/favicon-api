@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.15.16] — 2026-08-07
 
+### Added
+
+- **`UI_SIZE_FILTER_MIN` / `UI_SIZE_FILTER_MAX`** — set the homepage Size range slider defaults (e.g. `16`–`512`). Applied when the visitor has no saved preference in `localStorage`. Allowed steps: `0`, `16`, `32`, `64`, `128`, `180`, `256`, `512`; max may also be `max` / `-1` for the open-ended Max stop. Exposed on `GET /providers` as `sizeFilterMin` / `sizeFilterMax`.
+
 ### Fixed
 
 - **Disk cache — prefer cached scraper bytes over re-fetch** — several paths re-scraped or blanked the UI even when icons were already on disk:
