@@ -5,6 +5,22 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.15.17] — 2026-08-07
+
+### Added
+
+- **Web UI — collapsible scraper size strip** — the HTML Scraper card now shows only the standard sizes (`16`, `32`, `64`, `128`, `256`, `512`) by default and tucks every other discovered size behind a **`+N more` / `− less`** toggle, keeping the strip tidy for domains that expose many odd icon sizes (e.g. `76`, `120`, `144`, `180`, `192`). The currently selected button always stays visible so the strip never shows an orphaned selection, and each search resets to the collapsed state.
+
+### Changed
+
+- **Web UI — oversize scraper sizes gated behind the Max filter** — non-standard sizes larger than `512` (e.g. `1200×630` `og:image` share cards) no longer count as "standard" and are omitted from the size strip unless the Size range filter's upper bound is set to **Max** (open-ended). When Max is selected they appear under the `+N more` toggle. The strip rebuilds automatically as the upper bound crosses the Max stop.
+
+## [2.15.17] — 2026-08-07
+
+### Fixed
+
+- **Web UI — HTML Scraper shows a loader while loading** — the initial (non-refresh) scraper preview was a "soft load" that kept the spinner hidden, so on a slow/cold scrape the card stayed blank with no visible loader. A fresh/blank scraper card now shows the spinner immediately until the first image appears; an already-visible preview is still kept on screen (no flash) while it upgrades to a larger discovered size.
+
 ## [2.15.16] — 2026-08-07
 
 ### Added
