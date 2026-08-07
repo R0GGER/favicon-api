@@ -5,6 +5,20 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.15.18] — 2026-08-08
+
+### Added
+
+- **Web UI — list view targets the preferred icon size** — every provider row in the table/list view now normalizes to the configured preferred size (`SCRAPER_MAX_ICON_SIZE`, default `128`) instead of showing each provider's raw delivered dimensions. When a provider cannot deliver that size, the row falls back to the largest smaller standard size (`64` → `32` → `16`); the copied/opened URL is retargeted to match the shown size. The preferred size is displayed as a small number badge next to the **Size** column header.
+
+### Changed
+
+- **Web UI — size filter removed from list view** — the Size range slider (and its toolbar divider) is now hidden in the table/list view, and the list no longer applies the filter: all active providers are shown regardless of the slider position (rows are already normalized to the preferred size). The size filter continues to work unchanged in grid view.
+
+### Fixed
+
+- **Web UI — long provider titles are truncated on narrow screens** — result card titles (e.g. `Faviconextractor.com`) had no overflow handling, so on smaller screen resolutions the title ran into the **Source** / **Download** buttons in the card header. The `.card-header h3` (and its link) now truncate with an ellipsis (`text-overflow: ellipsis`) while the header buttons keep their space; the full name stays available via the link's `href`.
+
 ## [2.15.17] — 2026-08-07
 
 ### Added
