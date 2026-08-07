@@ -1259,8 +1259,8 @@ app.get('/s-asset', async (req, res) => {
 });
 
 // HTML scraper proxy.
-//   Canonical: /scraper/:size/:ext/:domain   (sized, ext=png)
-//              /scraper/:domain               (auto / largest available)
+//   Canonical: /scraper/:size/:ext/:domain   (sized, ext=png; size may be `max`)
+//              /scraper/:domain               (auto / SCRAPER_MAX_ICON_SIZE-capped)
 //   Legacy:    /scraper/:size/:domain, /s/:size/:domain, /s/:domain
 // Drop the unsized scraper entry plus every known/requested size file
 // (`scraper_{domain}`, `scraper_{size}_{domain}`) so ?refresh=1 does not leave
@@ -1274,12 +1274,44 @@ async function invalidateScraperImageCaches(domain, extraSize) {
 
 // Build (and disk-cache) a single sized scraper PNG. Persists as
 // `scraper_{size}_{domain}` so preload / repeat hits skip resize work.
+//
+// Order is cache-first: resize from an already-cached unsized `scraper_{domain}`
+// entry (including `.orig` / `.origsvg` sidecars) before running discovery or
+// any upstream fetch. Previously discovery ran first, so a warm disk image was
+// ignored while HTML/probes hit the network again (e.g. UI switching yelp.com
+// from /scraper/… to /scraper/180/…).
 async function buildSizedScraperIcon(domain, size) {
+  const cached = await cache.get('scraper', domain, null);
+  if (cached?.buffer) {
+    const fromCache = await tryRenderCachedScraperToSize(cached, domain, size);
+    if (fromCache) return fromCache;
+  }
+
   const served = await serveSizedScraperIcon(domain, size);
   if (served) return served;
 
   const entry = await fetchWithCache('scraper', domain, null, () => fetchScraper(domain));
   if (!entry) return null;
+  return renderScraperEntryToSize(entry, domain, size);
+}
+
+// True when cached scraper bytes can produce `size` without upscaling a smaller
+// raster (same rule as serveSizedScraperIcon). SVG originals always qualify.
+async function tryRenderCachedScraperToSize(entry, domain, size) {
+  if (entry.originalSvgBuffer?.length) {
+    return renderScraperEntryToSize(entry, domain, size);
+  }
+
+  const source = entry.originalBuffer?.length ? entry.originalBuffer : entry.buffer;
+  const dims = await readImageDimensions(source, {
+    contentType: entry.contentType,
+    url: entry.url,
+  });
+  if (!dims || dims.width <= 0) return null;
+
+  const side = Math.min(dims.width, dims.height || dims.width);
+  if (side < size) return null;
+
   return renderScraperEntryToSize(entry, domain, size);
 }
 
@@ -1295,18 +1327,52 @@ async function scraperHandler(req, res) {
 
   const refresh = req.query.refresh === '1' || req.query.nocache === '1';
   // Size from the path segment takes precedence over the legacy ?size= query.
-  const pathSize = req.params.size ? parseInt(req.params.size, 10) : 0;
-  const querySize = req.query.size ? parseInt(req.query.size, 10) : 0;
-  const sizeParam = pathSize || querySize;
+  // `max` = largest discovered source at native resolution (no SCRAPER_MAX_ICON_SIZE).
+  const rawSize = req.params.size != null && String(req.params.size).trim() !== ''
+    ? String(req.params.size).trim()
+    : req.query.size != null && String(req.query.size).trim() !== ''
+      ? String(req.query.size).trim()
+      : '';
+  const wantMax = rawSize.toLowerCase() === 'max';
+  const sizeParam = wantMax ? 0 : rawSize ? parseInt(rawSize, 10) : 0;
 
-  if (sizeParam && (sizeParam < 1 || sizeParam > 1024)) {
-    return res.status(400).json({ error: 'Invalid size. Use a value between 1 and 1024.' });
+  if (rawSize && !wantMax && (!Number.isFinite(sizeParam) || sizeParam < 1)) {
+    return res.status(400).json({ error: 'Invalid size. Use a positive integer or max.' });
   }
 
   try {
     if (refresh) {
-      await invalidateScraperImageCaches(domain, sizeParam || null);
+      await invalidateScraperImageCaches(domain, wantMax ? 'max' : sizeParam || null);
       invalidateScraperDomainCaches(domain);
+    }
+
+    if (wantMax) {
+      // Native max: largest discovered source at full resolution (not SCRAPER_MAX_ICON_SIZE).
+      const sized = await fetchWithCache('scraper', domain, 'max', async () => {
+        let largest = 0;
+        try {
+          const allIcons = await fetchScraperAllIcons(domain);
+          largest = (allIcons || []).reduce((m, i) => Math.max(m, i.width || 0), 0);
+        } catch {
+          /* fall through */
+        }
+        if (largest > 0) {
+          const served = await buildSizedScraperIcon(domain, largest);
+          if (served) return served;
+        }
+        const entry = await fetchScraper(domain);
+        if (!entry) return null;
+        if (entry.originalBuffer?.length) {
+          return {
+            ...entry,
+            buffer: entry.originalBuffer,
+            contentType: entry.contentType || 'image/png',
+          };
+        }
+        return entry;
+      });
+      if (!sized) return res.status(502).json({ error: 'Could not scrape favicon.' });
+      return sendFavicon(res, sized);
     }
 
     if (sizeParam) {

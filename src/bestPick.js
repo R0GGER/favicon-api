@@ -52,6 +52,23 @@ const DEFAULT_PROVIDER = (() => {
 
 const HEAD_START_MS = parseInt(process.env.PICK_HEAD_START_MS || '150', 10);
 
+// Cached best-pick entries from the scraper pipeline use provider "scraper" or
+// "scraper-fallback:<source>". Both satisfy DEFAULT_PROVIDER=scraper — without
+// this, every /:domain hit for catalog/Google fallbacks deleted best_* and
+// re-ran the race even when scraper_* bytes were already on disk.
+function matchesDefaultProvider(cachedProvider) {
+  if (!DEFAULT_PROVIDER) return true;
+  if (!cachedProvider) return false;
+  if (cachedProvider === DEFAULT_PROVIDER) return true;
+  if (
+    DEFAULT_PROVIDER === 'scraper' &&
+    String(cachedProvider).startsWith('scraper-fallback:')
+  ) {
+    return true;
+  }
+  return false;
+}
+
 async function analyzeImage(buffer) {
   try {
     const metadata = await sharp(buffer).metadata();
@@ -185,6 +202,10 @@ async function raceFetchers(fallbacks, cacheProvider, cacheKey, cacheSize) {
       provider: result.provider,
       url: result.url,
     };
+    if (result.originalBuffer?.length) entry.originalBuffer = result.originalBuffer;
+    if (result.originalSvgBuffer?.length) {
+      entry.originalSvgBuffer = result.originalSvgBuffer;
+    }
     await cache.set(cacheProvider, cacheKey, cacheSize, entry);
     return entry;
   };
@@ -236,10 +257,11 @@ async function pickBest(domain) {
   if (cached) {
     if (cached.notFound || cached.provider === 'none') {
       await cache.del('best', domain, null);
-    } else if (DEFAULT_PROVIDER && cached.provider !== DEFAULT_PROVIDER) {
+    } else if (!matchesDefaultProvider(cached.provider)) {
       // Pre-2.8.12 `best` entries can hold a fast CDN fallback (e.g. duckduckgo's
       // generic Google favicon for calendar.google.com) even when DEFAULT_PROVIDER
       // is scraper. Those icons pass isUnusableIcon, so invalidate and re-pick.
+      // scraper-fallback:* still counts as the scraper pipeline.
       await cache.del('best', domain, null);
     } else if (!(await isUnusableIcon(cached.buffer, cached))) {
       return cached;
@@ -257,7 +279,7 @@ async function pickBestService(service) {
   if (cached) {
     if (cached.notFound || cached.provider === 'none') {
       await cache.del('best-service', service, null);
-    } else if (DEFAULT_PROVIDER && cached.provider !== DEFAULT_PROVIDER) {
+    } else if (!matchesDefaultProvider(cached.provider)) {
       await cache.del('best-service', service, null);
     } else if (!(await isUnusableIcon(cached.buffer, cached))) {
       return cached;

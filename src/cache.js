@@ -37,8 +37,33 @@ function metaPath(key) {
   return path.join(CACHE_DIR, `${key}.meta`);
 }
 
+function originalPath(key) {
+  return path.join(CACHE_DIR, `${key}.orig`);
+}
+
+function originalSvgPath(key) {
+  return path.join(CACHE_DIR, `${key}.origsvg`);
+}
+
+function isSidecarName(name) {
+  return (
+    name.endsWith('.meta') ||
+    name.endsWith('.orig') ||
+    name.endsWith('.origsvg')
+  );
+}
+
 async function ensureCacheDir() {
   await fs.mkdir(CACHE_DIR, { recursive: true });
+}
+
+async function unlinkEntryFiles(key) {
+  await Promise.all([
+    fs.unlink(diskPath(key)).catch(() => {}),
+    fs.unlink(metaPath(key)).catch(() => {}),
+    fs.unlink(originalPath(key)).catch(() => {}),
+    fs.unlink(originalSvgPath(key)).catch(() => {}),
+  ]);
 }
 
 async function scanDiskCache() {
@@ -50,12 +75,23 @@ async function scanDiskCache() {
       const next = new Map();
       let total = 0;
       for (const name of entries) {
-        if (name.endsWith('.meta')) continue;
+        if (isSidecarName(name)) continue;
         try {
-          const stat = await fs.stat(path.join(CACHE_DIR, name));
+          const base = path.join(CACHE_DIR, name);
+          const stat = await fs.stat(base);
           if (!stat.isFile()) continue;
-          next.set(name, { size: stat.size, mtimeMs: stat.mtimeMs });
-          total += stat.size;
+          let size = stat.size;
+          // Sidecar originals belong to this entry's budget.
+          for (const side of [metaPath(name), originalPath(name), originalSvgPath(name)]) {
+            try {
+              const sideStat = await fs.stat(side);
+              if (sideStat.isFile()) size += sideStat.size;
+            } catch {
+              /* missing sidecar */
+            }
+          }
+          next.set(name, { size, mtimeMs: stat.mtimeMs });
+          total += size;
         } catch {
           // File disappeared between readdir and stat — ignore.
         }
@@ -90,8 +126,7 @@ async function evictIfOverLimit() {
     diskIndex.delete(key);
     diskTotal = Math.max(0, diskTotal - info.size);
     memoryCache.delete(key);
-    await fs.unlink(diskPath(key)).catch(() => {});
-    await fs.unlink(metaPath(key)).catch(() => {});
+    await unlinkEntryFiles(key);
   }
 }
 
@@ -116,14 +151,15 @@ async function get(provider, domain, size) {
 
     if (age > DISK_TTL) {
       trackDelete(key);
-      await fs.unlink(file).catch(() => {});
-      await fs.unlink(metaPath(key)).catch(() => {});
+      await unlinkEntryFiles(key);
       return null;
     }
 
-    const [buffer, metaRaw] = await Promise.all([
+    const [buffer, metaRaw, originalBuffer, originalSvgBuffer] = await Promise.all([
       fs.readFile(file),
       fs.readFile(metaPath(key), 'utf-8').catch(() => '{}'),
+      fs.readFile(originalPath(key)).catch(() => null),
+      fs.readFile(originalSvgPath(key)).catch(() => null),
     ]);
 
     const meta = JSON.parse(metaRaw);
@@ -133,6 +169,8 @@ async function get(provider, domain, size) {
       provider: meta.provider || provider,
     };
     if (meta.url) entry.url = meta.url;
+    if (originalBuffer?.length) entry.originalBuffer = originalBuffer;
+    if (originalSvgBuffer?.length) entry.originalSvgBuffer = originalSvgBuffer;
 
     memoryCache.set(key, entry);
     return entry;
@@ -152,19 +190,43 @@ async function set(provider, domain, size, entry) {
     await ensureCacheDir();
     const meta = { contentType: entry.contentType, provider: entry.provider };
     if (entry.url) meta.url = entry.url;
-    await Promise.all([
+
+    const writes = [
       fs.writeFile(diskPath(key), entry.buffer),
       fs.writeFile(metaPath(key), JSON.stringify(meta)),
-    ]);
+    ];
+
+    // Persist full-resolution / SVG sources so sized routes can rebuild after
+    // MEMORY_CACHE_TTL without re-fetching upstream (disk previously only kept
+    // the capped display buffer).
+    const hasDistinctOriginal =
+      entry.originalBuffer?.length &&
+      entry.originalBuffer !== entry.buffer;
+    if (hasDistinctOriginal) {
+      writes.push(fs.writeFile(originalPath(key), entry.originalBuffer));
+    } else {
+      writes.push(fs.unlink(originalPath(key)).catch(() => {}));
+    }
+
+    if (entry.originalSvgBuffer?.length) {
+      writes.push(fs.writeFile(originalSvgPath(key), entry.originalSvgBuffer));
+    } else {
+      writes.push(fs.unlink(originalSvgPath(key)).catch(() => {}));
+    }
+
+    await Promise.all(writes);
 
     if (DISK_MAX_BYTES) {
       const previous = diskIndex.get(key);
       if (previous) diskTotal = Math.max(0, diskTotal - previous.size);
+      let sizeBytes = entry.buffer.length;
+      if (hasDistinctOriginal) sizeBytes += entry.originalBuffer.length;
+      if (entry.originalSvgBuffer?.length) sizeBytes += entry.originalSvgBuffer.length;
       diskIndex.set(key, {
-        size: entry.buffer.length,
+        size: sizeBytes,
         mtimeMs: Date.now(),
       });
-      diskTotal += entry.buffer.length;
+      diskTotal += sizeBytes;
 
       if (diskTotal > DISK_MAX_BYTES) {
         // Run eviction in the background so set() stays fast for the caller.
@@ -182,8 +244,7 @@ async function del(provider, domain, size) {
   const key = cacheKey(provider, domain, size);
   memoryCache.delete(key);
   trackDelete(key);
-  await fs.unlink(diskPath(key)).catch(() => {});
-  await fs.unlink(metaPath(key)).catch(() => {});
+  await unlinkEntryFiles(key);
 }
 
 if (DISK_MAX_BYTES) {

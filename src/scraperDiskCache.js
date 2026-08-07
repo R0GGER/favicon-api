@@ -5,8 +5,12 @@ const path = require('path');
 const CACHE_DIR = process.env.CACHE_DIR || './cache';
 const SCRAPER_DISK_CACHE_DIR =
   process.env.SCRAPER_DISK_CACHE_DIR || path.join(CACHE_DIR, 'scraper-discovery');
+// Keep discovery on disk as long as image bytes by default (DISK_CACHE_TTL).
 const TTL_MS =
-  parseInt(process.env.SCRAPER_ICONS_CACHE_TTL || '3600', 10) * 1000;
+  parseInt(
+    process.env.SCRAPER_ICONS_CACHE_TTL || process.env.DISK_CACHE_TTL || '86400',
+    10
+  ) * 1000;
 
 // Default = on. Persisting scraper discovery on disk lets it survive restarts
 // and be shared across cluster workers, so an unset/empty value enables it;

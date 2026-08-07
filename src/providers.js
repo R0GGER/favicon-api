@@ -27,9 +27,15 @@ const BESTICON_URL = (process.env.BESTICON_URL || '').replace(/\/+$/, '');
 // In-memory cache for the enriched scraper icons list. Probing 8+ candidate
 // URLs (besticon + static hints + sized variants) on every /:domain/json
 // request would add seconds of latency for the UI's size-button strip, so we
-// reuse the probe result for a configurable TTL (default: 1 hour).
+// reuse the probe result for a configurable TTL. Default matches DISK_CACHE_TTL
+// so discovery does not expire (and re-fetch HTML/probes) while image bytes
+// are still valid on disk.
+const DISK_CACHE_TTL_SECS = parseInt(process.env.DISK_CACHE_TTL || '86400', 10);
 const SCRAPER_ICONS_CACHE_TTL_MS =
-  parseInt(process.env.SCRAPER_ICONS_CACHE_TTL || '3600', 10) * 1000;
+  parseInt(
+    process.env.SCRAPER_ICONS_CACHE_TTL || String(DISK_CACHE_TTL_SECS),
+    10
+  ) * 1000;
 const SCRAPER_ICONS_CACHE_MAX =
   parseInt(process.env.SCRAPER_ICONS_CACHE_MAX || '500', 10);
 
@@ -1296,7 +1302,9 @@ function parseSizesAttr(sizes) {
 }
 
 // Social / tile meta images (og:image, twitter:image, …) are useful logo
-// fallbacks but often widescreen share cards. Only keep near-square ones.
+// fallbacks but often widescreen share cards. The default /scraper pick still
+// prefers near-square metas only; discovery lists all successful probes so
+// og:image variants appear in /{domain}/json and the UI size strip.
 const META_IMAGE_MAX_ASPECT = 1.4;
 
 function isMetaImageRel(rel) {
@@ -1327,6 +1335,18 @@ function metaImageRelFromKey(key) {
     return 'msapplication-tileimage';
   }
   return null;
+}
+
+function isMetaImageDimensionKey(key) {
+  const k = String(key || '').toLowerCase().trim();
+  return (
+    k === 'og:image:width' ||
+    k === 'og:image:height' ||
+    k === 'og:image:type' ||
+    k === 'twitter:image:width' ||
+    k === 'twitter:image:height' ||
+    k === 'twitter:image:type'
+  );
 }
 
 function formatScore(format) {
@@ -1772,8 +1792,10 @@ async function fetchScraperAllIcons(domain) {
       async (c) => {
         const p = await probeIconMetadata(c.href, referer);
         if (!p) return null;
-        if (isMetaImageRel(c.rel) && !isNearSquareIcon(p.width, p.height)) {
-          return null;
+        // Keep meta images in discovery even when widescreen — the default
+        // /scraper pick still filters via isNearSquareIcon in probeScraperCandidates.
+        if (isMetaImageRel(c.rel)) {
+          return { ...p, source: c.rel };
         }
         return p;
       }
@@ -1882,6 +1904,48 @@ async function fetchScraperAllIcons(domain) {
       }
     } catch {
       /* catalog reflection is best-effort */
+    }
+  }
+
+  // Same last-resort as fetchScraper(): when HTML/catalog discovery still has
+  // nothing usable, reflect Google faviconV2 into the icons list so the UI size
+  // strip matches what /scraper/{domain} actually serves (e.g. bbb.org). Without
+  // this, icons=[] and the UI only offers the single Fast-proxy button even
+  // though preload warmed /scraper/{16..512}/… successfully.
+  const largestAfterCatalog = sorted.reduce(
+    (max, icon) => Math.max(max, icon.width || 0, icon.height || 0),
+    0
+  );
+  if (SCRAPER_FALLBACK && largestAfterCatalog < MIN_SOURCE_SIZE) {
+    try {
+      const fb = await fetchScraperGoogleFallback(domain);
+      if (fb?.buffer) {
+        const sourceBuffer = fb.originalBuffer || fb.buffer;
+        const dims = await readImageDimensions(sourceBuffer, {
+          contentType: fb.contentType,
+          url: fb.url,
+        }).catch(() => null);
+        const width = dims
+          ? Math.max(dims.width || 0, dims.height || 0)
+          : 0;
+        if (width > 0) {
+          const googleIcon = {
+            url: fb.url,
+            width,
+            height: width,
+            format: 'png',
+            bytes: sourceBuffer.length,
+            source: 'googlev2',
+          };
+          if (sorted.length === 0 || width > largestAfterCatalog) {
+            sorted = [googleIcon, ...sorted.filter((i) => (i.width || 0) !== width)];
+          } else if (!sorted.some((i) => i.url === googleIcon.url)) {
+            sorted.push(googleIcon);
+          }
+        }
+      }
+    } catch {
+      /* google reflection is best-effort */
     }
   }
 
@@ -2192,33 +2256,62 @@ function parseIconCandidatesFromHtml(html, finalBaseUrl, domain = null) {
     }
   });
 
-  // Open Graph / Twitter / Windows tile images — often a brand logo when the
-  // site only exposes a tiny favicon. Widescreen share cards are filtered out
-  // later via isNearSquareIcon during probing.
+  // Open Graph / Twitter / Windows tile images. Structured properties
+  // (og:image:width / :height / :type) attach to the preceding og:image URL so
+  // declared dimensions are available before probing. Widescreen share cards
+  // stay in discovery; probeScraperCandidates still skips them for the default
+  // /scraper pick when a real <link rel="icon"> exists.
   const seenMetaHrefs = new Set(linkCandidates.map((c) => c.href));
+  const metaCandidates = [];
+  let currentMeta = null;
   $('meta[property], meta[name]').each((_, el) => {
     const property = ($(el).attr('property') || '').trim();
     const name = ($(el).attr('name') || '').trim();
-    const rel = metaImageRelFromKey(property || name);
-    if (!rel) return;
-
+    const key = (property || name).toLowerCase();
     const content = ($(el).attr('content') || '').trim();
     if (!content || content.startsWith('data:')) return;
 
-    try {
-      const href = new URL(content, resolveBase).toString();
-      if (seenMetaHrefs.has(href)) return;
-      seenMetaHrefs.add(href);
-      linkCandidates.push({
-        href,
-        sizes: '',
-        type: '',
-        rel,
-      });
-    } catch {
-      /* ignore invalid URLs */
+    const rel = metaImageRelFromKey(key);
+    if (rel) {
+      try {
+        const href = new URL(content, resolveBase).toString();
+        currentMeta = { href, sizes: '', type: '', rel, width: 0, height: 0 };
+        metaCandidates.push(currentMeta);
+      } catch {
+        currentMeta = null;
+      }
+      return;
+    }
+
+    if (!currentMeta || !isMetaImageDimensionKey(key)) {
+      if (key.startsWith('og:') || key.startsWith('twitter:') || key.startsWith('msapplication-')) {
+        // Unrelated social/meta property — stop attaching to the previous image.
+        if (!isMetaImageDimensionKey(key)) currentMeta = null;
+      }
+      return;
+    }
+
+    if (key.endsWith(':width')) {
+      currentMeta.width = parseInt(content, 10) || 0;
+    } else if (key.endsWith(':height')) {
+      currentMeta.height = parseInt(content, 10) || 0;
+    } else if (key.endsWith(':type')) {
+      currentMeta.type = content;
     }
   });
+
+  for (const m of metaCandidates) {
+    if (seenMetaHrefs.has(m.href)) continue;
+    seenMetaHrefs.add(m.href);
+    const sizes =
+      m.width > 0 && m.height > 0 ? `${m.width}x${m.height}` : '';
+    linkCandidates.push({
+      href: m.href,
+      sizes,
+      type: m.type || '',
+      rel: m.rel,
+    });
+  }
 
   // Icons referenced in the page body (Google product logos on redirected
   // marketing pages). These are absolute gstatic URLs, so no base resolution.
