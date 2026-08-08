@@ -986,6 +986,68 @@
       display: none;
     }
 
+    /* The list-view icon-size selector is only relevant in table view. */
+    .list-size-group,
+    .list-size-divider {
+      display: none;
+    }
+
+    .results.view-table .list-size-group {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      min-width: 0;
+    }
+
+    .results.view-table .list-size-divider {
+      display: block;
+    }
+
+    .list-size-panel {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      font-size: 0.85rem;
+      color: #6b6560;
+      min-width: 0;
+    }
+
+    /* Single-thumb slider: unlike the grid's dual-range overlay, the track is
+       directly clickable/draggable. The id selector outweighs the shared
+       `.size-range-slider input { pointer-events: none }` rule defined later. */
+    #list-size-range {
+      pointer-events: auto;
+      cursor: pointer;
+    }
+
+    /* The 14px thumb travels inset by its 7px radius on each side, so inset the
+       track and ticks by the same amount to line the thumb up with the ticks. */
+    .list-size-slider .size-range-track {
+      left: 7px;
+      right: 7px;
+    }
+
+    /* One tick mark per selectable icon size. */
+    .list-size-ticks {
+      position: absolute;
+      left: 7px;
+      right: 7px;
+      top: 50%;
+      height: 0;
+      pointer-events: none;
+    }
+
+    .list-size-ticks span {
+      position: absolute;
+      top: 0;
+      width: 2px;
+      height: 12px;
+      margin-left: -1px;
+      transform: translateY(-50%);
+      border-radius: 1px;
+      background: #c3b4d4;
+    }
+
     .results-view-toggle {
       flex: 0 0 auto;
       display: inline-flex;
@@ -1135,8 +1197,10 @@
 
     .results-table-icon-btn img {
       display: block;
-      width: 16px;
-      height: 16px;
+      /* The list view always renders a fixed 16px thumbnail; this cap is a
+         safety net so the icon never overflows the row. */
+      max-width: 16px;
+      max-height: 16px;
       object-fit: contain;
       pointer-events: none;
     }
@@ -3038,6 +3102,27 @@
               <span class="size-filter-value" id="size-filter-label" aria-live="polite">16–512px</span>
             </div>
           </div>
+          <div class="download-toolbar-divider list-size-divider" aria-hidden="true"></div>
+          <div class="list-size-group">
+            <div class="list-size-panel">
+              <span class="size-filter-heading">Icon size</span>
+              <div class="size-range-slider list-size-slider" id="list-size-slider">
+                <div class="size-range-track" aria-hidden="true">
+                  <div class="size-range-fill" id="list-size-fill"></div>
+                </div>
+                <div class="list-size-ticks" aria-hidden="true">
+                  <span style="left:0%"></span>
+                  <span style="left:20%"></span>
+                  <span style="left:40%"></span>
+                  <span style="left:60%"></span>
+                  <span style="left:80%"></span>
+                  <span style="left:100%"></span>
+                </div>
+                <input type="range" id="list-size-range" min="0" max="5" step="1" value="3" aria-label="List view icon size" aria-valuetext="128px">
+              </div>
+              <span class="size-filter-value" id="list-size-label" aria-live="polite">128px</span>
+            </div>
+          </div>
         </div>
         <div class="download-toolbar-actions">
           <button type="button" class="download-all-btn btn-cta-attention" id="profile-builder-btn" onclick="openProfileModal()" data-tip="Build a shareable URL with your own preferred provider, fallbacks and minimum icon size." aria-label="Build a custom favicon URL: a shareable URL with your own preferred provider, fallbacks and minimum icon size, encoded in the URL with no account needed">
@@ -4501,9 +4586,35 @@ document.getElementById('sf').addEventListener('submit',function(e){
     const CATALOG_RASTER_SIZES = [16, 32, 64, 128, 256];
     const SVGL_RASTER_SIZES = [64, 128, 256];
     const THESVG_RASTER_SIZES = [64, 128, 256];
+    // Standard raster sizes each proxy route actually accepts (mirrors the
+    // server-side size validation in src/index.js), keyed by URL path prefix.
+    // `null` = accepts any size (the scraper never upscales). Used by the list
+    // view to hide rows whose provider cannot deliver the chosen size.
+    const PROVIDER_PATH_VALID_SIZES = {
+      google: [16, 32, 64, 128],
+      googlev2: [16, 32, 64, 128, 180, 256],
+      duckduckgo: [16, 32, 64, 128, 256],
+      yandex: [16, 32, 64, 128, 256],
+      faviconso: [16, 32, 64, 128, 256],
+      vemetric: [16, 32, 64, 128, 256],
+      favicondev: [16, 32, 64, 128, 256],
+      faviconkit: [16, 32, 64, 128, 256],
+      faviconrun: [16, 32, 64, 128, 256],
+      twentyicons: [16, 32, 64, 128, 180, 192],
+      ryanjc: [16, 32, 64, 128, 256],
+      logodev: [16, 32, 64, 128, 256],
+      brandfetch: [16, 32, 64, 128, 256, 512],
+      selfhst: [16, 32, 64, 128, 256],
+      dashboardicons: [16, 32, 64, 128, 256],
+      lobehub: [64, 128, 256],
+      svgl: [64, 128, 256],
+      thesvg: [64, 128, 256],
+      scraper: null,
+    };
     const SIZE_FILTER_INDEX_VALUES = [0, ...SIZE_FILTER_STEPS];
     const SIZE_FILTER_STORAGE_KEY = 'faviconapi-size-filter';
     const RESULTS_VIEW_STORAGE_KEY = 'faviconapi-results-view';
+    const LIST_ICON_SIZE_STORAGE_KEY = 'faviconapi-list-icon-size';
     const SIZE_FILTER_ALLOWED = new Set([0, ...SIZE_FILTER_STEPS]);
     const svglCatalogCache = new Map();
     const thesvgCatalogCache = new Map();
@@ -4550,6 +4661,7 @@ document.getElementById('sf').addEventListener('submit',function(e){
     const DOWNLOAD_ICON_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>';
     let jsZipLoadPromise = null;
     let currentResultsView = 'grid';
+    let currentTableIconSize = null;
     let resultsTableSyncRaf = null;
 
     function resolveCardUrl(proxyUrl, sourceUrl, opts = {}) {
@@ -4651,6 +4763,10 @@ document.getElementById('sf').addEventListener('submit',function(e){
     }
 
     const TABLE_STANDARD_SIZES = [16, 32, 64, 128, 256, 512];
+    // The list view always renders a fixed 16px thumbnail so every row stays
+    // neat; the chosen size still drives the target URL, Size column and row
+    // hiding.
+    const TABLE_ICON_DISPLAY_MAX = 16;
 
     // Preferred icon size for the list/table view. Uses the configured scraper
     // cap (SCRAPER_MAX_ICON_SIZE) as the target so every provider row lines up
@@ -4659,23 +4775,40 @@ document.getElementById('sf').addEventListener('submit',function(e){
       return Number(providersConfig.scraperMaxIconSize) || 128;
     }
 
-    // Standard sizes at or below the preferred size, largest first. For 128
-    // this is [128, 64, 32, 16] (best -> 2nd -> 3rd -> 4th best), never larger
-    // than the preferred size.
-    function tableSizeLadder() {
+    // Default size for the list-view icon-size selector: the largest standard
+    // size at or below the preferred size (SCRAPER_MAX_ICON_SIZE), e.g. 128.
+    function defaultTableIconSize() {
       const preferred = tablePreferredSize();
-      return TABLE_STANDARD_SIZES.filter((s) => s <= preferred).sort((a, b) => b - a);
+      const candidates = TABLE_STANDARD_SIZES.filter((s) => s <= preferred);
+      return candidates.length ? candidates[candidates.length - 1] : TABLE_STANDARD_SIZES[0];
     }
 
-    // Pick the largest ladder value the provider can deliver without upscaling
-    // (<= native pixels); if the icon is smaller than every candidate, use the
-    // smallest ladder value.
-    function pickTableSize(nativePx) {
-      const ladder = tableSizeLadder();
-      if (ladder.length === 0) return tablePreferredSize();
-      const native = Number(nativePx) || 0;
-      const chosen = ladder.find((s) => s <= native);
-      return chosen != null ? chosen : ladder[ladder.length - 1];
+    // Whether the proxy route in `url` accepts the given size. Unknown routes
+    // and `null` (any-size) routes always pass.
+    function urlPathSizeValid(url, size) {
+      if (!url) return true;
+      let path = url;
+      if (url.startsWith('http')) {
+        try {
+          path = new URL(url).pathname;
+        } catch {
+          /* fall back to raw string */
+        }
+      }
+      const m = path.match(/^\/([^/]+)\//);
+      if (!m) return true;
+      const key = m[1];
+      if (!Object.prototype.hasOwnProperty.call(PROVIDER_PATH_VALID_SIZES, key)) return true;
+      const allowed = PROVIDER_PATH_VALID_SIZES[key];
+      return allowed == null || allowed.includes(size);
+    }
+
+    // The size currently selected in the list-view icon-size selector.
+    function getTableIconSize() {
+      if (currentTableIconSize && TABLE_STANDARD_SIZES.includes(currentTableIconSize)) {
+        return currentTableIconSize;
+      }
+      return defaultTableIconSize();
     }
 
     // Rewrite the size in a URL to `size`, so the copied/opened URL matches the
@@ -5748,6 +5881,58 @@ document.getElementById('sf').addEventListener('submit',function(e){
       }
     }
 
+    function loadTableIconSizeFromStorage() {
+      try {
+        const stored = parseInt(localStorage.getItem(LIST_ICON_SIZE_STORAGE_KEY), 10);
+        if (TABLE_STANDARD_SIZES.includes(stored)) currentTableIconSize = stored;
+      } catch {
+        /* ignore quota / private mode */
+      }
+    }
+
+    function syncTableIconSizeSlider() {
+      const size = getTableIconSize();
+      const idx = Math.max(0, TABLE_STANDARD_SIZES.indexOf(size));
+      const steps = TABLE_STANDARD_SIZES.length - 1;
+      const range = document.getElementById('list-size-range');
+      const fill = document.getElementById('list-size-fill');
+      const label = document.getElementById('list-size-label');
+      if (range) {
+        range.value = String(idx);
+        range.setAttribute('aria-valuetext', `${size}px`);
+      }
+      if (fill) {
+        fill.style.left = '0%';
+        fill.style.right = `${100 - (idx / steps) * 100}%`;
+      }
+      if (label) label.textContent = `${size}px`;
+    }
+
+    function setTableIconSize(size) {
+      if (!TABLE_STANDARD_SIZES.includes(size)) return;
+      currentTableIconSize = size;
+      try {
+        localStorage.setItem(LIST_ICON_SIZE_STORAGE_KEY, String(size));
+      } catch {
+        /* ignore quota / private mode */
+      }
+      syncTableIconSizeSlider();
+      scheduleResultsTableSync();
+    }
+
+    function initTableIconSizeSelector() {
+      loadTableIconSizeFromStorage();
+      syncTableIconSizeSlider();
+      const range = document.getElementById('list-size-range');
+      if (range && !range.dataset.bound) {
+        range.dataset.bound = '1';
+        range.addEventListener('input', () => {
+          const idx = Math.max(0, Math.min(TABLE_STANDARD_SIZES.length - 1, parseInt(range.value, 10) || 0));
+          setTableIconSize(TABLE_STANDARD_SIZES[idx]);
+        });
+      }
+    }
+
     function scheduleResultsTableSync() {
       if (resultsTableSyncRaf) cancelAnimationFrame(resultsTableSyncRaf);
       resultsTableSyncRaf = requestAnimationFrame(() => {
@@ -5789,6 +5974,7 @@ document.getElementById('sf').addEventListener('submit',function(e){
 
     function initResultsViewToggle() {
       loadResultsViewFromStorage();
+      initTableIconSizeSelector();
       applyResultsViewClasses();
       document.querySelectorAll('.results-view-btn').forEach((btn) => {
         btn.addEventListener('click', () => setResultsView(btn.dataset.view));
@@ -5852,20 +6038,49 @@ document.getElementById('sf').addEventListener('submit',function(e){
         if (catalogFmt) extension = catalogFmt;
       }
 
+      // List view renders every row at the size chosen in the icon-size
+      // selector. Vector icons scale freely; raster icons may only be shown
+      // when their native resolution can satisfy the chosen size without
+      // upscaling. Rows that cannot meet the chosen size are hidden entirely.
+      const targetSize = getTableIconSize();
+      const nativePx = Math.max(w, h);
+      const isCatalog = CATALOG_SVG_PROVIDERS.has(providerId);
       let sizeLabel = '—';
       let rowCopyUrl = copyUrl;
       let rowSourceUrl = sourceUrl;
-      if (isVector && (!w || !h)) {
+
+      if (isVector) {
+        // Vector icons scale to any size, so they always satisfy the chosen
+        // size. Keep their original (working) URL rather than retargeting,
+        // since some vector routes reject arbitrary size segments.
         sizeLabel = 'SVG';
-      } else if (w > 0 && h > 0) {
-        // In list view every provider row targets the configured preferred size
-        // (or the largest smaller standard size it can deliver) so the Size
-        // column stays consistent; the copied/opened URL is retargeted to match.
-        const chosen = pickTableSize(Math.max(w, h));
-        sizeLabel = `${chosen}×${chosen}`;
-        rowCopyUrl = retargetUrlSize(copyUrl, chosen);
-        rowSourceUrl = retargetUrlSize(sourceUrl, chosen);
+      } else if (isCatalog) {
+        // Catalog providers render PNGs from a vector source at the exact
+        // requested size, so any size in their route's valid set is
+        // deliverable regardless of the currently displayed size.
+        if (!urlPathSizeValid(copyUrl, targetSize)) return null;
+        sizeLabel = `${targetSize}×${targetSize}`;
+        rowCopyUrl = retargetUrlSize(copyUrl, targetSize);
+        rowSourceUrl = retargetUrlSize(sourceUrl, targetSize);
+      } else if (nativePx > 0) {
+        // Raster providers: the chosen size must be deliverable without
+        // upscaling AND accepted by the provider's route. Otherwise hide it.
+        if (nativePx < targetSize || !urlPathSizeValid(copyUrl, targetSize)) return null;
+        sizeLabel = `${targetSize}×${targetSize}`;
+        rowCopyUrl = retargetUrlSize(copyUrl, targetSize);
+        rowSourceUrl = retargetUrlSize(sourceUrl, targetSize);
+      } else {
+        // Native size unknown and not a vector: we cannot confirm the chosen
+        // size can be delivered, so the row is hidden.
+        return null;
       }
+
+      // Always show a fixed 16px thumbnail by reusing the image the grid
+      // already loaded (scaled down by the browser). We deliberately do NOT
+      // retarget the src to 16px, because some providers (e.g. svgl/thesvg)
+      // don't serve small raster sizes and would return a broken image.
+      const iconDisplaySize = TABLE_ICON_DISPLAY_MAX;
+      const iconSrc = img.src;
 
       const extensionChoices = providerSupportsExtensionChoice(providerId)
         ? { current: getCatalogFormat(providerId), formats: ['png', 'svg'] }
@@ -5874,7 +6089,8 @@ document.getElementById('sf').addEventListener('submit',function(e){
       return {
         providerId,
         provider: getCardProviderLabel(card),
-        iconSrc: img.src,
+        iconSrc,
+        iconRenderSize: iconDisplaySize,
         extension: extension || '—',
         extensionChoices,
         sizeLabel,
@@ -5949,7 +6165,7 @@ document.getElementById('sf').addEventListener('submit',function(e){
       return `<tr data-provider="${escapeHtml(data.providerId)}" class="results-table-row">
         <td class="results-table-icon">
           <button type="button" class="results-table-icon-btn" data-action="copy-url" data-url="${escapeHtml(data.copyUrl)}" data-tip="Copy URL" aria-label="Copy URL">
-            <img src="${escapeHtml(data.iconSrc)}" width="16" height="16" alt="">
+            <img src="${escapeHtml(data.iconSrc)}" width="${data.iconRenderSize}" height="${data.iconRenderSize}" style="width:${data.iconRenderSize}px;height:${data.iconRenderSize}px" alt="">
           </button>
         </td>
         <td>${escapeHtml(data.provider)}</td>
@@ -5977,7 +6193,8 @@ document.getElementById('sf').addEventListener('submit',function(e){
       if (!showTable) return;
 
       const sizeDefaultEl = document.getElementById('results-table-size-default');
-      if (sizeDefaultEl) sizeDefaultEl.textContent = String(tablePreferredSize());
+      if (sizeDefaultEl) sizeDefaultEl.textContent = String(getTableIconSize());
+      syncTableIconSizeSlider();
 
       const providers = activeFaviconProviders();
       const showAppSection = shouldShowAppIconsTableSection();
