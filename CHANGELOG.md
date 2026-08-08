@@ -5,7 +5,16 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.15.18] — 2026-08-08
+## [2.15.19] — 2026-08-09
+
+### Added
+
+- **Web UI — icon-size selector in list view** — the table/list view now has an **Icon size** slider (single thumb, one tick + tiny label per stop: `16` / `32` / `64` / `128` / `256` / `512`) that sets the target size for every row. Click a tick or drag the thumb to choose; the selection persists in `localStorage` and drives the copied/opened URL and the **Size** column. It defaults to the largest standard size at or below `SCRAPER_MAX_ICON_SIZE` (i.e. `128`).
+- **Web UI — hide rows that cannot deliver the chosen size** — a provider row is hidden entirely when it cannot serve the selected size: raster providers whose native icon is smaller (no upscaling) and any provider whose route rejects that size. The client mirrors the server-side per-route size validation (e.g. `svgl` / `thesvg` / `lobehub` only `64`/`128`/`256`, `google` only up to `128`, `512` only on `brandfetch`), so the list no longer generates invalid URLs like `/svgl/16/png/…`. Vector (SVG) icons scale freely and always remain visible.
+
+### Changed
+
+- **Web UI — list view uses a fixed 16px thumbnail** — every row reuses the icon the grid already loaded, rendered at a constant `16px`, so rows stay compact regardless of the chosen size (the size only governs the target URL, Size column and row visibility). This replaces the previous behavior where the list auto-normalized each row to the preferred size (with a `128` → `64` → `32` → `16` fallback ladder) and showed a size badge next to the **Size** header.
 
 ### Added
 
