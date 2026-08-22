@@ -10,6 +10,9 @@ RUN npm ci --omit=dev \
 
 FROM node:22-alpine
 WORKDIR /app
+# fontconfig so librsvg can load a default fonts.conf (otherwise every SVG
+# raster logs "Fontconfig error: Cannot load default config file").
+RUN apk add --no-cache fontconfig
 RUN addgroup -S app && adduser -S app -G app
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json ./
