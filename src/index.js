@@ -213,6 +213,15 @@ app.use((req, res, next) => {
   next();
 });
 
+app.use((req, res, next) => {
+  try {
+    decodeURIComponent(req.path);
+  } catch {
+    return res.status(400).json({ error: 'Invalid URL.' });
+  }
+  next();
+});
+
 // SEO / templated index. The HTML template ships with `__BASE_URL__` tokens
 // in the <head> (canonical, Open Graph, Twitter Card, JSON-LD) so absolute
 // URLs resolve to whichever public origin the deployment is reached on,
@@ -2303,6 +2312,15 @@ app.get('/:domain', async (req, res) => {
     console.error('Best-pick error:', err.message);
     res.status(500).json({ error: 'Internal error.' });
   }
+});
+
+app.use((err, req, res, next) => {
+  if (res.headersSent) return next(err);
+  if (err instanceof URIError) {
+    return res.status(400).json({ error: 'Invalid URL.' });
+  }
+  console.error('Unhandled request error:', err.message);
+  res.status(500).json({ error: 'Internal error.' });
 });
 
 app.listen(PORT, '0.0.0.0', () => {

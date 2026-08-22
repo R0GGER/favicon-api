@@ -6,6 +6,7 @@ const {
   readImageDimensions,
   toDisplayPng,
   looksLikeSvg,
+  looksLikeImageBuffer,
   isBlankFavicon,
   isUnusableIcon,
   encodeLosslessPng,
@@ -14,7 +15,7 @@ const {
   resizeIcon,
 } = require('./imageNormalize');
 const { LRUCache } = require('lru-cache');
-const { upstreamFetch, ipv4Dispatcher, ipv4Http1Dispatcher } = require('./upstreamFetch');
+const { upstreamFetch, discardResponseBody, ipv4Dispatcher, ipv4Http1Dispatcher } = require('./upstreamFetch');
 const cache = require('./cache');
 const scraperDiskCache = require('./scraperDiskCache');
 const { serviceSlugFromDomain } = require('./serviceSlugFromDomain');
@@ -179,12 +180,15 @@ async function fetchUpstreamRaw(url, { redirect = false } = {}) {
     if (redirect) init.redirect = 'follow';
     const res = await upstreamFetch(url, init);
 
-    if (!res.ok) return null;
+    if (!res.ok) {
+      discardResponseBody(res);
+      return null;
+    }
 
     const contentType = res.headers.get('content-type') || 'image/png';
     const buffer = Buffer.from(await res.arrayBuffer());
 
-    if (buffer.length === 0) return null;
+    if (buffer.length === 0 || !looksLikeImageBuffer(buffer)) return null;
 
     return { buffer, contentType, url };
   } catch {
@@ -788,12 +792,15 @@ async function fetchFavicon(url, requestHeaders) {
       headers: requestHeaders || FAVICON_FETCH_HEADERS,
     });
 
-    if (!res.ok) return null;
+    if (!res.ok) {
+      discardResponseBody(res);
+      return null;
+    }
 
     const contentType = res.headers.get('content-type') || 'image/png';
     const buffer = Buffer.from(await res.arrayBuffer());
 
-    if (buffer.length === 0) return null;
+    if (buffer.length === 0 || !looksLikeImageBuffer(buffer)) return null;
 
     return { buffer, contentType, url };
   } catch {
@@ -1406,12 +1413,14 @@ async function fetchManifestIcons(manifestUrl, referer) {
   try {
     let res = await upstreamFetch(manifestUrl, { signal: controller.signal });
     if (!res.ok) {
+      discardResponseBody(res);
       res = await upstreamFetch(manifestUrl, {
         signal: controller.signal,
         headers: scraperDocumentHeaders(referer, 'manifest'),
       });
     }
     if (!res.ok) {
+      discardResponseBody(res);
       manifestFetchCache.set(manifestUrl, []);
       scraperDiskCache.setManifest(manifestUrl, []);
       return [];
@@ -2000,7 +2009,10 @@ async function fetchScraperPageUncached(domain) {
             typeof attempt.headers === 'function' ? attempt.headers(pageUrl) : attempt.headers;
         }
         const res = await upstreamFetch(pageUrl, init);
-        if (!res.ok) continue;
+        if (!res.ok) {
+          discardResponseBody(res);
+          continue;
+        }
         const html = await res.text();
         if (html.length >= HTML_MIN_BYTES) {
           const linkHeader = res.headers.get('link') || res.headers.get('Link') || null;
@@ -2176,7 +2188,10 @@ async function fetchGoogleWorkspaceProductHtml(slug) {
       redirect: 'follow',
       headers: scraperDocumentHeaders(),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      discardResponseBody(res);
+      return null;
+    }
     const html = await res.text();
     return html && html.length >= HTML_MIN_BYTES ? html : null;
   } catch {
@@ -2414,11 +2429,12 @@ async function fetchBesticonAllIcons(domain, { bypassCache = false } = {}) {
   const timer = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT);
 
   try {
-    const res = await fetch(url, {
+    const res = await upstreamFetch(url, {
       signal: controller.signal,
       headers: { Accept: 'application/json' },
     });
     if (!res.ok) {
+      discardResponseBody(res);
       if (!bypassCache) {
         besticonIconsCache.set(domain, []);
         scraperDiskCache.setBesticon(domain, []);

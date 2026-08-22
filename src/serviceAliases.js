@@ -1,4 +1,4 @@
-const { upstreamFetch } = require('./upstreamFetch');
+const { upstreamFetch, discardResponseBody } = require('./upstreamFetch');
 
 const DASHBOARD_METADATA_URL =
   'https://raw.githubusercontent.com/homarr-labs/dashboard-icons/main/metadata.json';
@@ -111,6 +111,7 @@ async function ensureDashboardIndex() {
       dashboardCache = { loadedAt: now, ...buildDashboardAliasIndex(metadata) };
       return dashboardCache;
     }
+    discardResponseBody(res);
   } catch {
     /* use stale or static fallback */
   }
@@ -135,6 +136,7 @@ async function ensureSelfhstIndex() {
       selfhstCache = { loadedAt: now, entries: parseSelfhstIndex(raw) };
       return selfhstCache;
     }
+    discardResponseBody(res);
   } catch {
     /* use stale cache if available */
   }
@@ -209,6 +211,7 @@ async function ensureLobehubIndex() {
       lobehubCache = { loadedAt: now, ...buildLobehubAliasIndex(toc) };
       return lobehubCache;
     }
+    discardResponseBody(res);
   } catch {
     /* use stale or empty fallback */
   }
@@ -293,6 +296,7 @@ async function ensureSvglIndex() {
       svglCache = { loadedAt: now, ...buildSvglAliasIndex(svgs) };
       return svglCache;
     }
+    discardResponseBody(res);
   } catch {
     /* use stale or empty fallback */
   }
@@ -366,6 +370,7 @@ async function ensureThesvgIndex() {
       thesvgCache = { loadedAt: now, ...buildThesvgAliasIndex(icons) };
       return thesvgCache;
     }
+    discardResponseBody(res);
   } catch {
     /* use stale or empty fallback */
   }

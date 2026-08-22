@@ -26,6 +26,16 @@ function isConnectFailure(err) {
   return CONNECT_RETRY_CODES.has(code);
 }
 
+// Drop an unused response so the HTTP/1 parser is not left paused. A peer FIN
+// while paused used to throw an uncatchable assert(!this.paused) in undici
+// (nodejs/undici#5360) and kill the worker.
+function discardResponseBody(res) {
+  const body = res?.body;
+  if (body && typeof body.cancel === 'function') {
+    Promise.resolve(body.cancel()).catch(() => {});
+  }
+}
+
 function upstreamFetch(url, init = {}) {
   const dispatcher = init.dispatcher ?? ipv4Dispatcher;
   return fetch(url, { ...init, dispatcher }).catch((err) => {
@@ -38,4 +48,4 @@ function upstreamFetch(url, init = {}) {
   });
 }
 
-module.exports = { upstreamFetch, ipv4Dispatcher, ipv4Http1Dispatcher };
+module.exports = { upstreamFetch, discardResponseBody, ipv4Dispatcher, ipv4Http1Dispatcher };

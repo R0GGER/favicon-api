@@ -57,18 +57,48 @@ function looksLikeIco(buffer) {
   );
 }
 
+function looksLikeImageBuffer(buffer) {
+  if (!buffer || buffer.length < 4) return false;
+  if (looksLikeSvg(buffer) || looksLikeIco(buffer)) return true;
+  if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47) {
+    return true;
+  }
+  if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return true;
+  if (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46) return true;
+  if (buffer[0] === 0x42 && buffer[1] === 0x4d) return true;
+  if (
+    buffer.length >= 12 &&
+    buffer.toString('ascii', 0, 4) === 'RIFF' &&
+    buffer.toString('ascii', 8, 12) === 'WEBP'
+  ) {
+    return true;
+  }
+  if (buffer.length >= 12 && buffer.toString('ascii', 4, 8) === 'ftyp') return true;
+  return false;
+}
+
+// librsvg rejects relative xmlns URIs (Adobe Illustrator leftovers such as
+// xmlns:ns_sfw="ns_sfw;") with "xmlns: URI … is not absolute".
+function sanitizeSvgXmlns(svg) {
+  return svg.replace(
+    /\s+xmlns(?::[A-Za-z_][\w.-]*)?\s*=\s*(["'])([^"']*)\1/gi,
+    (match, _quote, uri) => (/^(?:https?:|urn:)/i.test(String(uri).trim()) ? match : '')
+  );
+}
+
 // Sharp/librsvg cannot resolve CSS custom properties (e.g. favicon.so SVGs using
 // var(--primary-fill) with prefers-color-scheme). Substitute light-mode defaults.
 function preprocessSvgForRaster(buffer) {
   if (!buffer || buffer.length === 0) return buffer;
-  const svg = buffer.toString('utf8');
-  if (!svg.includes('var(')) return buffer;
-  return Buffer.from(
-    svg
+  let svg = buffer.toString('utf8');
+  const original = svg;
+  if (svg.includes('var(')) {
+    svg = svg
       .replace(/var\(--primary-fill\)/gi, '#ffffff')
-      .replace(/var\(--secondary-fill\)/gi, '#000000'),
-    'utf8'
-  );
+      .replace(/var\(--secondary-fill\)/gi, '#000000');
+  }
+  svg = sanitizeSvgXmlns(svg);
+  return svg === original ? buffer : Buffer.from(svg, 'utf8');
 }
 
 function parseSvgLength(value) {
@@ -610,6 +640,7 @@ module.exports = {
   isUnusableIcon,
   looksLikeIco,
   looksLikeSvg,
+  looksLikeImageBuffer,
   rasterizeSvgToSize,
   TARGET_SIZE,
   MIN_SOURCE_SIZE,
