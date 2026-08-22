@@ -5,6 +5,16 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.15.21] — 2026-08-22
+
+### Fixed
+
+- **Workers no longer crash on `assert(!this.paused)`** — undici 7.28 (pulled in transitively by cheerio) threw an uncatchable `AssertionError` from the HTTP/1 parser when a peer closed the socket while the response body was paused. That killed the worker (`Worker … died (code=1); respawning`). undici is now a direct dependency at **7.29.0** (the `#5360`/`#5474` fix), unused response bodies are cancelled instead of left paused, and cheerio is overridden onto the same undici version.
+- **Malformed percent-encoding returns 400** — scanner probes such as `/%c0` made Express 5's router throw `URIError: Failed to decode param` and dump a stack trace. Invalid paths are rejected before routing.
+- **SVG rasterize — relative `xmlns` URIs** — librsvg rejected Adobe leftovers such as `xmlns:ns_sfw="ns_sfw;"` (`xmlns: URI … is not absolute`), which surfaced as `API normalize error` / `Scraper proxy error` for domains like `kroger.com`. Invalid xmlns attributes are stripped before rasterizing.
+- **logo.dev non-images** — HTML/JSON error bodies are no longer passed to sharp (`Invalid magic bytes`); they are treated as an upstream miss.
+- **Fontconfig noise on Alpine** — the runtime image now includes `fontconfig` so SVG rasterization no longer logs `Cannot load default config file`.
+
 ## [2.15.20] — 2026-08-22
 
 ### Changed
