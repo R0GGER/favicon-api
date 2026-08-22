@@ -5,6 +5,12 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.15.20] — 2026-08-22
+
+### Changed
+
+- **Web UI — simplified homepage tip** — the Tips block is now a single-line hint with an `mdi:magic` icon instead of a titled “Tips” heading and bullet list. The example-URL “open in new tab” control uses `mdi:external-link` (was `line-md:external-link`).
+
 ## [2.15.19] — 2026-08-09
 
 ### Added
