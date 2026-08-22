@@ -1,6 +1,6 @@
 {
   "name": "favicon-proxy",
-  "version": "2.15.20",
+  "version": "2.15.21",
   "description": "Favicon proxy service - fetches favicons from Google, DuckDuckGo, and Yandex with caching",
   "main": "src/index.js",
   "scripts": {
@@ -19,6 +19,10 @@
     "express": "^5.1.0",
     "lru-cache": "^11.1.0",
     "marked": "^15.0.12",
-    "sharp": "^0.34.2"
+    "sharp": "^0.34.2",
+    "undici": "^7.29.0"
+  },
+  "overrides": {
+    "undici": "$undici"
   }
 }
