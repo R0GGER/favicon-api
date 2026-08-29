@@ -5,6 +5,13 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.1] — 2026-08-30
+
+### Added
+
+- **MIT License** — the project now carries an explicit [`LICENSE`](LICENSE) file and a matching `license` field in `package.json`, so GitHub, npm and dependency scanners report the terms instead of "no license" (which legally means all rights reserved). MIT was chosen over AGPL-3.0 because every dependency is already permissive — MIT, Apache-2.0 (`sharp`) and BlueOak-1.0.0 (`lru-cache`) — and because FaviconAPI is meant to be forked and self-hosted with as little friction as possible.
+- **License section in the README and [Getting started](/docs/getting-started)** — records two things the license itself does not cover. The name *FaviconAPI*, the logo and the `faviconapi.com` domain fall outside the grant, so a public fork should run under its own name. And the icons are not ours to license: they are fetched from the upstream providers and catalogs at runtime, never shipped in this repository, so [selfh.st icons](https://github.com/selfhst/icons), [homarr dashboard-icons](https://github.com/homarr-labs/dashboard-icons), [LobeHub icons](https://www.npmjs.com/package/@lobehub/icons-static-svg), [SVGL](https://github.com/pheralb/svgl), [theSVG](https://thesvg.org/) and the favicon providers each keep their own terms — worth checking before using the results commercially.
+
 ## [3.0.0] — 2026-08-29
 
 ### Added
