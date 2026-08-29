@@ -1,8 +1,8 @@
-# Proxy
+# Reverse proxy
 
 Deploy FaviconAPI behind a reverse proxy (nginx, Caddy, or Traefik). Covers HTTPS headers, canonical URLs, and SEO tag behaviour when `trust proxy` is enabled.
 
-## Reverse proxy
+The bundled `docker-compose.yml` publishes the `favicon-api` service as `3100:3000` (host **3100** → container **3000**). Point your reverse proxy at that host port.
 
 `trust proxy` is enabled. Honored headers:
 
@@ -64,7 +64,7 @@ favicon.example.com {
 
 These changes improve **repeat page loads** and **icon delivery**. First-hit
 latency for uncached domains is dominated by upstream scraping (see
-[Tweaks](tweaks.md)); Caddy cannot fix that — it can only compress, multiplex,
+[Performance](performance.md)); Caddy cannot fix that — it can only compress, multiplex,
 and avoid re-fetching what the app already marked cacheable.
 
 #### 1. Compress text responses (`encode`)
@@ -231,7 +231,7 @@ Checklist:
 2. No global short `Cache-Control` overriding `/assets` and `/cdn/favicons`
 3. TCP **and** UDP 443 open (HTTP/3), unless you intentionally disable h3
 4. If Cloudflare is in front: disable Cloudflare HTTP/3 (see below)
-5. App-side cache TTLs tuned — see [Tweaks](tweaks.md)
+5. App-side cache TTLs tuned — see [Performance](performance.md)
 
 ## Cloudflare
 

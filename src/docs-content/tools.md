@@ -1,4 +1,8 @@
-# Tools
+# Browser tools
+
+The **Tools** button on the homepage (and on `/api` and `/docs`) opens a side panel of helpers for using FaviconAPI from the browser. You configure a profile once — preferred provider, optional fallbacks, and a minimum icon size — and that profile powers every tool below. Preferences are encoded in the URL; there is no account and nothing is stored on the server.
+
+Open the panel from **Tools** in the top navigation, or go to `https://your-host/#tools`.
 
 ## Browser Search
 
@@ -26,7 +30,7 @@ That redirects to `/?q=github.com`, which runs the same lookup as the homepage s
 2. Click **Search from browser** (under **Browser search**).
 3. Copy the URL from the modal, or follow the step-by-step guide for your browser.
 
-**Firefox shortcut:** the homepage exposes [OpenSearch](api-reference.md) at `/opensearch.xml`. Firefox may show **Add search engine** automatically when you visit the site.
+**Firefox shortcut:** the homepage exposes [OpenSearch](api.md) at `/opensearch.xml`. Firefox may show **Add search engine** automatically when you visit the site.
 
 Suggested values when adding manually:
 
