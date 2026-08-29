@@ -6,9 +6,13 @@
  *   1. Standard API  — GET /{domain}  (best-pick, same as the homepage API example)
  *   2. API v1        — GET /api/v1/favicon?url=https://{domain}
  *
- * Domains come from DataForSEO's free "Top 1000 Websites By Ranking Keywords"
- * list by default (--source dataforseo); a local file is also supported.
- * Origins are deduplicated to their registrable domain via the Public Suffix List.
+ * Domain sources:
+ *   dataforseo  — most Google ranking keywords (default; closest to "highest PageRank")
+ *   similarweb  — most visited (https://www.similarweb.com/top-websites/)
+ *   backlinko   — most popular by monthly visits (https://backlinko.com/most-popular-websites)
+ *   db / file   — your own preload database or a local list
+ * Origins from ranking dumps are deduplicated to their registrable domain via
+ * the Public Suffix List. Curated website lists keep the host as published.
  *
  * Example:
  *   docker compose exec favicon-api node scripts/preload-top-sites.js --base-url http://127.0.0.1:3000
@@ -16,6 +20,19 @@
 
 const fs = require('fs');
 const https = require('https');
+// Known CDN/DNS/ad-infrastructure domains that never have a browsable favicon.
+// Shared with the preload blocklist seed in scripts/manage-preload.js.
+const { isServiceDomain } = require('../src/serviceDomains');
+const { isAdultDomain } = require('../src/adultDomains');
+const preloadSets = require('../src/preloadSets');
+const preloadStore = require('../src/preloadStore');
+
+const SOURCE_ALIASES = {
+  visited: 'similarweb',
+  popular: 'backlinko',
+  pagerank: 'dataforseo',
+};
+const RANKING_SOURCES = new Set(['dataforseo', 'similarweb', 'backlinko', 'file', 'db']);
 
 // DataForSEO "Top 1000 Websites By Ranking Keywords" free tool. Backed by their
 // WordPress admin-ajax endpoint (action=dfs_ranked_domains), it returns a fine
@@ -49,49 +66,6 @@ const DATAFORSEO_LOCATIONS = {
 // kemkes.go.id. Fetched at runtime to keep this script dependency-free.
 const PUBLIC_SUFFIX_LIST_URL = 'https://publicsuffix.org/list/public_suffix_list.dat';
 const USER_AGENT = 'FaviconProxy-preload/1.0';
-
-// Pure service/infrastructure domains that have no user-facing website or
-// favicon (CDN, DNS/registry, cloud backends, ad/tracking endpoints). These
-// occasionally still surface in ranking lists; we drop them so the preload set
-// only contains real, browsable websites. Company sites that happen to also run
-// infra (e.g. cloudflare.com, appsflyer.com, criteo.com) are deliberately NOT
-// listed here. Matching also covers subdomains (foo.gstatic.com).
-const SERVICE_DOMAINS = new Set([
-  // Google infrastructure / CDN / ads / tracking
-  'gstatic.com', 'googleapis.com', 'googleusercontent.com', 'googlevideo.com',
-  'ggpht.com', 'gvt1.com', 'gvt2.com', 'googlesyndication.com', 'googletagmanager.com',
-  'googletagservices.com', 'googleadservices.com', 'google-analytics.com',
-  'doubleclick.net', 'app-measurement.com', 'usercontent.goog', '2mdn.net',
-  // Apple infrastructure
-  'aaplimg.com', 'apple-dns.net', 'mzstatic.com', 'cdn-apple.com',
-  // Microsoft infrastructure
-  'microsoftonline.com', 'windowsupdate.com', 'trafficmanager.net', 'azureedge.net',
-  'windows.net', 'msedge.net', 'cloudapp.net', 's-microsoft.com',
-  // Meta / Facebook infrastructure
-  'fbcdn.net', 'cdninstagram.com', 'whatsapp.net', 'fbsbx.com',
-  // Amazon / AWS infrastructure
-  'amazonaws.com', 'cloudfront.net', 'media-amazon.com', 'ssl-images-amazon.com',
-  // CDNs
-  'akamai.net', 'akamaiedge.net', 'akamaihd.net', 'akadns.net', 'akam.net',
-  'edgekey.net', 'edgesuite.net', 'fastly.net', 'fastlylb.net', 'llnwd.net',
-  // DNS / registry infrastructure
-  'gtld-servers.net', 'root-servers.net', 'nstld.com', 'domaincontrol.com',
-  'ripn.net', 'registrar-servers.com',
-  // Ad / tracking endpoints (no browsable site)
-  'adnxs.com', 'adsrvr.org', 'criteo.net', 'scorecardresearch.com',
-  'appsflyersdk.com', 'demdex.net', 'rubiconproject.com', 'pubmatic.com',
-  'casalemedia.com',
-  // TikTok / ByteDance infrastructure
-  'tiktokcdn.com', 'tiktokv.com', 'bytefcdn.com', 'byteoversea.com', 'ibyteimg.com',
-]);
-
-function isServiceDomain(host) {
-  if (SERVICE_DOMAINS.has(host)) return true;
-  for (const svc of SERVICE_DOMAINS) {
-    if (host.endsWith(`.${svc}`)) return true;
-  }
-  return false;
-}
 
 /** Normalize a raw origin/domain into a bare hostname (no scheme/path/www). */
 function normalizeHost(raw) {
@@ -175,24 +149,55 @@ function registrableDomain(host, psl) {
 }
 
 /**
- * Dedupe (collapsing to registrable domain), drop service domains, and cap to
- * `limit`. `psl` enables correct eTLD+1 deduplication.
+ * Dedupe, drop service/adult domains, and cap to `limit`.
+ * `collapseRegistrable` (default true) maps origins to eTLD+1 via the PSL.
+ * Curated website lists pass false so hosts such as gemini.google.com stay.
  */
-function applyFilters(rawDomains, { filterServices, limit, psl = null }) {
+function applyFilters(rawDomains, {
+  filterServices,
+  excludeAdult = false,
+  limit,
+  psl = null,
+  collapseRegistrable = true,
+}) {
   const out = [];
   const seen = new Set();
   for (const raw of rawDomains) {
     const host = normalizeHost(raw);
     if (!host || !host.includes('.')) continue;
-    const domain = registrableDomain(host, psl);
+    const domain = collapseRegistrable ? registrableDomain(host, psl) : host;
     if (!domain || !domain.includes('.')) continue;
     if (seen.has(domain)) continue;
     if (filterServices && isServiceDomain(domain)) continue;
+    if (excludeAdult && isAdultDomain(domain)) continue;
     seen.add(domain);
     out.push(domain);
     if (out.length >= limit) break;
   }
   return out;
+}
+
+/** `--adult include|exclude`. Default include (matches SimilarWeb's published list). */
+function resolveAdultMode(args) {
+  if (args['exclude-adult'] === true) return 'exclude';
+  if (args['include-adult'] === true) return 'include';
+  const raw = args.adult;
+  if (raw === undefined || raw === true) return 'include';
+  const value = String(raw).toLowerCase();
+  if (value === 'exclude' || value === 'no' || value === 'off') return 'exclude';
+  if (value === 'include' || value === 'yes' || value === 'on') return 'include';
+  throw new Error(`Unknown --adult "${raw}" (expected: include or exclude).`);
+}
+
+function resolveSource(raw, hasDomainsFile) {
+  let source = String(raw || (hasDomainsFile ? 'file' : 'dataforseo')).toLowerCase();
+  source = SOURCE_ALIASES[source] || source;
+  if (!RANKING_SOURCES.has(source)) {
+    throw new Error(
+      `Unknown --source "${raw}" (expected: similarweb, backlinko, dataforseo, db or file).`,
+    );
+  }
+  return source;
 }
 
 function parseArgs(argv) {
@@ -217,9 +222,9 @@ function parseArgs(argv) {
 
 function usage(code = 0) {
   const msg = [
-    'Preload favicon caches for the most-visited websites (DataForSEO by default).',
-    'Origins are deduplicated to their registrable domain (eTLD+1) via the',
-    'Public Suffix List (e.g. pt.xhamster.com -> xhamster.com).',
+    'Preload favicon caches for the most-visited / most-popular websites.',
+    'Ranking dumps (dataforseo) are deduplicated to their registrable domain',
+    '(eTLD+1) via the Public Suffix List. Curated lists keep the published host.',
     '',
     'Usage:',
     '  node scripts/preload-top-sites.js [options]',
@@ -227,12 +232,30 @@ function usage(code = 0) {
     'Options:',
     '  --base-url URL       FaviconAPI base URL',
     '                       (default: PRELOAD_BASE_URL or http://localhost:3100)',
-    '  --source NAME        Domain source: dataforseo (default) or file',
-    '                       dataforseo = DataForSEO top-1000 keyword ranking',
+    '  --source NAME        Domain source (default: dataforseo):',
+    '                       similarweb = most visited, SimilarWeb worldwide top 50',
+    '                                    (https://www.similarweb.com/top-websites/).',
+    '                                    Extra slots filled from Backlinko.',
+    '                       backlinko  = most popular, Semrush monthly visits',
+    '                                    (https://backlinko.com/most-popular-websites).',
+    '                                    NSFW already removed by the publisher.',
+    '                       dataforseo = most Google ranking keywords (top ~1000).',
+    '                                    Alias: pagerank.',
+    '                       db         = enabled domains from the preload database,',
+    '                                    highest usage rank first. List position is',
+    '                                    only a tiebreaker (see manage-preload.js)',
     '                       file       = local list (requires --domains-file)',
+    '                       Aliases: visited=similarweb, popular=backlinko.',
+    '  --adult MODE         include (default) or exclude porn/adult domains.',
+    '                       SimilarWeb marks Adult-category sites; other sources',
+    '                       use the built-in adult-domain list. Backlinko is',
+    '                       already NSFW-free. Aliases: --exclude-adult / --include-adult.',
     '  --location LOC       DataForSEO country: name or numeric ID (default: Worldwide).',
     '                       E.g. --location Netherlands, --location "United States", 2528',
-    '  --limit N            Number of domains to preload (default: 500, max ~1000)',
+    '  --limit N            Number of domains to preload (default: 500)',
+    '  --min-rank N         --source db only: skip traffic-only domains below this',
+    '                       usage rank (hit count; default: PRELOAD_MIN_RANK, normally 3).',
+    '                       List-imported domains still fill remaining slots.',
     '  --concurrency N      Parallel domain workers (default: 4)',
     '  --api-key KEY        API key for /api/v1/favicon',
     '                       (or PRELOAD_API_KEY / API_KEY env var)',
@@ -249,6 +272,9 @@ function usage(code = 0) {
     '',
     'Examples:',
     '  node scripts/preload-top-sites.js',
+    '  node scripts/preload-top-sites.js --source similarweb --limit 100 --adult exclude',
+    '  node scripts/preload-top-sites.js --source backlinko --limit 100',
+    '  node scripts/preload-top-sites.js --source db',
     '  node scripts/preload-top-sites.js --limit 1000',
     '  node scripts/preload-top-sites.js --location Netherlands --limit 200',
     '  docker compose exec favicon-api node scripts/preload-top-sites.js --base-url http://127.0.0.1:3000',
@@ -390,11 +416,11 @@ async function fetchDataForSeoRanked(locationId, timeoutMs) {
 async function fetchDataForSeoDomains(
   limit,
   timeoutMs,
-  { filterServices, psl = null, locationId = 0 },
+  { filterServices, excludeAdult = false, psl = null, locationId = 0 },
 ) {
   const ranked = await fetchDataForSeoRanked(locationId, timeoutMs);
   const raw = ranked.map((r) => r.domain).filter(Boolean);
-  const domains = applyFilters(raw, { filterServices, limit, psl });
+  const domains = applyFilters(raw, { filterServices, excludeAdult, limit, psl });
   if (domains.length === 0) {
     throw new Error('DataForSEO list was empty after filtering.');
   }
@@ -418,9 +444,9 @@ async function loadPublicSuffixList(timeoutMs) {
   }
 }
 
-function loadDomainsFromFile(filePath, limit, filterServices, psl) {
+function loadDomainsFromFile(filePath, limit, filterServices, excludeAdult, psl) {
   const raw = fs.readFileSync(filePath, 'utf8').split(/\r?\n/);
-  const domains = applyFilters(raw, { filterServices, limit, psl });
+  const domains = applyFilters(raw, { filterServices, excludeAdult, limit, psl });
   if (domains.length === 0) {
     throw new Error(`No domains found in ${filePath}`);
   }
@@ -542,6 +568,8 @@ async function main() {
   const skipSizes = !!args['skip-sizes'];
   const dryRun = !!args['dry-run'];
   const filterServices = !args['no-filter'];
+  const adultMode = resolveAdultMode(args);
+  const excludeAdult = adultMode === 'exclude';
 
   // Scraper sizes to warm via /scraper/{size}/{domain}. Default: all valid sizes.
   const VALID_SIZES = [16, 32, 64, 128, 256, 512];
@@ -559,18 +587,11 @@ async function main() {
       throw new Error(`Invalid --sizes; choose from ${VALID_SIZES.join(', ')}.`);
     }
   }
-  const source = String(
-    args.source || (args['domains-file'] ? 'file' : 'dataforseo'),
-  ).toLowerCase();
+  const source = resolveSource(args.source, !!args['domains-file']);
 
   if (skipStandard && skipV1 && sizes.length === 0) {
     throw new Error(
       'Nothing to do: --skip-standard, --skip-v1, and --skip-sizes are all set.',
-    );
-  }
-  if (!['dataforseo', 'file'].includes(source)) {
-    throw new Error(
-      `Unknown --source "${source}" (expected: dataforseo or file).`,
     );
   }
 
@@ -578,32 +599,113 @@ async function main() {
 
   // Public Suffix List lets us dedupe origins to their registrable domain
   // (eTLD+1) so pt.xhamster.com and xhamster.com collapse to one entry.
-  const psl = await loadPublicSuffixList(timeoutMs);
+  // Curated website lists keep the published host and do not need it.
+  const needsPsl = source === 'dataforseo' || source === 'file';
+  const psl = needsPsl ? await loadPublicSuffixList(timeoutMs) : null;
+
+  // domain -> { id } for result writeback. Filled from --source db, and from
+  // recordSourceList for ranking lists so those rows are not left as `traffic`.
+  const domainMeta = new Map();
 
   let domains;
-  if (source === 'file' || args['domains-file']) {
+  if (source === 'db') {
+    const minRank =
+      args['min-rank'] === undefined || args['min-rank'] === true
+        ? preloadStore.MIN_RANK
+        : parseInt(args['min-rank'], 10);
+    if (!Number.isFinite(minRank)) {
+      throw new Error('--min-rank must be a number.');
+    }
+    const fetchLimit = excludeAdult ? Math.max(limit * 3, limit) : limit;
+    const rows = preloadStore.listForPreload({ limit: fetchLimit, minRank });
+    const picked = [];
+    for (const row of rows) {
+      if (excludeAdult && isAdultDomain(row.domain)) continue;
+      picked.push(row);
+      if (picked.length >= limit) break;
+    }
+    if (picked.length === 0) {
+      throw new Error(
+        `No enabled domains with rank >= ${minRank} in ${preloadStore.DB_PATH}. ` +
+          'Add some with scripts/manage-preload.js, or lower --min-rank.',
+      );
+    }
+    domains = picked.map((row) => row.domain);
+    for (const row of picked) domainMeta.set(row.domain, { id: row.id });
+    console.log(
+      `Preload database (${preloadStore.DB_PATH}): ${domains.length} domains, rank >= ${minRank}`,
+    );
+  } else if (source === 'file' || args['domains-file']) {
     if (!args['domains-file']) {
       throw new Error('--source file requires --domains-file PATH.');
     }
-    domains = loadDomainsFromFile(args['domains-file'], limit, filterServices, psl);
+    domains = loadDomainsFromFile(
+      args['domains-file'],
+      limit,
+      filterServices,
+      excludeAdult,
+      psl,
+    );
     console.log(`Loaded ${domains.length} domains from ${args['domains-file']}`);
+  } else if (source === 'similarweb') {
+    console.log(`Fetching SimilarWeb most-visited list (top ${limit})…`);
+    const sw = await preloadSets.fetchSimilarwebDomains(limit, {
+      excludeAdult,
+      timeoutMs: Math.max(timeoutMs, 20000),
+    });
+    domains = sw.domains;
+    const origin = sw.live ? 'live scrape' : 'built-in snapshot';
+    const fillNote = sw.filled
+      ? `; filled extra from Backlinko`
+      : '';
+    console.log(
+      `SimilarWeb (${origin}, ${sw.available} ranked): ${domains.length} domains${fillNote}`,
+    );
+  } else if (source === 'backlinko') {
+    console.log(`Fetching Backlinko / Semrush most-popular list (top ${limit})…`);
+    const bl = await preloadSets.fetchBacklinkoDomains(limit, {
+      excludeAdult,
+      timeoutMs: Math.max(timeoutMs, 20000),
+    });
+    domains = bl.domains;
+    const origin = bl.live ? 'live scrape' : 'built-in snapshot';
+    console.log(`Backlinko (${origin}, ${bl.available} ranked): ${domains.length} domains`);
   } else {
     console.log(`Fetching top ${limit} domains from DataForSEO (${location.name})…`);
     const dfs = await fetchDataForSeoDomains(limit, timeoutMs, {
       filterServices,
+      excludeAdult,
       psl,
       locationId: location.id,
     });
     domains = dfs.domains;
     console.log(`DataForSEO list (DataForSEO ${location.name}): ${domains.length} domains`);
   }
-  if (filterServices) {
+  if (filterServices && source !== 'db' && source !== 'similarweb' && source !== 'backlinko') {
     console.log('Service/infra domains (CDN, DNS, tracking) filtered out.');
+  }
+  if (excludeAdult) {
+    console.log('Adult/porn domains excluded.');
+  }
+  if (!domains || domains.length === 0) {
+    throw new Error('No domains left after filtering.');
   }
 
   if (dryRun) {
     domains.forEach((domain, i) => console.log(`${i + 1}\t${domain}`));
     return;
+  }
+
+  // Persist ranking-source domains before the API calls, with the list name as
+  // `source`. Otherwise the hit counter creates the same rows as `traffic`.
+  if (source !== 'db') {
+    const recorded = preloadStore.recordSourceList(domains, source);
+    for (const row of recorded) domainMeta.set(row.domain, { id: row.id });
+    if (recorded.length) {
+      console.log(
+        `Preload database: ${recorded.length} domains stored as source=${source}`,
+      );
+    }
   }
 
   const modes = [];
@@ -626,6 +728,47 @@ async function main() {
 
   const started = Date.now();
   let completed = 0;
+
+  // Result writeback. Rows are buffered and flushed per batch: better-sqlite3
+  // writes synchronously, so a write per domain would stall the event loop in
+  // the middle of the concurrent fetches.
+  const WRITEBACK_BATCH = 25;
+  const writebackQueue = [];
+  let writebackRows = 0;
+
+  function flushWriteback(force = false) {
+    if (writebackQueue.length === 0) return;
+    if (!force && writebackQueue.length < WRITEBACK_BATCH) return;
+    writebackRows += preloadStore.recordPreloadResults(writebackQueue.splice(0));
+  }
+
+  function queueWriteback(row) {
+    const meta = domainMeta.get(row.domain);
+    if (!meta) return;
+
+    const result = [];
+    const errors = [];
+    if (!skipStandard) {
+      result.push(row.standard.ok ? 'standard_ok' : 'standard_fail');
+      if (!row.standard.ok) errors.push(`standard: ${row.standard.error || row.standard.status}`);
+    }
+    if (!skipV1) {
+      result.push(row.v1.ok ? 'v1_ok' : 'v1_fail');
+      if (!row.v1.ok) errors.push(`v1: ${row.v1.error || row.v1.status}`);
+    }
+    if (row.sizes) {
+      result.push(row.sizes.fail === 0 ? 'sizes_ok' : `sizes_${row.sizes.ok}/${sizes.length}`);
+      if (row.sizes.fail > 0) errors.push(`sizes: ${row.sizes.errors.join(', ')}`);
+    }
+
+    writebackQueue.push({
+      id: meta.id,
+      ok: errors.length === 0,
+      result: result.join(','),
+      error: errors.length ? errors.join('; ') : null,
+    });
+    flushWriteback();
+  }
 
   await mapPool(domains, concurrency, async (domain) => {
     const row = { domain, standard: null, v1: null, sizes: null };
@@ -703,8 +846,11 @@ async function main() {
       stats.failures.push(row);
     }
 
+    queueWriteback(row);
     return row;
   });
+
+  flushWriteback(true);
 
   const elapsed = Date.now() - started;
   console.log('');
@@ -721,6 +867,9 @@ async function main() {
     console.log(
       `Scraper sizes (${sizes.join(', ')}): ${stats.sizes.ok} ok, ${stats.sizes.fail} failed`,
     );
+  }
+  if (domainMeta.size) {
+    console.log(`DB updated: ${writebackRows} rows`);
   }
 
   if (stats.failures.length > 0) {

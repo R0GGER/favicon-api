@@ -8,8 +8,16 @@ const {
   googleWorkspaceLogoFallback,
   PROVIDERS,
 } = require('./providers');
-const { resolveServiceSlugForProviderSync } = require('./serviceAliases');
+const {
+  resolveServiceSlugForProviderSync,
+  ensureDashboardIndex,
+  ensureSelfhstIndex,
+  ensureLobehubIndex,
+  ensureSvglIndex,
+  ensureThesvgIndex,
+} = require('./serviceAliases');
 const { serviceSlugFromDomain } = require('./serviceSlugFromDomain');
+const { fetchOverrideAsset } = require('./iconOverride');
 
 // FaviconAPIs source priority. The first tier to produce a usable icon wins;
 // within a tier we try the largest declared size first.
@@ -31,7 +39,7 @@ const SOURCE_TYPES = [
   'external',
 ];
 
-const { MIN_SOURCE_SIZE, readImageDimensions } = require('./imageNormalize');
+const { MIN_SOURCE_SIZE, readImageDimensions, looksLikeSvg } = require('./imageNormalize');
 
 // Well-known paths most sites serve even without HTML link tags.
 const STANDARD_FALLBACKS = [
@@ -151,6 +159,25 @@ async function findInTier(candidates, referer) {
   return preferred || fallback;
 }
 
+// Loading the five provider indexes is idempotent and TTL-cached inside
+// serviceAliases; this only keeps concurrent cold requests from each kicking off
+// their own copy of the same five downloads.
+let serviceIndexPromise = null;
+function ensureServiceIndexes() {
+  if (!serviceIndexPromise) {
+    serviceIndexPromise = Promise.all([
+      ensureDashboardIndex(),
+      ensureSelfhstIndex(),
+      ensureLobehubIndex(),
+      ensureSvglIndex(),
+      ensureThesvgIndex(),
+    ]).finally(() => {
+      serviceIndexPromise = null;
+    });
+  }
+  return serviceIndexPromise;
+}
+
 async function gatherCandidates(domain) {
   const buckets = {
     svg: [],
@@ -259,6 +286,11 @@ async function gatherCandidates(domain) {
   }
 
   // Service-name icon packs (domain label → slug, e.g. google.com → google).
+  // The slug resolvers below are synchronous and answer '' until the provider
+  // indexes are loaded, so they have to be awaited first: on a cold worker an
+  // unresolved slug turns these five tiers into 404s and the whole request into
+  // a 422, even for domains the packs do cover.
+  await ensureServiceIndexes();
   const serviceSlug = serviceSlugFromDomain(domain);
   if (serviceSlug) {
     const selfhstSlug = resolveServiceSlugForProviderSync(serviceSlug, 'selfhst');
@@ -310,6 +342,9 @@ async function gatherCandidates(domain) {
 }
 
 async function fetchBySourcePriority(domain) {
+  const override = await fetchOverrideCandidate(domain);
+  if (override) return override;
+
   const result = await fetchBySourcePriorityForDomain(domain);
   if (result) return result;
 
@@ -323,6 +358,43 @@ async function fetchBySourcePriority(domain) {
   }
 
   return null;
+}
+
+/**
+ * A manual icon override, offered as the highest-priority source. This pipeline
+ * always answers with a 128x128 PNG and refuses to upscale, so the override has
+ * to clear the same minimum as any discovered candidate — otherwise pinning a
+ * small icon would turn a working v1 response into a 422. When it does not
+ * clear it, we fall through to normal discovery and say so in the log.
+ */
+async function fetchOverrideCandidate(domain) {
+  const override = await fetchOverrideAsset(domain);
+  if (!override) return null;
+
+  const isVector =
+    String(override.contentType || '').toLowerCase().includes('svg') ||
+    looksLikeSvg(override.buffer);
+
+  if (!isVector) {
+    const dims = await readImageDimensions(override.buffer, {
+      contentType: override.contentType,
+      url: override.sourceUrl,
+    });
+    const side = dims ? Math.min(dims.width || 0, dims.height || 0) : 0;
+    if (side < MIN_SOURCE_SIZE) {
+      console.warn(
+        `Icon override for ${domain} is ${side || 'unknown'}px, below the ${MIN_SOURCE_SIZE}px minimum for /api/v1/favicon; falling back to discovery.`
+      );
+      return null;
+    }
+  }
+
+  return {
+    buffer: override.buffer,
+    contentType: override.contentType,
+    sourceUrl: override.sourceUrl,
+    sourceType: 'override',
+  };
 }
 
 async function fetchBySourcePriorityForDomain(domain) {

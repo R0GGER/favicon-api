@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const fs = require('fs/promises');
 const path = require('path');
+const { DISK_CACHE_TTL_SECONDS } = require('./ttl');
 
 const CACHE_DIR = process.env.CACHE_DIR || './cache';
 const SCRAPER_DISK_CACHE_DIR =
@@ -8,9 +9,30 @@ const SCRAPER_DISK_CACHE_DIR =
 // Keep discovery on disk as long as image bytes by default (DISK_CACHE_TTL).
 const TTL_MS =
   parseInt(
-    process.env.SCRAPER_ICONS_CACHE_TTL || process.env.DISK_CACHE_TTL || '86400',
+    process.env.SCRAPER_ICONS_CACHE_TTL || String(DISK_CACHE_TTL_SECONDS),
     10
   ) * 1000;
+
+// Raw homepage HTML gets its own, much shorter lifetime.
+//
+// It is only an intermediate: fetchScraperAllIcons() consults the `icons`
+// bucket first and never touches `page` once a domain's icon list is known. But
+// a stored page is two orders of magnitude larger than any other bucket — on a
+// real volume the five buckets measured 219 MB of HTML against 0.3 MB each for
+// icons, manifest, probe and besticon. Keeping HTML for as long as the derived
+// list buys almost nothing and costs almost everything.
+const PAGE_TTL_MS = (() => {
+  const n = parseInt(process.env.SCRAPER_PAGE_CACHE_TTL ?? '', 10);
+  if (Number.isFinite(n) && n > 0) return n * 1000;
+  return Math.min(TTL_MS, 6 * 3600 * 1000);
+})();
+
+const BUCKET_TTL_MS = { page: PAGE_TTL_MS };
+
+/** Entry lifetime for one discovery bucket. Also used by src/cacheGc.js. */
+function ttlForBucket(bucket) {
+  return BUCKET_TTL_MS[bucket] ?? TTL_MS;
+}
 
 // Default = on. Persisting scraper discovery on disk lets it survive restarts
 // and be shared across cluster workers, so an unset/empty value enables it;
@@ -54,7 +76,7 @@ async function readEntry(bucket, key) {
       await fs.unlink(file).catch(() => {});
       return undefined;
     }
-    if (Date.now() - envelope.cachedAt > TTL_MS) {
+    if (Date.now() - envelope.cachedAt > ttlForBucket(bucket)) {
       await fs.unlink(file).catch(() => {});
       return undefined;
     }
@@ -87,6 +109,11 @@ function getPage(domain) {
 
 function setPage(domain, data) {
   return writeEntry('page', sanitizeDomain(domain), data);
+}
+
+/** Drop a stored page, used to clear a cached HTML-fetch failure. */
+function deletePage(domain) {
+  return deleteEntry('page', sanitizeDomain(domain));
 }
 
 function getIcons(domain) {
@@ -132,9 +159,13 @@ async function invalidateDomain(domain) {
 }
 
 module.exports = {
+  DIR: SCRAPER_DISK_CACHE_DIR,
+  TTL_MS,
+  ttlForBucket,
   isEnabled,
   getPage,
   setPage,
+  deletePage,
   getIcons,
   setIcons,
   getBesticon,

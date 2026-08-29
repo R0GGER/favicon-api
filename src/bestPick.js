@@ -19,6 +19,7 @@ const {
   fetchScraper,
 } = require('./providers');
 const cache = require('./cache');
+const { fetchOverrideEntry } = require('./iconOverride');
 const { isUnusableIcon } = require('./imageNormalize');
 const { serviceSlugFromDomain } = require('./serviceSlugFromDomain');
 const { notFoundEntry } = require('./notFoundPlaceholder');
@@ -51,6 +52,19 @@ const DEFAULT_PROVIDER = (() => {
 })();
 
 const HEAD_START_MS = parseInt(process.env.PICK_HEAD_START_MS || '150', 10);
+
+// Stale-while-revalidate settings for the two directions through this module.
+//
+// A favicon barely changes, so once an entry is past DISK_CACHE_TTL the right
+// move is to serve the bytes we have and refresh behind the request — a cold
+// provider race costs seconds, a stale hit costs milliseconds.
+//
+// The refresh itself must use FORCE_FRESH. If it were allowed to reuse stale
+// entries it would find the same bytes one level down, store them again, and
+// mark everything fresh without ever asking a provider — the cache would then
+// never renew itself.
+const REUSE_STALE = { allowStale: true };
+const FORCE_FRESH = { allowStale: false };
 
 // Cached best-pick entries from the scraper pipeline use provider "scraper" or
 // "scraper-fallback:<source>". Both satisfy DEFAULT_PROVIDER=scraper — without
@@ -103,20 +117,20 @@ function scoreCandidate(info) {
   return score;
 }
 
-function buildFallbackFetchers(domain) {
+function buildFallbackFetchers(domain, opts = REUSE_STALE) {
   const all = {
-    scraper:    () => fetchWithCache('scraper', domain, null, () => fetchScraper(domain)),
-    googlev2:   () => fetchWithCache('googlev2', domain, 128, () => fetchGoogleV2(domain, 128)),
-    duckduckgo: () => fetchWithCache('duckduckgo', domain, null, () => fetchDuckDuckGo(domain)),
-    google:     () => fetchWithCache('google', domain, 32, () => fetchGoogle(domain, 32)),
-    faviconkit: () => fetchWithCache('faviconkit', domain, 128, () => fetchFaviconkit(domain, 128)),
-    faviconrun: () => fetchWithCache('faviconrun', domain, 128, () => fetchFaviconRun(domain, 128)),
-    twentyicons: () => fetchWithCache('twentyicons', domain, 128, () => fetchTwentyIcons(domain, 128)),
-    ryanjc:     () => fetchWithCache('ryanjc', domain, null, () => fetchRyanjc(domain)),
-    faviconso:  () => fetchWithCache('faviconso', domain, null, () => fetchFaviconSo(domain)),
-    vemetric:   () => fetchWithCache('vemetric', domain, null, () => fetchVemetric(domain)),
-    favicondev: () => fetchWithCache('favicondev', domain, null, () => fetchFaviconDev(domain)),
-    yandex:     () => fetchWithCache('yandex', domain, null, () => fetchYandex(domain)),
+    scraper:    () => fetchWithCache('scraper', domain, null, () => fetchScraper(domain), opts),
+    googlev2:   () => fetchWithCache('googlev2', domain, 128, () => fetchGoogleV2(domain, 128), opts),
+    duckduckgo: () => fetchWithCache('duckduckgo', domain, null, () => fetchDuckDuckGo(domain), opts),
+    google:     () => fetchWithCache('google', domain, 32, () => fetchGoogle(domain, 32), opts),
+    faviconkit: () => fetchWithCache('faviconkit', domain, 128, () => fetchFaviconkit(domain, 128), opts),
+    faviconrun: () => fetchWithCache('faviconrun', domain, 128, () => fetchFaviconRun(domain, 128), opts),
+    twentyicons: () => fetchWithCache('twentyicons', domain, 128, () => fetchTwentyIcons(domain, 128), opts),
+    ryanjc:     () => fetchWithCache('ryanjc', domain, null, () => fetchRyanjc(domain), opts),
+    faviconso:  () => fetchWithCache('faviconso', domain, null, () => fetchFaviconSo(domain), opts),
+    vemetric:   () => fetchWithCache('vemetric', domain, null, () => fetchVemetric(domain), opts),
+    favicondev: () => fetchWithCache('favicondev', domain, null, () => fetchFaviconDev(domain), opts),
+    yandex:     () => fetchWithCache('yandex', domain, null, () => fetchYandex(domain), opts),
   };
 
   // logo.dev is intentionally excluded from the best-pick race. It has a
@@ -130,22 +144,22 @@ function buildFallbackFetchers(domain) {
   const slug = serviceSlugFromDomain(domain);
   if (slug) {
     all.selfhst = () =>
-      fetchWithCache('selfhst', slug, null, () => fetchSelfhst(slug, 'color', { strict: true }));
+      fetchWithCache('selfhst', slug, null, () => fetchSelfhst(slug, 'color', { strict: true }), opts);
     all.dashboardicons = () =>
       fetchWithCache('dashboardicons', slug, null, () =>
-        fetchDashboardIcons(slug, 'color', { strict: true })
+        fetchDashboardIcons(slug, 'color', { strict: true }), opts
       );
     all.lobehub = () =>
       fetchWithCache('lobehub', slug, '128_c_v2', () =>
-        fetchLobehub(slug, 'color', 128, { strict: true })
+        fetchLobehub(slug, 'color', 128, { strict: true }), opts
       );
     all.svgl = () =>
       fetchWithCache('svgl', slug, '128_c_v2', () =>
-        fetchSvgl(slug, 'color', 128, { strict: true })
+        fetchSvgl(slug, 'color', 128, { strict: true }), opts
       );
     all.thesvg = () =>
       fetchWithCache('thesvg', slug, '128_c_v2', () =>
-        fetchThesvg(slug, 'color', 128, { strict: true })
+        fetchThesvg(slug, 'color', 128, { strict: true }), opts
       );
   }
 
@@ -162,17 +176,17 @@ function buildFallbackFetchers(domain) {
   return defaultOrder.map((k) => all[k]).filter(Boolean);
 }
 
-function buildServiceFetchers(service) {
+function buildServiceFetchers(service, opts = REUSE_STALE) {
   const all = {
-    selfhst: () => fetchWithCache('selfhst', service, null, () => fetchSelfhst(service)),
+    selfhst: () => fetchWithCache('selfhst', service, null, () => fetchSelfhst(service), opts),
     dashboardicons: () =>
-      fetchWithCache('dashboardicons', service, null, () => fetchDashboardIcons(service)),
+      fetchWithCache('dashboardicons', service, null, () => fetchDashboardIcons(service), opts),
     lobehub: () =>
-      fetchWithCache('lobehub', service, '128_c_v2', () => fetchLobehub(service, 'color', 128)),
+      fetchWithCache('lobehub', service, '128_c_v2', () => fetchLobehub(service, 'color', 128), opts),
     svgl: () =>
-      fetchWithCache('svgl', service, '128_c_v2', () => fetchSvgl(service, 'color', 128)),
+      fetchWithCache('svgl', service, '128_c_v2', () => fetchSvgl(service, 'color', 128), opts),
     thesvg: () =>
-      fetchWithCache('thesvg', service, '128_c_v2', () => fetchThesvg(service, 'color', 128)),
+      fetchWithCache('thesvg', service, '128_c_v2', () => fetchThesvg(service, 'color', 128), opts),
   };
 
   const defaultOrder = ['selfhst', 'dashboardicons', 'svgl', 'thesvg', 'lobehub'];
@@ -250,10 +264,15 @@ async function raceFetchers(fallbacks, cacheProvider, cacheKey, cacheSize) {
 }
 
 async function pickBest(domain) {
+  // A manual override wins outright, and is checked before the best-pick cache
+  // so an entry written before the override was set cannot shadow it.
+  const override = await fetchOverrideEntry(domain, null, fetchWithCache, REUSE_STALE);
+  if (override) return override;
+
   // The best-pick entry stores the winning provider's icon at its native/best
   // resolution (scraper output is capped at SCRAPER_MAX_ICON_SIZE), so the cache
   // key carries no size segment — the file is `best_{domain}`, not a fixed px.
-  const cached = await cache.get('best', domain, null);
+  const cached = await cache.get('best', domain, null, REUSE_STALE);
   if (cached) {
     if (cached.notFound || cached.provider === 'none') {
       await cache.del('best', domain, null);
@@ -264,38 +283,58 @@ async function pickBest(domain) {
       // scraper-fallback:* still counts as the scraper pipeline.
       await cache.del('best', domain, null);
     } else if (!(await isUnusableIcon(cached.buffer, cached))) {
+      if (cached.stale) {
+        cache.revalidate('best', domain, null, () =>
+          raceFetchers(buildFallbackFetchers(domain, FORCE_FRESH), 'best', domain, null)
+        );
+      }
       return cached;
     } else {
       await cache.del('best', domain, null);
     }
   }
 
-  const fallbacks = buildFallbackFetchers(domain);
+  const fallbacks = buildFallbackFetchers(domain, REUSE_STALE);
   return raceFetchers(fallbacks, 'best', domain, null);
 }
 
 async function pickBestService(service) {
-  const cached = await cache.get('best-service', service, null);
+  const cached = await cache.get('best-service', service, null, REUSE_STALE);
   if (cached) {
     if (cached.notFound || cached.provider === 'none') {
       await cache.del('best-service', service, null);
     } else if (!matchesDefaultProvider(cached.provider)) {
       await cache.del('best-service', service, null);
     } else if (!(await isUnusableIcon(cached.buffer, cached))) {
+      if (cached.stale) {
+        cache.revalidate('best-service', service, null, () =>
+          raceFetchers(buildServiceFetchers(service, FORCE_FRESH), 'best-service', service, null)
+        );
+      }
       return cached;
     } else {
       await cache.del('best-service', service, null);
     }
   }
 
-  const fallbacks = buildServiceFetchers(service);
+  const fallbacks = buildServiceFetchers(service, REUSE_STALE);
   return raceFetchers(fallbacks, 'best-service', service, null);
 }
 
-async function fetchWithCache(provider, domain, size, fetcher) {
-  const cached = await cache.get(provider, domain, size);
+async function fetchWithCache(provider, domain, size, fetcher, { allowStale = false } = {}) {
+  const cached = await cache.get(provider, domain, size, { allowStale });
   if (cached) {
-    if (!(await isUnusableIcon(cached.buffer, cached))) return cached;
+    if (!(await isUnusableIcon(cached.buffer, cached))) {
+      if (cached.stale) {
+        cache.revalidate(provider, domain, size, async () => {
+          const fresh = await fetcher();
+          if (!fresh?.buffer?.length) return;
+          if (await isUnusableIcon(fresh.buffer, fresh)) return;
+          await cache.set(provider, domain, size, fresh);
+        });
+      }
+      return cached;
+    }
     await cache.del(provider, domain, size);
   }
 

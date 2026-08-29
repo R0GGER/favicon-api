@@ -63,14 +63,20 @@ const {
   looksLikeIco,
 } = require('./imageNormalize');
 const cache = require('./cache');
+const cacheGc = require('./cacheGc');
 const apiRoutes = require('./apiRoutes');
 const apiStore = require('./apiStore');
+const adminAuth = require('./adminAuth');
+const { createAdminRouter } = require('./adminRoutes');
 const { renderDocPage, NAV_PAGES, buildSearchIndex } = require('./docsRender');
 const { extractDomainFromInput } = require('./domainValidation');
+const { hitCounterMiddleware } = require('./hitCounter');
+const { hasOverride, fetchOverrideEntry } = require('./iconOverride');
 const { decodeProfile } = require('./customProfile');
 const { resolveProfileIcon } = require('./profileResolve');
 
 const { extractPageAssets, getAsset } = require('./staticAssets');
+const { API_CACHE_TTL_SECONDS } = require('./ttl');
 
 const { version: APP_VERSION } = require('../package.json');
 
@@ -222,6 +228,10 @@ app.use((req, res, next) => {
   next();
 });
 
+// Feeds the preload database's popularity ranking. Counts every successful
+// domain lookup across all icon routes, deduplicated per visitor.
+app.use(hitCounterMiddleware);
+
 // SEO / templated index. The HTML template ships with `__BASE_URL__` tokens
 // in the <head> (canonical, Open Graph, Twitter Card, JSON-LD) so absolute
 // URLs resolve to whichever public origin the deployment is reached on,
@@ -256,7 +266,7 @@ function getBaseUrl(req) {
   return `${req.protocol}://${req.get('host')}`;
 }
 
-function renderTemplate(template) {
+function renderTemplate(template, { cacheControl = 'no-cache' } = {}) {
   return (req, res) => {
     const baseUrl = getBaseUrl(req);
     const html = template
@@ -269,7 +279,7 @@ function renderTemplate(template) {
         UI_ENABLE_DOCS ? `,\n      "${baseUrl}/docs/getting-started"` : ''
       );
     res.set('Content-Type', 'text/html; charset=utf-8');
-    res.set('Cache-Control', 'no-cache');
+    res.set('Cache-Control', cacheControl);
     res.send(html);
   };
 }
@@ -304,6 +314,15 @@ if (UI_ENABLE_DOCS) {
   app.get(['/docs', '/docs/'], (_req, res) => {
     res.redirect(301, '/docs/getting-started');
   });
+  app.get('/docs/api-reference', (_req, res) => {
+    res.redirect(301, '/docs/api');
+  });
+  app.get('/docs/api-v1', (_req, res) => {
+    res.redirect(301, '/docs/api#api-v1');
+  });
+  app.get('/docs/tweaks', (_req, res) => {
+    res.redirect(301, '/docs/performance');
+  });
   app.get('/docs/:slug', (req, res, next) => {
     const slug = String(req.params.slug || '').trim();
     if (!slug || slug.includes('.')) {
@@ -316,6 +335,28 @@ if (UI_ENABLE_DOCS) {
     res.status(404).send('Not found');
   });
   app.get('/docs/:slug', (_req, res) => {
+    res.status(404).send('Not found');
+  });
+}
+
+// Preload manager. The whole surface exists only when ADMIN_SESSION_SECRET and
+// ADMIN_PASSWORD_HASH are configured (see src/adminAuth.js), so a deployment
+// that never sets them keeps exactly the route table it had before. Mounted
+// here because everything under /admin has to be matched before the catch-all
+// favicon route below.
+if (adminAuth.isEnabled()) {
+  const ADMIN_HTML_TEMPLATE = extractPageAssets(
+    fs.readFileSync(path.join(__dirname, 'public', 'admin.html'), 'utf8')
+  ).html;
+  app.use(
+    '/admin',
+    createAdminRouter({
+      renderPage: renderTemplate(ADMIN_HTML_TEMPLATE, { cacheControl: 'no-store' }),
+      port: PORT,
+    })
+  );
+} else {
+  app.use('/admin', (_req, res) => {
     res.status(404).send('Not found');
   });
 }
@@ -365,6 +406,7 @@ app.get('/robots.txt', (req, res) => {
     'Allow: /favicon.png\n' +
     'Allow: /logo.png\n' +
     'Allow: /sitemap.xml\n' +
+    'Disallow: /admin\n' +
     'Disallow: /\n' +
     '\n' +
     `Sitemap: ${baseUrl}/sitemap.xml\n`;
@@ -1302,6 +1344,14 @@ app.get('/s-asset', async (req, res) => {
 // Drop the unsized scraper entry plus every known/requested size file
 // (`scraper_{domain}`, `scraper_{size}_{domain}`) so ?refresh=1 does not leave
 // stale resized PNGs behind after discovery re-runs.
+// Stale-while-revalidate applies at the route boundary only. These three
+// fetchWithCache calls are the outermost cache layer for /scraper/…, so a stale
+// entry is served here while the refresh runs behind the request. Everything
+// they call in turn (buildSizedScraperIcon, fetchScraper, discovery) keeps the
+// default fresh-only behaviour — that inner path *is* the refresh, and reusing
+// stale bytes there would make it a no-op.
+const REUSE_STALE = { allowStale: true };
+
 async function invalidateScraperImageCaches(domain, extraSize) {
   const sizes = new Set(SCRAPER_SIZES_ARRAY);
   if (extraSize) sizes.add(extraSize);
@@ -1383,6 +1433,18 @@ async function scraperHandler(req, res) {
       invalidateScraperDomainCaches(domain);
     }
 
+    // A manual override replaces the scrape on the sized routes too, otherwise
+    // the preload run would cache the site's own (rejected) icon for every size.
+    // It is served at native resolution for `max` and the unsized route, and
+    // only downscaled for an explicit size; SCRAPER_MAX_ICON_SIZE does not apply
+    // because an override is a deliberate choice, not an unknown scrape result.
+    if (hasOverride(domain)) {
+      const override = await fetchOverrideEntry(domain, sizeParam || null, fetchWithCache);
+      if (override) {
+        return sendFavicon(res, sizeParam ? await renderIconToSize(override, sizeParam) : override);
+      }
+    }
+
     if (wantMax) {
       // Native max: largest discovered source at full resolution (not SCRAPER_MAX_ICON_SIZE).
       const sized = await fetchWithCache('scraper', domain, 'max', async () => {
@@ -1407,20 +1469,20 @@ async function scraperHandler(req, res) {
           };
         }
         return entry;
-      });
+      }, REUSE_STALE);
       if (!sized) return res.status(502).json({ error: 'Could not scrape favicon.' });
       return sendFavicon(res, sized);
     }
 
     if (sizeParam) {
       const sized = await fetchWithCache('scraper', domain, sizeParam, () =>
-        buildSizedScraperIcon(domain, sizeParam)
+        buildSizedScraperIcon(domain, sizeParam), REUSE_STALE
       );
       if (!sized) return res.status(502).json({ error: 'Could not scrape favicon.' });
       return sendFavicon(res, sized);
     }
 
-    const entry = await fetchWithCache('scraper', domain, null, () => fetchScraper(domain));
+    const entry = await fetchWithCache('scraper', domain, null, () => fetchScraper(domain), REUSE_STALE);
     if (!entry) return res.status(502).json({ error: 'Could not scrape favicon.' });
 
     // Enforce SCRAPER_MAX_ICON_SIZE at serve time too, not just when the icon is
@@ -1967,7 +2029,7 @@ app.get('/providers', (req, res) => {
     upstreamIpv4: true,
     api: {
       requireKey: API_REQUIRE_KEY,
-      cacheTtl: parseInt(process.env.API_CACHE_TTL || '604800', 10),
+      cacheTtl: API_CACHE_TTL_SECONDS,
       plans: { ...apiStore.PLAN_LIMITS },
     },
   });
@@ -2325,4 +2387,5 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Favicon proxy listening on port ${PORT}`);
+  cacheGc.start();
 });

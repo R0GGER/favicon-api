@@ -9,11 +9,13 @@ const {
   extractDomainFromUrl,
   isValidHostname,
 } = require('./domainValidation');
+const { countDomainHit } = require('./hitCounter');
+const cache = require('./cache');
+const { API_CACHE_TTL_SECONDS, SERVE_STALE } = require('./ttl');
 
 const API_CACHE_DIR = process.env.API_CACHE_DIR || '/cache/api';
-const API_CACHE_TTL_MS =
-  parseInt(process.env.API_CACHE_TTL || '604800', 10) * 1000;
-const CDN_MAX_AGE = parseInt(process.env.API_CACHE_TTL || '604800', 10);
+const API_CACHE_TTL_MS = API_CACHE_TTL_SECONDS * 1000;
+const CDN_MAX_AGE = API_CACHE_TTL_SECONDS;
 
 // When false, /api/v1/favicon accepts any request without an API key and
 // skips quota enforcement entirely. Intended for self-hosted setups that
@@ -64,12 +66,21 @@ function buildCdnUrl(req, domain) {
   return `${baseUrl(req)}/cdn/favicons/${encodeURIComponent(domain)}.png`;
 }
 
-async function readCachedEntry(domain) {
+/**
+ * Read the cached PNG's metadata, or null when there is nothing usable.
+ *
+ * With `allowStale` an entry past API_CACHE_TTL is still returned, flagged
+ * `stale`, so the route can answer immediately and refresh behind the request.
+ * The PNG itself is never deleted here: /cdn/favicons/ serves the file directly
+ * and the sweeper in src/cacheGc.js owns its lifetime.
+ */
+async function readCachedEntry(domain, { allowStale = false } = {}) {
   try {
     const file = pngPath(domain);
     const stat = await fs.stat(file);
     const age = Date.now() - stat.mtimeMs;
-    if (age > API_CACHE_TTL_MS) return null;
+    const stale = age > API_CACHE_TTL_MS;
+    if (stale && !(allowStale && SERVE_STALE)) return null;
 
     const metaRaw = await fs.readFile(metaPath(domain), 'utf8').catch(() => '{}');
     let meta = {};
@@ -88,6 +99,7 @@ async function readCachedEntry(domain) {
       mtime: stat.mtimeMs,
       sourceType: meta.sourceType || 'png',
       cachedAt: meta.cachedAt || new Date(stat.mtimeMs).toISOString(),
+      stale,
     };
   } catch {
     return null;
@@ -109,6 +121,24 @@ async function writeCachedEntry(domain, pngBuffer, sourceType) {
     ),
   ]);
   return cachedAt;
+}
+
+/**
+ * Rebuild a stale v1 entry behind the request.
+ *
+ * cache.revalidate() is borrowed purely for its single-flight + cooldown
+ * bookkeeping; the `api-v1` key namespace is a dedup token, not a file in
+ * CACHE_DIR (this cache lives in API_CACHE_DIR and is written by
+ * writeCachedEntry). Failures are swallowed there, which is what we want: the
+ * stale PNG keeps being served until a later attempt succeeds.
+ */
+function revalidateApiEntry(domain) {
+  cache.revalidate('api-v1', domain, null, async () => {
+    const hit = await fetchBySourcePriority(domain);
+    if (!hit?.buffer?.length) return;
+    const normalized = await toPng256(hit.buffer, { hintFormat: hit.contentType });
+    await writeCachedEntry(domain, normalized.buffer, hit.sourceType);
+  });
 }
 
 const router = express.Router();
@@ -151,6 +181,12 @@ router.get('/api/v1/favicon', async (req, res) => {
     return jsonError(res, 400, 'invalid_url', 'Could not parse url into a domain.');
   }
 
+  // This route carries the domain in ?url=, so the path-based hit counter
+  // middleware in src/index.js skips it (the /api prefix is on its skip list).
+  res.on('finish', () => {
+    if (res.statusCode === 200) countDomainHit(req, domain);
+  });
+
   const period = apiStore.currentPeriod();
 
   if (keyRow) {
@@ -172,8 +208,9 @@ router.get('/api/v1/favicon', async (req, res) => {
     );
 
     if (!forceRefresh) {
-      const cached = await readCachedEntry(domain);
+      const cached = await readCachedEntry(domain, { allowStale: true });
       if (cached) {
+        if (cached.stale) revalidateApiEntry(domain);
         if (keyRow) apiStore.incrementUsage(keyRow.id, period);
         return res.json({
           url: buildCdnUrl(req, domain),

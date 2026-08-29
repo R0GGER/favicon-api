@@ -18,10 +18,52 @@ const { LRUCache } = require('lru-cache');
 const { upstreamFetch, discardResponseBody, ipv4Dispatcher, ipv4Http1Dispatcher } = require('./upstreamFetch');
 const cache = require('./cache');
 const scraperDiskCache = require('./scraperDiskCache');
+const { DISK_CACHE_TTL_SECONDS } = require('./ttl');
 const { serviceSlugFromDomain } = require('./serviceSlugFromDomain');
 const { iconTagForDomain, iconSourceForDomain } = require('./domainIconTags');
 
 const UPSTREAM_TIMEOUT = parseInt(process.env.UPSTREAM_TIMEOUT || '5000', 10);
+
+// Wall-clock budget for the whole homepage-HTML retry ladder, across every URL
+// and header/HTTP-version combination it tries.
+//
+// Without it the ladder is 2 URLs x 5 attempts, each with its own
+// UPSTREAM_TIMEOUT, so a site that accepts connections but never answers can
+// cost 50 seconds before the scraper gives up and falls back to besticon /
+// catalogs / Google — which answer in milliseconds. A site that fails fast
+// (connection refused) still gets all ten attempts, since those cost ~200ms
+// each; the budget only bites when attempts hang.
+const SCRAPER_PAGE_TOTAL_TIMEOUT = (() => {
+  const n = parseInt(process.env.SCRAPER_PAGE_TOTAL_TIMEOUT ?? '', 10);
+  return Number.isFinite(n) && n > 0 ? n : 8000;
+})();
+
+// Wall-clock budget for one complete origin scrape: homepage HTML, manifest
+// discovery and every candidate icon probe.
+//
+// SCRAPER_PAGE_TOTAL_TIMEOUT only bounds the HTML step. Everything after it
+// also talks to the same origin — up to 32 candidate icons, probed in batches
+// of SCRAPER_PROBE_BATCH_SIZE, each with its own UPSTREAM_TIMEOUT, and then the
+// whole thing again for the www. variant. Against a host that accepts
+// connections but never answers, that measured 88 seconds on the dedicated
+// /scraper/ route. The best-pick route /{domain} never showed it because there
+// the scraper is raced against eleven fast providers.
+//
+// Once the budget is gone no new upstream request is started and the cheap
+// fallbacks (catalogs, Google faviconV2) produce the icon instead.
+const SCRAPER_TOTAL_TIMEOUT = (() => {
+  const n = parseInt(process.env.SCRAPER_TOTAL_TIMEOUT ?? '', 10);
+  return Number.isFinite(n) && n > 0 ? n : 15000;
+})();
+
+// How long a failed HTML fetch is remembered. Deliberately short: a transient
+// network problem must not convince the scraper for hours that a site has no
+// HTML. Long enough to absorb the burst of requests one page load produces
+// (the card image, the size strip, /json).
+const SCRAPER_PAGE_NEGATIVE_TTL = (() => {
+  const n = parseInt(process.env.SCRAPER_PAGE_NEGATIVE_TTL ?? '', 10);
+  return (Number.isFinite(n) && n >= 0 ? n : 60) * 1000;
+})();
 
 const BESTICON_URL = (process.env.BESTICON_URL || '').replace(/\/+$/, '');
 
@@ -31,10 +73,9 @@ const BESTICON_URL = (process.env.BESTICON_URL || '').replace(/\/+$/, '');
 // reuse the probe result for a configurable TTL. Default matches DISK_CACHE_TTL
 // so discovery does not expire (and re-fetch HTML/probes) while image bytes
 // are still valid on disk.
-const DISK_CACHE_TTL_SECS = parseInt(process.env.DISK_CACHE_TTL || '86400', 10);
 const SCRAPER_ICONS_CACHE_TTL_MS =
   parseInt(
-    process.env.SCRAPER_ICONS_CACHE_TTL || String(DISK_CACHE_TTL_SECS),
+    process.env.SCRAPER_ICONS_CACHE_TTL || String(DISK_CACHE_TTL_SECONDS),
     10
   ) * 1000;
 const SCRAPER_ICONS_CACHE_MAX =
@@ -411,7 +452,7 @@ function rankCandidates(candidates) {
     });
 }
 
-async function probeScraperCandidates(candidates, referer, limit = 16) {
+async function probeScraperCandidates(candidates, referer, limit = 16, { deadline = 0 } = {}) {
   const slice = candidates.slice(0, limit);
   const variantGroups = new Map();
   const loose = [];
@@ -451,6 +492,12 @@ async function probeScraperCandidates(candidates, referer, limit = 16) {
   }
 
   async function probeOne(candidate) {
+    // Single choke point for the scrape budget: every probe, whether it comes
+    // from a variant group or a loose batch, passes through here. Once the
+    // budget is gone the remaining groups and batches drain without starting
+    // another upstream request.
+    if (deadline && Date.now() >= deadline) return null;
+
     const result = await fetchScraperAsset(candidate.href, referer);
     if (!result) return null;
 
@@ -1757,8 +1804,15 @@ async function fetchScraperAllIcons(domain) {
   }
 
   const referer = `https://${domain}/`;
-  const { html, finalBaseUrl, linkHeader } = await fetchScraperPage(domain);
+  const { html, finalBaseUrl, linkHeader, budgetExhausted } = await fetchScraperPage(domain);
   const besticonIcons = BESTICON_URL ? await fetchBesticonAllIcons(domain) : [];
+
+  // Discovery probes every candidate to read its real dimensions, so it carries
+  // the same budget as a scrape: against an unresponsive origin this is dozens
+  // of requests that each burn a full UPSTREAM_TIMEOUT.
+  const deadline = Date.now() + SCRAPER_TOTAL_TIMEOUT;
+  const probeWithinBudget = (href) =>
+    Date.now() >= deadline ? Promise.resolve(null) : probeIconMetadata(href, referer);
 
   const byUrl = new Map();
   for (const icon of besticonIcons) {
@@ -1799,7 +1853,7 @@ async function fetchScraperAllIcons(domain) {
       dedupeCandidates(pageLinkCandidates),
       SCRAPER_PROBE_BATCH_SIZE,
       async (c) => {
-        const p = await probeIconMetadata(c.href, referer);
+        const p = await probeWithinBudget(c.href);
         if (!p) return null;
         // Keep meta images in discovery even when widescreen — the default
         // /scraper pick still filters via isNearSquareIcon in probeScraperCandidates.
@@ -1815,15 +1869,18 @@ async function fetchScraperAllIcons(domain) {
   }
 
   try {
-    const manifestIcons = await loadManifestIconCandidates(domain, {
-      html,
-      finalBaseUrl,
-      linkHeader,
-      iconCandidates,
-    });
+    const manifestIcons =
+      budgetExhausted || Date.now() >= deadline
+        ? []
+        : await loadManifestIconCandidates(domain, {
+            html,
+            finalBaseUrl,
+            linkHeader,
+            iconCandidates,
+          });
     if (manifestIcons.length > 0) {
       const probed = await runInBatches(manifestIcons, SCRAPER_PROBE_BATCH_SIZE, (c) =>
-        probeIconMetadata(c.href, referer)
+        probeWithinBudget(c.href)
       );
       for (const p of probed) {
         if (p && p.url && !byUrl.has(p.url)) byUrl.set(p.url, p);
@@ -1837,7 +1894,7 @@ async function fetchScraperAllIcons(domain) {
 
   if (extras.length > 0) {
     const probed = await runInBatches(extras, SCRAPER_PROBE_BATCH_SIZE, (c) =>
-      probeIconMetadata(c.href, referer)
+      probeWithinBudget(c.href)
     );
     for (const p of probed) {
       if (p && p.url && !byUrl.has(p.url)) byUrl.set(p.url, p);
@@ -1994,10 +2051,29 @@ async function fetchScraperPageUncached(domain) {
     },
   ];
 
+  const deadline = Date.now() + SCRAPER_PAGE_TOTAL_TIMEOUT;
+
   for (const pageUrl of pageUrlsForDomain(domain)) {
     for (const attempt of attempts) {
+      // Give up on the ladder rather than spending another UPSTREAM_TIMEOUT on
+      // a host that has already eaten the whole budget. The caller's fallbacks
+      // (besticon, catalogs, Google) are far cheaper than one more attempt.
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) {
+        return {
+          html: null,
+          finalBaseUrl: baseUrl,
+          htmlFetchMethod: null,
+          linkHeader: null,
+          budgetExhausted: true,
+        };
+      }
+
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT);
+      const timer = setTimeout(
+        () => controller.abort(),
+        Math.min(UPSTREAM_TIMEOUT, remaining)
+      );
       try {
         const init = {
           signal: controller.signal,
@@ -2040,9 +2116,16 @@ async function fetchScraperPage(domain, { bypassCache = false } = {}) {
     if (cached) return cached;
 
     const diskPage = await scraperDiskCache.getPage(domain);
-    if (diskPage !== undefined) {
+    // Only a successful scrape is trusted from disk. Failures used to be stored
+    // here like any other result, so a single network hiccup told every worker
+    // for the rest of the TTL that the site serves no HTML — and the icons were
+    // silently degraded to whatever besticon alone could find.
+    if (diskPage !== undefined && diskPage?.html) {
       scraperPageCache.set(domain, diskPage);
       return diskPage;
+    }
+    if (diskPage !== undefined) {
+      scraperDiskCache.deletePage(domain).catch(() => {});
     }
 
     const inflight = scraperPageInflight.get(domain);
@@ -2052,8 +2135,16 @@ async function fetchScraperPage(domain, { bypassCache = false } = {}) {
   const run = async () => {
     const result = await fetchScraperPageUncached(domain);
     if (!bypassCache) {
-      scraperPageCache.set(domain, result);
-      scraperDiskCache.setPage(domain, result);
+      if (result?.html) {
+        scraperPageCache.set(domain, result);
+        scraperDiskCache.setPage(domain, result);
+      } else {
+        // Negative result: remembered briefly and in memory only, so the burst
+        // of requests from one page load does not each re-run the ladder.
+        if (SCRAPER_PAGE_NEGATIVE_TTL > 0) {
+          scraperPageCache.set(domain, result, { ttl: SCRAPER_PAGE_NEGATIVE_TTL });
+        }
+      }
     }
     return result;
   };
@@ -2486,9 +2577,18 @@ async function fetchBesticonCandidates(domain) {
   return besticonIconsToCandidates(await fetchBesticonAllIcons(domain));
 }
 
-async function fetchScraperForDomain(domain) {
+async function fetchScraperForDomain(domain, { deadline = 0 } = {}) {
   const referer = `https://${domain}/`;
-  const { html, finalBaseUrl, linkHeader } = await fetchScraperPage(domain);
+  const { html, finalBaseUrl, linkHeader, budgetExhausted } = await fetchScraperPage(domain);
+  const outOfBudget = () => deadline > 0 && Date.now() >= deadline;
+
+  // The HTML ladder spent its whole budget without one response, so the origin
+  // is not answering at all. Every remaining step here — manifest discovery and
+  // dozens of icon probes — targets that same origin and would burn an
+  // UPSTREAM_TIMEOUT each. Hand over to the caller's catalog/Google fallbacks,
+  // which reach a healthy host. A site that merely refuses or 404s the document
+  // fails fast, keeps budgetExhausted false, and is still probed normally.
+  if (budgetExhausted) return null;
 
   // For Google product subdomains that redirect to a login page (drive, docs, …)
   // the scraped HTML has no product logo; recover it from the workspace page.
@@ -2505,12 +2605,19 @@ async function fetchScraperForDomain(domain) {
           /* ignore */
         }
       }
-      const manifestIcons = await loadManifestIconCandidates(domain, {
-        html,
-        finalBaseUrl,
-        linkHeader,
-        iconCandidates: [...parsed.primaryCandidates, ...besticonCandidates],
-      });
+      // Manifest discovery probes up to MANIFEST_PROBE_MAX URLs on the same
+      // origin. Skip it when the HTML step already proved the host does not
+      // answer, or when the budget is spent — the candidates we have plus the
+      // fallback chain are a better use of what is left.
+      const manifestIcons =
+        budgetExhausted || outOfBudget()
+          ? []
+          : await loadManifestIconCandidates(domain, {
+              html,
+              finalBaseUrl,
+              linkHeader,
+              iconCandidates: [...parsed.primaryCandidates, ...besticonCandidates],
+            });
       const hintCandidates = deriveHintCandidates(
         domain,
         besticonCandidates.map((c) => c.href)
@@ -2535,7 +2642,7 @@ async function fetchScraperForDomain(domain) {
         ...hintCandidates,
         ...manifestIcons,
       ]);
-      const best = await probeScraperCandidates(combined, referer, 32);
+      const best = await probeScraperCandidates(combined, referer, 32, { deadline });
       if (best) return best;
     }
   }
@@ -2548,10 +2655,10 @@ async function fetchScraperForDomain(domain) {
     workspaceLogoCandidates
   );
 
-  const bestPrimary = await probeScraperCandidates(rankedPrimary, finalBaseUrl);
+  const bestPrimary = await probeScraperCandidates(rankedPrimary, finalBaseUrl, 16, { deadline });
   if (bestPrimary) return bestPrimary;
 
-  return probeScraperCandidates(rankedFallback, finalBaseUrl);
+  return probeScraperCandidates(rankedFallback, finalBaseUrl, 16, { deadline });
 }
 
 async function normalizeFallbackResult(entry, provider) {
@@ -2634,7 +2741,8 @@ async function fetchScraper(domain) {
   // (e.g. facebook.com only exposes a 60×60 favicon). When the site exposes a
   // large icon of its own (e.g. github.com's 512px app-icon), keep it instead
   // of overriding it with a catalog logo.
-  const result = await fetchScraperForDomain(domain);
+  const deadline = Date.now() + SCRAPER_TOTAL_TIMEOUT;
+  const result = await fetchScraperForDomain(domain, { deadline });
   const scrapedBigEnough = !!result && (result.sourceWidth || 0) >= MIN_SOURCE_SIZE;
 
   // A curated domain→icon-tag mapping (domainIconTags.js) is an intentional
@@ -2659,8 +2767,10 @@ async function fetchScraper(domain) {
 
   if (result) return result;
 
-  if (!domain.startsWith('www.')) {
-    const wwwResult = await fetchScraperForDomain(`www.${domain}`);
+  // The www. variant repeats the entire scrape — HTML ladder, manifests and all
+  // probes — against a host that just failed. Only worth it with budget left.
+  if (!domain.startsWith('www.') && Date.now() < deadline) {
+    const wwwResult = await fetchScraperForDomain(`www.${domain}`, { deadline });
     if (wwwResult) {
       wwwResult.fallbackDomain = `www.${domain}`;
       return wwwResult;

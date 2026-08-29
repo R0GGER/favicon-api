@@ -207,18 +207,31 @@ async function finalizeCandidate(candidate, size) {
 }
 
 async function resolveProfileIcon(target, profile, id) {
-  const { preferred, fallbacks, size } = profile;
+  const { size } = profile;
   const cacheDomain = `${id}_${target.value}`;
 
-  const cached = await cache.get('profile', cacheDomain, size);
+  const cached = await cache.get('profile', cacheDomain, size, { allowStale: true });
   if (cached) {
     if (cached.notFound || cached.provider === 'none') {
       await cache.del('profile', cacheDomain, size);
     } else {
+      // Past the TTL the stored icon is served as-is and the provider chain is
+      // re-run behind the request, so a profile hit never pays for an expiry.
+      if (cached.stale) {
+        cache.revalidate('profile', cacheDomain, size, () =>
+          resolveFromProviders(target, profile, cacheDomain)
+        );
+      }
       return cached;
     }
   }
 
+  return resolveFromProviders(target, profile, cacheDomain);
+}
+
+/** Walk the provider chain, store the first usable icon, and return it. */
+async function resolveFromProviders(target, profile, cacheDomain) {
+  const { preferred, fallbacks, size } = profile;
   const chain = [preferred, ...fallbacks];
   for (const provider of chain) {
     let candidate = null;

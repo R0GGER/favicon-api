@@ -10,16 +10,24 @@ const CHANGELOG_PATH = path.join(__dirname, '..', 'CHANGELOG.md');
 /** URL slug → filename when they differ. */
 const SLUG_ALIASES = {
   'custom-profile-urls': 'custom-profiles',
+  'api-reference': 'api',
+  'api-v1': 'api',
+  'tweaks': 'performance',
+};
+
+/** Extra hash when an old slug is rewritten to a combined page. */
+const SLUG_DEFAULT_HASH = {
+  'api-v1': 'api-v1',
 };
 
 /** Primary Selfhosted nav — shown in the sidebar. */
 const NAV_PAGES = [
   { slug: 'getting-started', title: 'Getting Started', label: 'Getting Started', file: 'getting-started.md' },
-  { slug: 'tweaks', title: 'Tweaks', label: 'Tweaks', file: 'tweaks.md' },
-  { slug: 'api-reference', title: 'API reference', label: 'API reference', file: 'api-reference.md' },
-  { slug: `api-v1`, title: 'API v1', label: 'API v1', file: 'api-v1.md' },
-  { slug: 'proxy', title: 'Proxy', label: 'Proxy', file: 'proxy.md' },
-  { slug: 'tools', title: 'Tools', label: 'Tools', file: 'tools.md' },
+  { slug: 'performance', title: 'Performance', label: 'Performance', file: 'performance.md' },
+  { slug: 'api', title: 'API', label: 'API', file: 'api.md' },
+  { slug: 'proxy', title: 'Reverse Proxy', label: 'Reverse Proxy', file: 'proxy.md' },
+  { slug: 'preload-manager', title: 'Preload manager', label: 'Preload manager', file: 'preload-manager.md' },
+  { slug: 'tools', title: 'Browser tools', label: 'Browser tools', file: 'tools.md' },
   { slug: 'changelog', title: 'Changelog', label: 'Changelog', rootFile: CHANGELOG_PATH },
 ];
 
@@ -71,18 +79,30 @@ function rewriteMarkdownLinks(markdown) {
     if (/^\/faviconapi\/([a-z0-9-]+)(#.*)?$/i.test(href)) {
       const [, name, hashPart] = href.match(/^\/faviconapi\/([a-z0-9-]+)(#.*)?$/i);
       const slug = SLUG_ALIASES[name] || name;
-      newHref = `/docs/${slug}${hashPart || ''}`;
+      const hash = hashPart || (SLUG_DEFAULT_HASH[name] ? `#${SLUG_DEFAULT_HASH[name]}` : '');
+      newHref = `/docs/${slug}${hash}`;
     } else if (/^(?:\.\.\/)?README\.md(?:#(.*))?$/i.test(href) || /^overview\.md(?:#(.*))?$/i.test(href)) {
       const hash = href.includes('#') ? href.slice(href.indexOf('#')) : '';
       newHref = `/docs${hash}`;
     } else if (/^docs\/([a-z0-9-]+)\.md(?:#(.*))?$/i.test(href)) {
       const [, name, hashPart] = href.match(/^docs\/([a-z0-9-]+)\.md(?:#(.*))?$/i);
-      newHref = `/docs/${SLUG_ALIASES[name] || name}${hashPart ? `#${hashPart}` : ''}`;
+      const hash = hashPart ? `#${hashPart}` : (SLUG_DEFAULT_HASH[name] ? `#${SLUG_DEFAULT_HASH[name]}` : '');
+      newHref = `/docs/${SLUG_ALIASES[name] || name}${hash}`;
     } else if (/^([a-z0-9-]+)\.md(?:#(.*))?$/i.test(href)) {
       const [, name, hashPart] = href.match(/^([a-z0-9-]+)\.md(?:#(.*))?$/i);
-      newHref = `/docs/${SLUG_ALIASES[name] || name}${hashPart ? `#${hashPart}` : ''}`;
+      const hash = hashPart ? `#${hashPart}` : (SLUG_DEFAULT_HASH[name] ? `#${SLUG_DEFAULT_HASH[name]}` : '');
+      newHref = `/docs/${SLUG_ALIASES[name] || name}${hash}`;
+    } else if (/^\/docs\/([a-z0-9-]+)(#.*)?$/i.test(href)) {
+      const [, name, hashPart] = href.match(/^\/docs\/([a-z0-9-]+)(#.*)?$/i);
+      if (SLUG_ALIASES[name] || SLUG_DEFAULT_HASH[name]) {
+        const slug = SLUG_ALIASES[name] || name;
+        const hash = hashPart || (SLUG_DEFAULT_HASH[name] ? `#${SLUG_DEFAULT_HASH[name]}` : '');
+        newHref = `/docs/${slug}${hash}`;
+      }
     } else if (href === '.env.example') {
-      newHref = 'https://github.com/R0GGER/maflplus-favicon-api/blob/main/.env.example';
+      newHref = 'https://github.com/R0GGER/favicon-api/blob/main/.env.example';
+    } else if (href === 'docker-compose.yml') {
+      newHref = 'https://github.com/R0GGER/favicon-api/blob/main/docker-compose.yml';
     } else if (href.startsWith('docs/')) {
       newHref = `/docs/${href.slice(5).replace(/\.md(?=#|$)/, '')}`;
     }
@@ -93,8 +113,14 @@ function rewriteMarkdownLinks(markdown) {
 
 function extractHeadings(markdown) {
   const headings = [];
-  for (const line of markdown.split('\n')) {
-    const match = line.match(/^(#{2,3})\s+(.+)$/);
+  let inCodeBlock = false;
+  for (const line of markdown.split(/\r?\n/)) {
+    if (line.trimStart().startsWith('```')) {
+      inCodeBlock = !inCodeBlock;
+      continue;
+    }
+    if (inCodeBlock) continue;
+    const match = line.match(/^(#{2,3})\s+(.+?)\s*$/);
     if (!match) continue;
     const depth = match[1].length;
     const text = match[2]
@@ -271,7 +297,7 @@ function buildSearchIndex() {
       continue;
     }
 
-    const lines = raw.split('\n');
+    const lines = raw.split(/\r?\n/);
     let currentHeading = page.title;
     let currentId = '';
     let currentLines = [];
@@ -301,7 +327,7 @@ function buildSearchIndex() {
         currentLines.push(line);
         continue;
       }
-      const m = line.match(/^(#{1,3})\s+(.+)$/);
+      const m = line.match(/^(#{1,3})\s+(.+?)\s*$/);
       if (m) {
         flushSection();
         const headingText = m[2]
@@ -351,14 +377,14 @@ function renderDocPage(slug, template) {
   const jsonLd = buildJsonLd(resolved.title, description, canonicalPath);
 
   return template
-    .replace(/__PAGE_TITLE__/g, escapeHtml(resolved.title))
-    .replace(/__PAGE_DESCRIPTION__/g, escapeHtml(description))
-    .replace(/__PAGE_KEYWORDS__/g, escapeHtml(keywords))
-    .replace(/__JSON_LD__/g, jsonLd)
-    .replace(/__CONTENT__/g, contentHtml)
-    .replace(/__TOC__/g, tocHtml)
-    .replace(/__NAV__/g, navHtml)
-    .replace(/__CANONICAL_PATH__/g, canonicalPath);
+    .replace(/__PAGE_TITLE__/g, () => escapeHtml(resolved.title))
+    .replace(/__PAGE_DESCRIPTION__/g, () => escapeHtml(description))
+    .replace(/__PAGE_KEYWORDS__/g, () => escapeHtml(keywords))
+    .replace(/__JSON_LD__/g, () => jsonLd)
+    .replace(/__CONTENT__/g, () => contentHtml)
+    .replace(/__TOC__/g, () => tocHtml)
+    .replace(/__NAV__/g, () => navHtml)
+    .replace(/__CANONICAL_PATH__/g, () => canonicalPath);
 }
 
 module.exports = {

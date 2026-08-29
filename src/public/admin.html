@@ -1,0 +1,1957 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Preload manager &ndash; FaviconAPI</title>
+  <meta name="description" content="Manage the FaviconAPI preload database: domains, icon overrides, blocklist, popularity stats and preload runs.">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#5b2e7e">
+  <meta name="color-scheme" content="light">
+  <meta name="referrer" content="no-referrer">
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicons/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicons/favicon-16x16.png">
+  <link rel="shortcut icon" href="/favicons/favicon.ico">
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #faf6f1;
+      color: #2d2a26;
+      min-height: 100vh;
+      padding: 2rem 1rem;
+    }
+
+    .container { max-width: 1280px; margin: 0 auto; }
+
+    .site-header { margin-bottom: 1.5rem; }
+
+    .site-header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 0.35rem;
+    }
+
+    .site-brand {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .site-brand:hover .site-logo { opacity: 0.85; }
+
+    .site-logo { display: block; width: 40px; height: 40px; flex-shrink: 0; transition: opacity 0.15s; }
+
+    .site-brand h1 {
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: 1.85rem;
+      font-weight: 700;
+      line-height: 1.15;
+      margin: 0;
+    }
+
+    .subtitle { color: #6b6560; font-size: 0.95rem; line-height: 1.4; margin: 0; }
+
+    .session-bar { display: flex; align-items: center; gap: 0.75rem; font-size: 0.85rem; color: #6b6560; }
+    .session-bar strong { color: #2d2a26; }
+
+    .card {
+      background: #fff;
+      border: 1px solid #ece6de;
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .card h2 {
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: 1.25rem;
+      margin: 0 0 0.35rem;
+    }
+
+    .card-lead { color: #6b6560; font-size: 0.9rem; line-height: 1.5; margin: 0 0 1.1rem; }
+
+    .login-card { max-width: 640px; margin: 3rem auto; }
+
+    label { display: block; font-size: 0.82rem; font-weight: 600; color: #6b6560; margin-bottom: 0.3rem; }
+
+    input[type="text"], input[type="number"], input[type="url"], input[type="password"], input[type="time"], select, textarea {
+      width: 100%;
+      font-family: inherit;
+      font-size: 0.9rem;
+      color: #2d2a26;
+      background: #fff;
+      border: 1px solid #ded6cc;
+      border-radius: 8px;
+      padding: 0.55rem 0.7rem;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: #b98fd4;
+      box-shadow: 0 0 0 3px rgba(123, 63, 168, 0.12);
+    }
+
+    textarea { resize: vertical; min-height: 120px; font-family: 'SF Mono', Consolas, monospace; font-size: 0.82rem; }
+
+    .btn-primary {
+      background: #5b2e7e;
+      color: #fff;
+      border: none;
+      padding: 0.6rem 1.25rem;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.15s;
+    }
+
+    .btn-primary:hover { background: #7b3fa8; }
+    .btn-primary:disabled { background: #a08aaf; cursor: wait; }
+
+    .btn-secondary {
+      background: transparent;
+      color: #5b2e7e;
+      border: 1px solid #d9c2e6;
+      padding: 0.55rem 0.9rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s;
+    }
+
+    .btn-secondary:hover { background: #f3eaf7; color: #7b3fa8; }
+    .btn-secondary:disabled,
+    .btn-secondary:disabled:hover {
+      opacity: 0.45;
+      cursor: default;
+      background: transparent;
+      color: #5b2e7e;
+    }
+
+    a.btn-secondary { display: inline-block; text-decoration: none; }
+
+    .btn-danger { color: #a3324c; border-color: #eccad3; }
+    .btn-danger:hover { background: #fbeef1; color: #7f2038; }
+
+    .btn-small { padding: 0.35rem 0.6rem; font-size: 0.78rem; border-radius: 6px; }
+
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      border-bottom: 1px solid #ece6de;
+      margin-bottom: 1.25rem;
+    }
+
+    .tab {
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      padding: 0.6rem 0.95rem;
+      font-family: inherit;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #6b6560;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s;
+    }
+
+    .tab:hover { color: #7b3fa8; }
+    .tab.active { color: #5b2e7e; border-bottom-color: #5b2e7e; }
+
+    .panel[hidden] { display: none; }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+
+    .toolbar .field { flex: 0 0 auto; }
+    .toolbar .field.grow { flex: 1 1 220px; min-width: 180px; }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 0.75rem;
+      align-items: end;
+    }
+
+    .table-wrap { overflow-x: auto; border: 1px solid #ece6de; border-radius: 10px; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+
+    th {
+      text-align: left;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #8b8580;
+      background: #faf6f1;
+      padding: 0.6rem 0.7rem;
+      border-bottom: 1px solid #ece6de;
+      white-space: nowrap;
+    }
+
+    th.sortable { padding: 0; }
+    .th-sort {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      width: 100%;
+      margin: 0;
+      padding: 0.6rem 0.7rem;
+      border: none;
+      background: transparent;
+      font: inherit;
+      font-size: inherit;
+      font-weight: inherit;
+      letter-spacing: inherit;
+      text-transform: inherit;
+      color: inherit;
+      cursor: pointer;
+      text-align: left;
+    }
+    .th-sort:hover { color: #5b2e7e; }
+    th.sorted .th-sort { color: #5b2e7e; }
+    .sort-ind {
+      font-size: 0.62rem;
+      line-height: 1;
+      color: #c4beb8;
+    }
+    th.sorted .sort-ind { color: #5b2e7e; }
+
+    td { padding: 0.5rem 0.7rem; border-bottom: 1px solid #f3efe9; vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tbody tr:hover { background: #fdfbf8; }
+
+    td.domain { font-weight: 600; white-space: nowrap; }
+    td.numeric input { width: 5.5rem; padding: 0.3rem 0.45rem; font-size: 0.82rem; }
+    td.numeric .rank-pin {
+      margin-left: 0.25rem;
+      color: #8b8580;
+      cursor: help;
+    }
+    .col-source .list-pos {
+      color: #8b8580;
+      font-variant-numeric: tabular-nums;
+    }
+    td.icon-url input { min-width: 260px; padding: 0.3rem 0.45rem; font-size: 0.8rem; }
+    td.actions { white-space: nowrap; text-align: right; }
+    td.actions button + button { margin-left: 0.35rem; }
+
+    th.check-col, td.check-col {
+      width: 2.2rem;
+      text-align: center;
+      padding-left: 0.55rem;
+      padding-right: 0.25rem;
+      user-select: none;
+    }
+    th.check-col input, td.check-col input {
+      width: auto;
+      accent-color: #5b2e7e;
+      cursor: pointer;
+    }
+    tbody tr:has(.row-check:checked) { background: #f8f2fb; }
+
+    .bulk-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.55rem;
+      margin: 0 0 0.85rem;
+      font-size: 0.85rem;
+      color: #6b6560;
+    }
+    .bulk-bar[hidden] { display: none; }
+    .bulk-bar strong { color: #2d2a26; }
+
+    table.hide-rank .col-rank,
+    table.hide-state .col-state,
+    table.hide-source .col-source,
+    table.hide-fails .col-fails,
+    table.hide-last .col-last,
+    table.hide-icon .col-icon { display: none; }
+
+    .dropdown-wrap { position: relative; }
+    .dropdown {
+      position: absolute;
+      top: calc(100% + 0.35rem);
+      right: 0;
+      z-index: 30;
+      min-width: 190px;
+      background: #fff;
+      border: 1px solid #ece6de;
+      border-radius: 10px;
+      padding: 0.45rem 0.65rem 0.55rem;
+      box-shadow: 0 10px 28px rgba(45, 42, 38, 0.14);
+    }
+    .dropdown[hidden] { display: none; }
+    .dropdown label {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      margin: 0.28rem 0;
+      font-weight: 500;
+      color: #2d2a26;
+      cursor: pointer;
+    }
+    .dropdown input { width: auto; accent-color: #5b2e7e; }
+
+    button.badge {
+      border: none;
+      font-family: inherit;
+      cursor: pointer;
+      appearance: none;
+    }
+    button.badge:hover { filter: brightness(0.96); }
+
+    .muted { color: #8b8580; }
+    .mono { font-family: 'SF Mono', Consolas, monospace; font-size: 0.8rem; }
+
+    .badge {
+      display: inline-block;
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      padding: 0.15rem 0.45rem;
+      border-radius: 999px;
+    }
+
+    .badge-on { background: #e6f4ea; color: #1e7a3c; }
+    .badge-off { background: #f1eeea; color: #7d766f; }
+    .badge-blocked { background: #fbeef1; color: #a3324c; }
+    .badge-manual { background: #f3eaf7; color: #5b2e7e; }
+    .badge-fail { background: #fdf1e3; color: #97591a; }
+    .badge-adult { background: #fbeef1; color: #a3324c; }
+
+    .switch { display: inline-flex; align-items: center; gap: 0.4rem; cursor: pointer; }
+    .switch input { width: auto; accent-color: #5b2e7e; }
+
+    .pager {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-top: 0.9rem;
+      font-size: 0.85rem;
+      color: #6b6560;
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 0.85rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .stat {
+      background: #faf6f1;
+      border: 1px solid #ece6de;
+      border-radius: 10px;
+      padding: 0.9rem 1rem;
+    }
+
+    .stat .value { font-size: 1.6rem; font-weight: 700; line-height: 1.1; }
+    .stat .label { font-size: 0.78rem; color: #8b8580; margin-top: 0.15rem; }
+
+    dl.config { display: grid; grid-template-columns: max-content 1fr; gap: 0.35rem 1rem; font-size: 0.85rem; }
+    dl.config dt { color: #8b8580; }
+    dl.config dd { font-family: 'SF Mono', Consolas, monospace; font-size: 0.8rem; word-break: break-all; }
+
+    pre.log {
+      background: #2d2a26;
+      color: #efe9e1;
+      border-radius: 10px;
+      padding: 0.9rem 1rem;
+      font-family: 'SF Mono', Consolas, monospace;
+      font-size: 0.78rem;
+      line-height: 1.5;
+      max-height: 420px;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .run-state { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.9rem; font-size: 0.9rem; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: #c4beb8; flex-shrink: 0; }
+    .dot.running { background: #1e7a3c; animation: pulse 1.4s ease-in-out infinite; }
+    .dot.failed { background: #a3324c; }
+    .dot.finished { background: #5b2e7e; }
+
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+    .checkbox-row { display: flex; flex-wrap: wrap; gap: 1rem; margin: 0.9rem 0; font-size: 0.86rem; }
+    .checkbox-row label { display: inline-flex; align-items: center; gap: 0.4rem; margin: 0; font-weight: 500; color: #2d2a26; }
+    .checkbox-row input { width: auto; accent-color: #5b2e7e; }
+
+    .cron-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.6rem;
+      margin: 0.35rem 0 0.55rem;
+    }
+
+    .cron-toolbar span { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+
+    pre.cron-output {
+      max-height: 160px;
+      user-select: all;
+    }
+
+    .cron-hint {
+      color: #6b6560;
+      font-size: 0.82rem;
+      line-height: 1.5;
+      margin: 0.75rem 0 0;
+    }
+
+    .cron-hint li { margin: 0.2rem 0 0 1.1rem; }
+
+    .notice {
+      border-radius: 8px;
+      padding: 0.7rem 0.9rem;
+      font-size: 0.86rem;
+      line-height: 1.45;
+      margin-bottom: 1rem;
+    }
+
+    .notice-error { background: #fbeef1; color: #7f2038; border: 1px solid #eccad3; }
+    .notice-info { background: #f3eaf7; color: #4a2568; border: 1px solid #e2d3ec; }
+    .notice[hidden] { display: none; }
+
+    .toast {
+      position: fixed;
+      bottom: 1.5rem;
+      left: 50%;
+      transform: translate(-50%, 1rem);
+      background: #2d2a26;
+      color: #fff;
+      padding: 0.65rem 1.1rem;
+      border-radius: 999px;
+      font-size: 0.86rem;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s, transform 0.2s;
+      z-index: 100;
+    }
+
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+    .toast.error { background: #7f2038; }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      z-index: 80;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 4rem 1rem 2rem;
+    }
+
+    .modal[hidden] { display: none; }
+
+    .modal-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(45, 42, 38, 0.45);
+    }
+
+    .modal-dialog {
+      position: relative;
+      width: min(520px, 100%);
+      max-height: calc(100vh - 6rem);
+      display: flex;
+      flex-direction: column;
+      background: #fff;
+      border: 1px solid #ece6de;
+      border-radius: 12px;
+      padding: 1.25rem 1.35rem;
+    }
+
+    .modal-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 0.35rem;
+    }
+
+    .modal-head h2 {
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: 1.25rem;
+      margin: 0;
+    }
+
+    .preview-wrap {
+      margin: 0.75rem 0 0;
+      overflow: auto;
+      border: 1px solid #ece6de;
+      border-radius: 10px;
+    }
+
+    .preview-wrap table { margin: 0; }
+    .preview-wrap th:last-child,
+    .preview-wrap td:last-child { text-align: right; }
+    td.preview-rank {
+      width: 3.25rem;
+      color: #8b8580;
+      font-variant-numeric: tabular-nums;
+      font-family: 'SF Mono', Consolas, monospace;
+      font-size: 0.8rem;
+    }
+    td.preview-adult { width: 4.5rem; white-space: nowrap; }
+
+    .empty { padding: 1.5rem; text-align: center; color: #8b8580; font-size: 0.88rem; }
+
+    footer.page-footer {
+      margin-top: 2.5rem;
+      padding-top: 1.25rem;
+      border-top: 1px solid #ece6de;
+      text-align: center;
+    }
+
+    footer.page-footer a.footer-brand {
+      display: inline-block;
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #b0aaa4;
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+
+    footer.page-footer a.footer-brand:hover { color: #5b2e7e; }
+
+    footer.page-footer .footer-version {
+      display: block;
+      margin-top: 0.15rem;
+      font-size: 0.7rem;
+      color: #c4beb8;
+      letter-spacing: 0.02em;
+    }
+
+    @media (max-width: 640px) {
+      body { padding: 1.25rem 0.75rem; }
+      .card { padding: 1.1rem; }
+      .site-brand h1 { font-size: 1.5rem; }
+      .site-logo { width: 34px; height: 34px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="site-header">
+      <div class="site-header-top">
+        <a href="/" class="site-brand" aria-label="FaviconAPI home">
+          <img src="/logo.svg" alt="" class="site-logo">
+          <h1>Preload manager</h1>
+        </a>
+        <div class="session-bar" id="session-bar" hidden>
+          <span>Signed in as <strong id="session-user">admin</strong></span>
+          <button type="button" class="btn-secondary btn-small" id="signout-btn">Sign out</button>
+        </div>
+      </div>
+      <p class="subtitle">Domains, icon overrides, blocklist and preload runs for <span class="mono">__BASE_URL__</span>.</p>
+    </header>
+
+    <section class="card login-card" id="login-view" hidden>
+      <h2>Sign in</h2>
+      <p class="card-lead">
+        The session extends itself while you work and ends after a stretch of inactivity.
+        Keep me signed in makes that window a lot longer on this browser.
+      </p>
+      <div class="notice notice-error" id="login-error" hidden></div>
+      <form id="login-form">
+        <label for="login-user">Username</label>
+        <input type="text" id="login-user" name="username" autocomplete="username" autocapitalize="none"
+               spellcheck="false">
+        <label for="login-password" style="margin-top: 0.75rem;">Password</label>
+        <input type="password" id="login-password" name="password" autocomplete="current-password">
+        <div class="checkbox-row">
+          <label><input type="checkbox" id="login-remember"> Keep me signed in</label>
+        </div>
+        <p style="margin: 0.9rem 0 1rem;">
+          <button type="submit" class="btn-primary" id="login-btn">Sign in</button>
+        </p>
+      </form>
+    </section>
+
+    <main id="app-view" hidden>
+      <div class="tabs" role="tablist">
+        <button type="button" class="tab active" data-tab="domains" role="tab">Domains</button>
+        <button type="button" class="tab" data-tab="blocklist" role="tab">Blocklist</button>
+        <button type="button" class="tab" data-tab="stats" role="tab">Stats</button>
+        <button type="button" class="tab" data-tab="csv" role="tab">Import / Export</button>
+        <button type="button" class="tab" data-tab="run" role="tab">Preload run</button>
+      </div>
+
+      <!-- Domains -->
+      <section class="panel" id="panel-domains">
+        <div class="card">
+          <h2>Add a domain</h2>
+          <p class="card-lead">Added by hand, so no automated pass can switch it off again. A rank you type is pinned and Recalculate will not overwrite it.</p>
+          <form id="add-form" class="form-grid">
+            <div>
+              <label for="add-domain">Domain</label>
+              <input type="text" id="add-domain" placeholder="example.com" spellcheck="false" required>
+            </div>
+            <div>
+              <label for="add-rank">Rank (hits)</label>
+              <input type="number" id="add-rank" min="0" placeholder="leave empty">
+            </div>
+            <div style="grid-column: span 2; min-width: 220px;">
+              <label for="add-icon">Icon override (https, optional)</label>
+              <input type="url" id="add-icon" placeholder="https://cdn.example.com/icon.png" spellcheck="false">
+            </div>
+            <div>
+              <button type="submit" class="btn-primary">Add domain</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="card">
+          <h2>Domains</h2>
+          <p class="card-lead">Rank is rolling request count, so real traffic outranks a worldwide list position. Click a column header to sort. State filters the list; Columns hides fields you do not need. Tick rows to disable or delete several at once.</p>
+          <div class="toolbar">
+            <div class="field grow">
+              <label for="filter-query">Search</label>
+              <input type="text" id="filter-query" placeholder="Filter by domain" spellcheck="false">
+            </div>
+            <div class="field">
+              <label for="filter-status">State</label>
+              <select id="filter-status">
+                <option value="all">All</option>
+                <option value="enabled">On</option>
+                <option value="disabled">Off</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="filter-limit">Per page</label>
+              <select id="filter-limit">
+                <option>25</option>
+                <option selected>50</option>
+                <option>100</option>
+                <option>250</option>
+              </select>
+            </div>
+            <div class="field dropdown-wrap">
+              <label for="columns-btn">Columns</label>
+              <button type="button" class="btn-secondary" id="columns-btn" aria-expanded="false" aria-haspopup="true" aria-controls="columns-menu">Show / hide</button>
+              <div class="dropdown" id="columns-menu" hidden>
+                <label><input type="checkbox" data-col="rank" checked> Rank</label>
+                <label><input type="checkbox" data-col="state" checked> State</label>
+                <label><input type="checkbox" data-col="source" checked> Source</label>
+                <label><input type="checkbox" data-col="fails" checked> Fails</label>
+                <label><input type="checkbox" data-col="last" checked> Last preload</label>
+                <label><input type="checkbox" data-col="icon" checked> Icon override</label>
+              </div>
+            </div>
+            <div class="field">
+              <button type="button" class="btn-secondary" id="domains-refresh">Refresh</button>
+            </div>
+          </div>
+
+          <div class="bulk-bar" id="domains-bulk" hidden>
+            <strong id="domains-bulk-count">0 selected</strong>
+            <button type="button" class="btn-secondary btn-small" id="bulk-disable">Disable selected</button>
+            <button type="button" class="btn-secondary btn-small" id="bulk-enable">Enable selected</button>
+            <button type="button" class="btn-secondary btn-small btn-danger" id="bulk-delete">Delete selected</button>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th class="check-col"><input type="checkbox" id="domains-select-all" aria-label="Select all on this page"></th>
+                  <th class="col-domain sortable" data-sort="domain" aria-sort="none">
+                    <button type="button" class="th-sort">Domain <span class="sort-ind" aria-hidden="true"></span></button>
+                  </th>
+                  <th class="col-rank sortable" data-sort="rank" aria-sort="none">
+                    <button type="button" class="th-sort" title="Rolling request count. List position is a tiebreaker only.">Rank <span class="sort-ind" aria-hidden="true"></span></button>
+                  </th>
+                  <th class="col-state sortable" data-sort="state" aria-sort="none">
+                    <button type="button" class="th-sort">State <span class="sort-ind" aria-hidden="true"></span></button>
+                  </th>
+                  <th class="col-source sortable" data-sort="source" aria-sort="none">
+                    <button type="button" class="th-sort">Source <span class="sort-ind" aria-hidden="true"></span></button>
+                  </th>
+                  <th class="col-fails sortable" data-sort="fails" aria-sort="none">
+                    <button type="button" class="th-sort">Fails <span class="sort-ind" aria-hidden="true"></span></button>
+                  </th>
+                  <th class="col-last sortable" data-sort="last" aria-sort="none">
+                    <button type="button" class="th-sort">Last preload <span class="sort-ind" aria-hidden="true"></span></button>
+                  </th>
+                  <th class="col-icon sortable" data-sort="icon" aria-sort="none">
+                    <button type="button" class="th-sort">Icon override <span class="sort-ind" aria-hidden="true"></span></button>
+                  </th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="domains-body"></tbody>
+            </table>
+            <div class="empty" id="domains-empty" hidden>No domains match this filter.</div>
+          </div>
+
+          <div class="pager">
+            <span id="domains-count">&nbsp;</span>
+            <span>
+              <button type="button" class="btn-secondary btn-small" id="page-prev">Previous</button>
+              <button type="button" class="btn-secondary btn-small" id="page-next">Next</button>
+            </span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Blocklist -->
+      <section class="panel" id="panel-blocklist" hidden>
+        <div class="card">
+          <h2>Block a pattern</h2>
+          <p class="card-lead">
+            An exact host (<span class="mono">example.com</span>) or a wildcard
+            (<span class="mono">*.example.com</span>, which also covers the bare parent). Blocking disables every
+            listed domain that matches; unblocking does not enable them again.
+          </p>
+          <form id="block-form" class="form-grid">
+            <div>
+              <label for="block-pattern">Pattern</label>
+              <input type="text" id="block-pattern" placeholder="*.gstatic.com" spellcheck="false" required>
+            </div>
+            <div style="grid-column: span 2;">
+              <label for="block-reason">Reason (optional)</label>
+              <input type="text" id="block-reason" placeholder="infra">
+            </div>
+            <div>
+              <button type="submit" class="btn-primary">Block</button>
+            </div>
+          </form>
+          <p style="margin-top: 1rem;">
+            <button type="button" class="btn-secondary" id="seed-btn">Seed built-in service domains</button>
+          </p>
+        </div>
+
+        <div class="card">
+          <h2>Blocked patterns</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Pattern</th><th>Reason</th><th>Added</th><th></th></tr>
+              </thead>
+              <tbody id="blocklist-body"></tbody>
+            </table>
+            <div class="empty" id="blocklist-empty" hidden>The blocklist is empty.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Stats -->
+      <section class="panel" id="panel-stats" hidden>
+        <div class="card">
+          <h2>Database</h2>
+          <div class="stat-grid" id="stat-grid"></div>
+          <dl class="config" id="stat-config"></dl>
+        </div>
+
+        <div class="card">
+          <h2>Hits per month</h2>
+          <p class="card-lead">
+            Raw counters behind the rank column. Recalculate rewrites <span class="mono">rank</span> from this
+            window for every domain whose rank is not pinned by hand. List position is stored separately, so a
+            top-100 import cannot outrank three real requests.
+          </p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Period</th><th>Hits</th><th>Domains</th></tr></thead>
+              <tbody id="hits-body"></tbody>
+            </table>
+            <div class="empty" id="hits-empty" hidden>No hits recorded yet.</div>
+          </div>
+          <div class="toolbar" style="margin-top: 1rem; margin-bottom: 0;">
+            <div class="field">
+              <label for="recalc-months">Window (months)</label>
+              <input type="number" id="recalc-months" min="1" max="120" value="3">
+            </div>
+            <div class="field">
+              <button type="button" class="btn-primary" id="recalc-btn">Recalculate ranks</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- CSV -->
+      <section class="panel" id="panel-csv" hidden>
+        <div class="card">
+          <h2>Export</h2>
+          <p class="card-lead">
+            Same column order as the CLI export, so a sheet can be edited and imported back.
+          </p>
+          <p>
+            <a class="btn-secondary" href="/admin/api/export.csv" download>Download all domains</a>
+            <a class="btn-secondary" href="/admin/api/export.csv?enabledOnly=1" download style="margin-left: 0.4rem;">Enabled only</a>
+          </p>
+        </div>
+
+        <div class="card">
+          <h2>Import</h2>
+          <p class="card-lead">
+            <span class="mono">domain</span> is the key. The <span class="mono">id</span> and
+            <span class="mono">last_*</span> columns are ignored, and blocked domains are skipped.
+          </p>
+          <div class="notice notice-info" id="import-result" hidden></div>
+          <p style="margin-bottom: 0.75rem;">
+            <input type="file" id="import-file" accept=".csv,text/csv">
+          </p>
+          <label for="import-csv">CSV</label>
+          <textarea id="import-csv" rows="10" spellcheck="false"
+                    placeholder="id,domain,enabled,source,rank,last_preloaded_at,last_preload_result,last_error,alter_icon_url"></textarea>
+          <p style="margin-top: 0.9rem;">
+            <button type="button" class="btn-primary" id="import-btn">Import CSV</button>
+          </p>
+        </div>
+      </section>
+
+      <!-- Preload run -->
+      <section class="panel" id="panel-run" hidden>
+        <div class="card">
+          <h2>Preload run</h2>
+          <p class="card-lead">
+            Warms the caches by calling this instance for every selected domain. The run is a separate process,
+            so it survives page reloads and is visible from every worker. Raise the timeout above the default
+            30000&nbsp;ms for slow sites — 60000 suits a scheduled run; domains that exceed it are logged as
+            <span class="mono">This operation was aborted</span>.
+          </p>
+          <div class="run-state">
+            <span class="dot" id="run-dot"></span>
+            <span id="run-status">Loading&hellip;</span>
+          </div>
+          <div class="form-grid">
+            <div>
+              <label for="run-source">Source</label>
+              <select id="run-source">
+                <option value="db">Preload database</option>
+                <option value="backlinko">Most popular — Backlinko / Semrush</option>
+                <option value="similarweb">Most visited — SimilarWeb</option>
+                <option value="dataforseo">Highest keyword rank — DataForSEO</option>
+              </select>
+            </div>
+            <div>
+              <label for="run-limit">Limit</label>
+              <input type="number" id="run-limit" min="1" max="1000" value="100">
+            </div>
+            <div id="run-minrank-field">
+              <label for="run-minrank">Min rank</label>
+              <input type="number" id="run-minrank" min="0" value="3">
+            </div>
+            <div>
+              <label for="run-concurrency">Concurrency</label>
+              <input type="number" id="run-concurrency" min="1" max="32" value="4">
+            </div>
+            <div>
+              <label for="run-timeout">Timeout (ms)</label>
+              <input type="number" id="run-timeout" min="1000" max="300000" step="1000" value="30000">
+            </div>
+            <div>
+              <label for="run-adult">Adult / porn domains</label>
+              <select id="run-adult">
+                <option value="include">Include</option>
+                <option value="exclude">Exclude</option>
+              </select>
+            </div>
+          </div>
+          <p class="card-lead" id="run-source-hint" style="margin-top: 0.4rem;">
+            Backlinko is already NSFW-free. SimilarWeb&rsquo;s public ranking is the worldwide top 50
+            (including Adult-category sites); remaining slots up to the limit are filled from Backlinko.
+          </p>
+          <div class="checkbox-row">
+            <label><input type="checkbox" id="run-dry"> Dry run</label>
+            <label><input type="checkbox" id="run-skip-standard"> Skip /{domain}</label>
+            <label><input type="checkbox" id="run-skip-v1"> Skip /api/v1</label>
+            <label><input type="checkbox" id="run-skip-sizes"> Skip sized scraper</label>
+          </div>
+          <p>
+            <button type="button" class="btn-primary" id="run-start">Start run</button>
+            <button type="button" class="btn-secondary" id="preview-open" style="margin-left: 0.4rem;">View list</button>
+            <button type="button" class="btn-secondary btn-danger" id="run-stop" style="margin-left: 0.4rem;">Stop</button>
+            <button type="button" class="btn-secondary" id="run-refresh" style="margin-left: 0.4rem;">Refresh log</button>
+          </p>
+        </div>
+
+        <div class="card">
+          <h2>Schedule with cron</h2>
+          <p class="card-lead">
+            Builds a crontab line from the options above. Cron runs on the host, not inside the
+            container &mdash; paste it with <span class="mono">crontab -e</span>. Dry run is left
+            out so a scheduled job actually warms the cache. For unattended runs, concurrency 2
+            and a 60000&nbsp;ms timeout are the usual values.
+          </p>
+          <div class="form-grid">
+            <div>
+              <label for="cron-schedule">Schedule</label>
+              <select id="cron-schedule">
+                <option value="weekly">Weekly</option>
+                <option value="daily">Daily</option>
+                <option value="weekdays">Weekdays</option>
+                <option value="custom">Custom expression</option>
+              </select>
+            </div>
+            <div id="cron-weekday-wrap">
+              <label for="cron-weekday">Day</label>
+              <select id="cron-weekday">
+                <option value="0" selected>Sunday</option>
+                <option value="1">Monday</option>
+                <option value="2">Tuesday</option>
+                <option value="3">Wednesday</option>
+                <option value="4">Thursday</option>
+                <option value="5">Friday</option>
+                <option value="6">Saturday</option>
+              </select>
+            </div>
+            <div id="cron-time-wrap">
+              <label for="cron-time">Time</label>
+              <input type="time" id="cron-time" value="03:00">
+            </div>
+            <div id="cron-expr-wrap" hidden>
+              <label for="cron-expr">Cron expression</label>
+              <input type="text" id="cron-expr" value="0 3 * * 0" spellcheck="false"
+                     placeholder="0 3 * * 0">
+            </div>
+            <div>
+              <label for="cron-invoke">Run with</label>
+              <select id="cron-invoke">
+                <option value="exec">docker exec</option>
+                <option value="compose">docker compose exec</option>
+              </select>
+            </div>
+            <div>
+              <label for="cron-name" id="cron-name-label">Container name</label>
+              <input type="text" id="cron-name" value="favicon-api" spellcheck="false">
+            </div>
+            <div>
+              <label for="cron-docker">Docker binary</label>
+              <input type="text" id="cron-docker" value="/usr/bin/docker" spellcheck="false">
+            </div>
+            <div>
+              <label for="cron-log-file">Log file</label>
+              <input type="text" id="cron-log-file" value="/var/log/favicon-preload.log" spellcheck="false">
+            </div>
+            <div id="cron-compose-wrap" hidden style="grid-column: 1 / -1;">
+              <label for="cron-compose-file">Compose file</label>
+              <input type="text" id="cron-compose-file" value="/opt/favicon-api/docker-compose.yml"
+                     spellcheck="false" placeholder="/opt/favicon-api/docker-compose.yml">
+            </div>
+          </div>
+          <div class="checkbox-row" id="cron-recalc-wrap">
+            <label>
+              <input type="checkbox" id="cron-recalc">
+              Recalculate ranks first
+            </label>
+            <label id="cron-recalc-months-wrap" hidden>
+              Months
+              <input type="number" id="cron-recalc-months" min="1" max="24" value="3" style="width: 4.5rem;">
+            </label>
+          </div>
+          <div class="cron-toolbar">
+            <span class="muted">Host crontab line</span>
+            <span>
+              <button type="button" class="btn-secondary btn-small" id="cron-recommended">Recommended values</button>
+              <button type="button" class="btn-secondary btn-small" id="cron-copy">Copy</button>
+            </span>
+          </div>
+          <pre class="log cron-output" id="cron-output"></pre>
+          <ul class="cron-hint">
+            <li>Cron&rsquo;s <span class="mono">PATH</span> is minimal &mdash; keep the full path from <span class="mono">which docker</span>.</li>
+            <li>Match the container or Compose service name from <span class="mono">docker ps</span>.</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h2>Log</h2>
+          <pre class="log" id="run-log">No run has been started yet.</pre>
+        </div>
+      </section>
+    </main>
+
+    <footer class="page-footer">
+      <a class="footer-brand" href="https://faviconapi.com" target="_blank" rel="noopener">FaviconAPI</a>
+      <span class="footer-version">v__VERSION__</span>
+    </footer>
+  </div>
+
+  <div class="modal" id="preview-modal" hidden>
+    <div class="modal-backdrop" id="preview-dismiss"></div>
+    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="preview-title">
+      <div class="modal-head">
+        <h2 id="preview-title">Set contents</h2>
+        <button type="button" class="btn-secondary btn-small" id="preview-close">Close</button>
+      </div>
+      <p class="card-lead" id="preview-meta" style="margin-bottom: 0;"></p>
+      <div class="preview-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Domain</th>
+              <th>Adult</th>
+            </tr>
+          </thead>
+          <tbody id="preview-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const DOMAIN_COLS = ['rank', 'state', 'source', 'fails', 'last', 'icon'];
+    const SORT_FIELDS = { domain: 1, rank: 1, state: 1, source: 1, fails: 1, last: 1, icon: 1 };
+    const TABLE_PREFS_KEY = 'favicon-admin-domains';
+
+    function readTablePrefs() {
+      try {
+        const raw = JSON.parse(localStorage.getItem(TABLE_PREFS_KEY) || '{}');
+        const hidden = new Set(
+          Array.isArray(raw.hidden) ? raw.hidden.filter((id) => DOMAIN_COLS.includes(id)) : []
+        );
+        return {
+          hidden,
+          sort: SORT_FIELDS[raw.sort] ? raw.sort : 'rank',
+          dir: raw.dir === 'asc' || raw.dir === 'desc' ? raw.dir : 'desc',
+        };
+      } catch {
+        return { hidden: new Set(), sort: 'rank', dir: 'desc' };
+      }
+    }
+
+    const tablePrefs = readTablePrefs();
+    const state = {
+      offset: 0,
+      limit: 50,
+      total: 0,
+      tab: 'domains',
+      runTimer: null,
+      previewSeq: 0,
+      sort: tablePrefs.sort,
+      dir: tablePrefs.dir,
+      hiddenCols: tablePrefs.hidden,
+    };
+
+    const $ = (id) => document.getElementById(id);
+
+    function esc(value) {
+      return String(value === null || value === undefined ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    let toastTimer = null;
+    function toast(message, isError) {
+      const el = $('toast');
+      el.textContent = message;
+      el.classList.toggle('error', Boolean(isError));
+      el.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => el.classList.remove('show'), isError ? 5000 : 2500);
+    }
+
+    /** Fetch wrapper: adds the same-origin marker and turns 401 into the login view. */
+    async function api(path, options) {
+      const opts = Object.assign({ method: 'GET', credentials: 'same-origin' }, options || {});
+      opts.headers = Object.assign({ 'X-Admin-Request': '1' }, opts.headers || {});
+      if (opts.body !== undefined && typeof opts.body !== 'string') {
+        opts.headers['Content-Type'] = 'application/json';
+        opts.body = JSON.stringify(opts.body);
+      }
+
+      const res = await fetch('/admin/api' + path, opts);
+      if (res.status === 401) {
+        showLogin();
+        throw new Error('Your session expired. Sign in again.');
+      }
+
+      const text = await res.text();
+      let data = null;
+      try {
+        data = text ? JSON.parse(text) : null;
+      } catch {
+        data = null;
+      }
+      if (!res.ok) throw new Error((data && data.error) || 'Request failed (' + res.status + ').');
+      return data;
+    }
+
+    function showLogin(message) {
+      $('app-view').hidden = true;
+      $('session-bar').hidden = true;
+      $('login-view').hidden = false;
+      stopRunPolling();
+      const box = $('login-error');
+      box.hidden = !message;
+      if (message) box.textContent = message;
+      $('login-password').value = '';
+      const user = $('login-user');
+      (user.value ? $('login-password') : user).focus();
+    }
+
+    function showApp(session) {
+      $('login-view').hidden = true;
+      $('app-view').hidden = false;
+      $('session-bar').hidden = false;
+      $('session-user').textContent = session.sub || 'admin';
+    }
+
+    // --- domains --------------------------------------------------------------
+
+    function stateBadges(row) {
+      return row.enabled
+        ? '<button type="button" class="badge badge-on" data-state-filter="enabled">on</button>'
+        : '<button type="button" class="badge badge-off" data-state-filter="disabled">off</button>';
+    }
+
+    function domainRow(row) {
+      const domain = esc(row.domain);
+      const last = row.lastPreloadedAt ? esc(row.lastPreloadedAt.slice(0, 16).replace('T', ' ')) : '&ndash;';
+      const result = row.lastPreloadResult ? '<div class="muted mono">' + esc(row.lastPreloadResult) + '</div>' : '';
+      const pinned = row.rankSource === 'manual';
+      const source = esc(row.source) + (row.sourceRank > 0 ? ' <span class="list-pos">#' + esc(row.sourceRank) + '</span>' : '');
+      return (
+        '<tr data-domain="' + domain + '">' +
+        '<td class="check-col"><input type="checkbox" class="row-check" aria-label="Select ' + domain + '"></td>' +
+        '<td class="domain col-domain">' + domain + '</td>' +
+        '<td class="numeric col-rank"><input type="number" min="0" value="' + esc(row.rank) + '" data-field="rank"' +
+          (pinned ? ' title="Pinned — Recalculate will not overwrite this"' : '') + '>' +
+          (pinned ? '<span class="rank-pin" title="Pinned — Recalculate will not overwrite this">*</span>' : '') +
+        '</td>' +
+        '<td class="col-state">' + stateBadges(row) + '</td>' +
+        '<td class="muted col-source">' + source + '</td>' +
+        '<td class="muted col-fails">' + esc(row.failCount) + '</td>' +
+        '<td class="muted mono col-last">' + last + result + '</td>' +
+        '<td class="icon-url col-icon"><input type="url" placeholder="https://..." value="' + esc(row.alterIconUrl || '') + '" data-field="iconUrl"></td>' +
+        '<td class="actions">' +
+        '<button type="button" class="btn-secondary btn-small" data-action="save">Save</button>' +
+        '<button type="button" class="btn-secondary btn-small" data-action="toggle">' + (row.enabled ? 'Disable' : 'Enable') + '</button>' +
+        '<button type="button" class="btn-secondary btn-small btn-danger" data-action="delete">Delete</button>' +
+        '</td></tr>'
+      );
+    }
+
+    function saveTablePrefs() {
+      localStorage.setItem(
+        TABLE_PREFS_KEY,
+        JSON.stringify({
+          sort: state.sort,
+          dir: state.dir,
+          hidden: Array.from(state.hiddenCols),
+        })
+      );
+    }
+
+    function syncSortHeaders() {
+      document.querySelectorAll('#panel-domains th.sortable').forEach((th) => {
+        const field = th.getAttribute('data-sort');
+        const active = field === state.sort;
+        th.classList.toggle('sorted', active);
+        th.setAttribute('aria-sort', active ? (state.dir === 'asc' ? 'ascending' : 'descending') : 'none');
+        const mark = th.querySelector('.sort-ind');
+        if (mark) mark.textContent = active ? (state.dir === 'asc' ? '\u25B2' : '\u25BC') : '\u2195';
+      });
+    }
+
+    function applyColumnVisibility() {
+      const table = document.querySelector('#panel-domains .table-wrap table');
+      DOMAIN_COLS.forEach((id) => {
+        table.classList.toggle('hide-' + id, state.hiddenCols.has(id));
+        const input = document.querySelector('#columns-menu [data-col="' + id + '"]');
+        if (input) input.checked = !state.hiddenCols.has(id);
+      });
+    }
+
+    function closeColumnsMenu() {
+      $('columns-menu').hidden = true;
+      $('columns-btn').setAttribute('aria-expanded', 'false');
+    }
+
+    async function loadDomains() {
+      const params = new URLSearchParams({
+        query: $('filter-query').value.trim(),
+        status: $('filter-status').value,
+        sort: state.sort,
+        dir: state.dir,
+        limit: String(state.limit),
+        offset: String(state.offset),
+      });
+      const data = await api('/domains?' + params.toString());
+      state.total = data.total;
+      if (data.sort) state.sort = data.sort;
+      if (data.dir) state.dir = data.dir;
+      $('domains-body').innerHTML = data.rows.map(domainRow).join('');
+      $('domains-empty').hidden = data.rows.length > 0;
+      lastCheckedRow = null;
+      syncDomainSelection();
+      syncSortHeaders();
+      applyColumnVisibility();
+
+      const from = data.total === 0 ? 0 : state.offset + 1;
+      const to = Math.min(state.offset + state.limit, data.total);
+      $('domains-count').textContent = 'Showing ' + from + '\u2013' + to + ' of ' + data.total;
+      $('page-prev').disabled = state.offset === 0;
+      $('page-next').disabled = to >= data.total;
+    }
+
+    function selectedDomainChecks() {
+      return Array.from(document.querySelectorAll('#domains-body input.row-check'));
+    }
+
+    function selectedDomains() {
+      return selectedDomainChecks()
+        .filter((input) => input.checked)
+        .map((input) => input.closest('tr').getAttribute('data-domain'));
+    }
+
+    function syncDomainSelection() {
+      const checks = selectedDomainChecks();
+      const picked = checks.filter((input) => input.checked).length;
+      const all = $('domains-select-all');
+      all.checked = checks.length > 0 && picked === checks.length;
+      all.indeterminate = picked > 0 && picked < checks.length;
+      $('domains-bulk').hidden = picked === 0;
+      $('domains-bulk-count').textContent = picked === 1 ? '1 selected' : picked + ' selected';
+    }
+
+    let lastCheckedRow = null;
+    function onDomainCheck(event) {
+      const input = event.target.closest('input.row-check');
+      if (!input) return;
+      const checks = selectedDomainChecks();
+      if (event.shiftKey && lastCheckedRow) {
+        const from = checks.indexOf(lastCheckedRow);
+        const to = checks.indexOf(input);
+        if (from >= 0 && to >= 0) {
+          const start = Math.min(from, to);
+          const end = Math.max(from, to);
+          for (let i = start; i <= end; i += 1) checks[i].checked = input.checked;
+        }
+      }
+      lastCheckedRow = input;
+      syncDomainSelection();
+    }
+
+    function onSelectAllDomains(event) {
+      const checked = event.target.checked;
+      selectedDomainChecks().forEach((input) => {
+        input.checked = checked;
+      });
+      lastCheckedRow = null;
+      syncDomainSelection();
+    }
+
+    async function onBulkDomains(action) {
+      const domains = selectedDomains();
+      if (!domains.length) return;
+      if (action === 'delete') {
+        const message = domains.length === 1
+          ? 'Remove ' + domains[0] + ' and its hit history?'
+          : 'Remove ' + domains.length + ' selected domains and their hit history?';
+        if (!confirm(message)) return;
+      }
+
+      const disableBtn = $('bulk-disable');
+      const enableBtn = $('bulk-enable');
+      const deleteBtn = $('bulk-delete');
+      disableBtn.disabled = true;
+      enableBtn.disabled = true;
+      deleteBtn.disabled = true;
+      try {
+        const data = await api('/domains/bulk', { method: 'POST', body: { action, domains } });
+        const bits = [data.changed + (action === 'delete' ? ' removed' : action === 'enable' ? ' enabled' : ' disabled')];
+        if (data.blocked && data.blocked.length) bits.push(data.blocked.length + ' blocked');
+        toast(bits.join(', '));
+        await loadDomains();
+      } catch (err) {
+        toast(err.message, true);
+      } finally {
+        disableBtn.disabled = false;
+        enableBtn.disabled = false;
+        deleteBtn.disabled = false;
+      }
+    }
+
+    async function onDomainAction(event) {
+      const button = event.target.closest('button[data-action]');
+      if (!button) return;
+      const tr = button.closest('tr');
+      const domain = tr.getAttribute('data-domain');
+      const action = button.getAttribute('data-action');
+      button.disabled = true;
+
+      try {
+        if (action === 'save') {
+          const body = {
+            rank: tr.querySelector('[data-field="rank"]').value,
+            iconUrl: tr.querySelector('[data-field="iconUrl"]').value.trim(),
+          };
+          await api('/domains/' + encodeURIComponent(domain), { method: 'PATCH', body });
+          toast('Saved ' + domain);
+        } else if (action === 'toggle') {
+          const enable = button.textContent.trim() === 'Enable';
+          await api('/domains/' + encodeURIComponent(domain), { method: 'PATCH', body: { enabled: enable } });
+          toast((enable ? 'Enabled ' : 'Disabled ') + domain);
+        } else if (action === 'delete') {
+          if (!confirm('Remove ' + domain + ' and its hit history?')) return;
+          await api('/domains/' + encodeURIComponent(domain), { method: 'DELETE' });
+          toast('Removed ' + domain);
+        }
+        await loadDomains();
+      } catch (err) {
+        toast(err.message, true);
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    async function onAddDomain(event) {
+      event.preventDefault();
+      const body = {
+        domain: $('add-domain').value.trim(),
+        rank: $('add-rank').value,
+        iconUrl: $('add-icon').value.trim(),
+      };
+      try {
+        await api('/domains', { method: 'POST', body });
+        toast('Added ' + body.domain);
+        $('add-domain').value = '';
+        $('add-rank').value = '';
+        $('add-icon').value = '';
+        state.offset = 0;
+        await loadDomains();
+      } catch (err) {
+        toast(err.message, true);
+      }
+    }
+
+    // --- blocklist ------------------------------------------------------------
+
+    async function loadBlocklist() {
+      const data = await api('/blocklist');
+      $('blocklist-body').innerHTML = data.rows
+        .map((row) =>
+          '<tr>' +
+          '<td class="domain mono">' + esc(row.pattern) + '</td>' +
+          '<td class="muted">' + esc(row.reason || '') + '</td>' +
+          '<td class="muted mono">' + esc((row.createdAt || '').slice(0, 10)) + '</td>' +
+          '<td class="actions"><button type="button" class="btn-secondary btn-small btn-danger" data-pattern="' +
+          esc(row.pattern) + '">Unblock</button></td>' +
+          '</tr>'
+        )
+        .join('');
+      $('blocklist-empty').hidden = data.rows.length > 0;
+    }
+
+    async function onBlockAction(event) {
+      const button = event.target.closest('button[data-pattern]');
+      if (!button) return;
+      const pattern = button.getAttribute('data-pattern');
+      button.disabled = true;
+      try {
+        await api('/blocklist?pattern=' + encodeURIComponent(pattern), { method: 'DELETE' });
+        toast('Unblocked ' + pattern);
+        await loadBlocklist();
+      } catch (err) {
+        toast(err.message, true);
+        button.disabled = false;
+      }
+    }
+
+    async function onBlock(event) {
+      event.preventDefault();
+      const pattern = $('block-pattern').value.trim();
+      try {
+        const data = await api('/blocklist', {
+          method: 'POST',
+          body: { pattern, reason: $('block-reason').value.trim() },
+        });
+        toast('Blocked ' + data.pattern + (data.disabled ? ' (' + data.disabled + ' disabled)' : ''));
+        $('block-pattern').value = '';
+        $('block-reason').value = '';
+        await loadBlocklist();
+      } catch (err) {
+        toast(err.message, true);
+      }
+    }
+
+    // --- stats ----------------------------------------------------------------
+
+    async function loadStats() {
+      const data = await api('/stats');
+      const cards = [
+        { label: 'Domains', value: data.total },
+        { label: 'Enabled', value: data.enabled },
+        { label: 'Icon overrides', value: data.overrides },
+        { label: 'Blocklist patterns', value: data.blocked },
+      ];
+      $('stat-grid').innerHTML = cards
+        .map((c) => '<div class="stat"><div class="value">' + esc(c.value) + '</div><div class="label">' + c.label + '</div></div>')
+        .join('');
+
+      const config = data.config || {};
+      $('stat-config').innerHTML =
+        '<dt>Database</dt><dd>' + esc(config.dbPath) + '</dd>' +
+        '<dt>Hit counting</dt><dd>' + (config.trackHits ? 'enabled' : 'disabled') + '</dd>' +
+        '<dt>Min rank for preload</dt><dd>' + esc(config.minRank) + '</dd>' +
+        '<dt>Rank window</dt><dd>' + esc(config.rankMonths) + ' months</dd>' +
+        '<dt>Auto-disable after</dt><dd>' + esc(config.autoDisableAfter) + ' failed runs</dd>' +
+        '<dt>Override reload</dt><dd>' + esc(config.overrideReloadMs) + ' ms</dd>';
+
+      const hits = data.hits || [];
+      $('hits-body').innerHTML = hits
+        .map((row) =>
+          '<tr><td class="mono">' + esc(row.period) + '</td><td>' + esc(row.hits) + '</td><td class="muted">' +
+          esc(row.domains) + '</td></tr>'
+        )
+        .join('');
+      $('hits-empty').hidden = hits.length > 0;
+      if (config.rankMonths) $('recalc-months').value = config.rankMonths;
+    }
+
+    async function onRecalc() {
+      const button = $('recalc-btn');
+      button.disabled = true;
+      try {
+        const data = await api('/recalc', { method: 'POST', body: { months: $('recalc-months').value } });
+        toast('Recalculated ' + data.changed + ' domains over ' + data.months + ' months');
+        await loadStats();
+      } catch (err) {
+        toast(err.message, true);
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    // --- CSV ------------------------------------------------------------------
+
+    async function onImport() {
+      const csv = $('import-csv').value;
+      const button = $('import-btn');
+      const box = $('import-result');
+      button.disabled = true;
+      try {
+        const data = await api('/import', { method: 'POST', body: { csv } });
+        let message = 'Imported ' + data.imported + ' of ' + data.total + ' rows';
+        if (data.skipped) message += ', skipped ' + data.skipped + ' (blocked)';
+        if (data.invalid) message += ', ' + data.invalid + ' invalid';
+        box.textContent = message + '.';
+        box.hidden = false;
+        toast('Import finished');
+      } catch (err) {
+        box.hidden = true;
+        toast(err.message, true);
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    function onImportFile(event) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        $('import-csv').value = String(reader.result || '');
+        toast('Loaded ' + file.name);
+      };
+      reader.readAsText(file);
+    }
+
+    // --- preload run ----------------------------------------------------------
+
+    function renderRun(status) {
+      const dot = $('run-dot');
+      dot.className = 'dot';
+      let text;
+      if (status.running) {
+        dot.classList.add('running');
+        text = 'Running since ' + status.startedAt + ' (pid ' + status.pid + ')';
+      } else if (status.state === 'finished') {
+        dot.classList.add('finished');
+        text = 'Finished at ' + status.finishedAt;
+      } else if (status.state === 'failed') {
+        dot.classList.add('failed');
+        text = 'Failed at ' + status.finishedAt + ' (exit code ' + status.exitCode + ')';
+      } else if (status.state === 'interrupted') {
+        dot.classList.add('failed');
+        text = 'Interrupted \u2014 the process disappeared before it finished';
+      } else {
+        text = 'Idle';
+      }
+      $('run-status').textContent = text;
+      $('run-start').disabled = Boolean(status.running);
+      $('run-stop').disabled = !status.running;
+
+      const log = $('run-log');
+      const atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 40;
+      log.textContent = status.log ? status.log : 'No run has been started yet.';
+      if (atBottom) log.scrollTop = log.scrollHeight;
+    }
+
+    async function loadRun() {
+      const status = await api('/preload/run');
+      renderRun(status);
+      if (status.running) startRunPolling();
+      else stopRunPolling();
+    }
+
+    function startRunPolling() {
+      if (state.runTimer) return;
+      state.runTimer = setInterval(() => {
+        loadRun().catch(() => stopRunPolling());
+      }, 3000);
+    }
+
+    function stopRunPolling() {
+      if (!state.runTimer) return;
+      clearInterval(state.runTimer);
+      state.runTimer = null;
+    }
+
+    async function onStartRun() {
+      const body = {
+        source: $('run-source').value,
+        limit: $('run-limit').value,
+        minRank: $('run-minrank').value,
+        concurrency: $('run-concurrency').value,
+        timeout: $('run-timeout').value,
+        adult: $('run-adult').value,
+        excludeAdult: $('run-adult').value === 'exclude',
+        dryRun: $('run-dry').checked,
+        skipStandard: $('run-skip-standard').checked,
+        skipV1: $('run-skip-v1').checked,
+        skipSizes: $('run-skip-sizes').checked,
+      };
+      $('run-start').disabled = true;
+      try {
+        await api('/preload/run', { method: 'POST', body });
+        toast('Preload run started');
+        await loadRun();
+        startRunPolling();
+      } catch (err) {
+        toast(err.message, true);
+        $('run-start').disabled = false;
+      }
+    }
+
+    async function onStopRun() {
+      try {
+        await api('/preload/stop', { method: 'POST' });
+        toast('Stop signal sent');
+        await loadRun();
+      } catch (err) {
+        toast(err.message, true);
+      }
+    }
+
+    function closePreview() {
+      $('preview-modal').hidden = true;
+    }
+
+    async function openPreview() {
+      $('preview-modal').hidden = false;
+      $('preview-title').textContent = 'Set contents';
+      $('preview-meta').textContent = 'Loading…';
+      $('preview-body').innerHTML = '<tr><td colspan="3" class="muted">Loading&hellip;</td></tr>';
+      await loadPreview();
+    }
+
+    async function loadPreview() {
+      const seq = (state.previewSeq += 1);
+      const source = runSource();
+      const params = new URLSearchParams({
+        source: source,
+        limit: String(clampInt($('run-limit').value, 100, 1, 1000)),
+        adult: $('run-adult').value === 'exclude' ? 'exclude' : 'include',
+      });
+      if (source === 'db') params.set('minRank', String(clampInt($('run-minrank').value, 3, 0, 1e9)));
+      let data;
+      try {
+        data = await api('/preload/preview?' + params.toString());
+      } catch (err) {
+        if (seq !== state.previewSeq) return;
+        $('preview-title').textContent = 'Set contents';
+        $('preview-meta').textContent = err.message;
+        $('preview-body').innerHTML = '<tr><td colspan="3" class="muted">Could not load this set.</td></tr>';
+        throw err;
+      }
+      if (seq !== state.previewSeq) return;
+
+      const bits = [data.count + ' domains'];
+      if (data.excludeAdult) bits.push('adult excluded');
+      $('preview-title').textContent = data.title;
+      $('preview-meta').textContent = bits.join(' · ');
+
+      if (!data.domains.length) {
+        $('preview-body').innerHTML = '<tr><td colspan="3" class="muted">No domains in this set.</td></tr>';
+        return;
+      }
+      $('preview-body').innerHTML = data.domains.map((row) => {
+        const adult = row.adult
+          ? '<span class="badge badge-adult">adult</span>'
+          : '<span class="muted">—</span>';
+        return '<tr>' +
+          '<td class="preview-rank">' + String(row.rank).padStart(2, '0') + '</td>' +
+          '<td class="domain">' + esc(row.domain) + '</td>' +
+          '<td class="preview-adult">' + adult + '</td>' +
+          '</tr>';
+      }).join('');
+    }
+
+    // --- cron command generator -----------------------------------------------
+
+    function clampInt(raw, fallback, min, max) {
+      const val = parseInt(raw, 10);
+      if (!Number.isFinite(val)) return fallback;
+      return Math.min(max, Math.max(min, val));
+    }
+
+    function shellQuote(value) {
+      const s = String(value);
+      if (s === '') return "''";
+      if (/^[A-Za-z0-9_./:=+-]+$/.test(s)) return s;
+      return "'" + s.replace(/'/g, "'\\''") + "'";
+    }
+
+    function runSource() {
+      const v = $('run-source').value;
+      if (v === 'similarweb' || v === 'backlinko' || v === 'dataforseo') return v;
+      return 'db';
+    }
+
+    function cronScheduleExpr() {
+      const preset = $('cron-schedule').value;
+      if (preset === 'custom') return ($('cron-expr').value.trim() || '0 3 * * 0');
+      const parts = ($('cron-time').value || '03:00').split(':');
+      const hour = clampInt(parts[0], 3, 0, 23);
+      const minute = clampInt(parts[1], 0, 0, 59);
+      if (preset === 'daily') return minute + ' ' + hour + ' * * *';
+      if (preset === 'weekdays') return minute + ' ' + hour + ' * * 1-5';
+      return minute + ' ' + hour + ' * * ' + ($('cron-weekday').value || '0');
+    }
+
+    function cronScheduleLabel() {
+      const preset = $('cron-schedule').value;
+      const time = $('cron-time').value || '03:00';
+      if (preset === 'custom') return 'custom (' + cronScheduleExpr() + ')';
+      if (preset === 'daily') return 'daily at ' + time;
+      if (preset === 'weekdays') return 'weekdays at ' + time;
+      const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      return 'weekly on ' + (days[parseInt($('cron-weekday').value, 10)] || 'Sunday') + ' at ' + time;
+    }
+
+    function dockerPrefix() {
+      const docker = shellQuote($('cron-docker').value.trim() || '/usr/bin/docker');
+      const name = shellQuote($('cron-name').value.trim() || 'favicon-api');
+      if ($('cron-invoke').value === 'compose') {
+        const file = $('cron-compose-file').value.trim();
+        return docker + ' compose' + (file ? ' -f ' + shellQuote(file) : '') + ' exec -T ' + name;
+      }
+      return docker + ' exec ' + name;
+    }
+
+    function buildPreloadArgv() {
+      const source = runSource();
+      const args = [
+        'node', 'scripts/preload-top-sites.js',
+        '--source', source,
+        '--base-url', 'http://127.0.0.1:3000',
+        '--limit', String(clampInt($('run-limit').value, 100, 1, 1000)),
+        '--concurrency', String(clampInt($('run-concurrency').value, 4, 1, 32)),
+        '--timeout', String(clampInt($('run-timeout').value, 30000, 1000, 300000)),
+      ];
+      if (source === 'db') {
+        args.push('--min-rank', String(clampInt($('run-minrank').value, 3, 0, 1e9)));
+      }
+      args.push('--adult', $('run-adult').value === 'exclude' ? 'exclude' : 'include');
+      if ($('run-skip-standard').checked) args.push('--skip-standard');
+      if ($('run-skip-v1').checked) args.push('--skip-v1');
+      if ($('run-skip-sizes').checked) args.push('--skip-sizes');
+      return args;
+    }
+
+    function updateCronCommand() {
+      const source = runSource();
+      const schedule = $('cron-schedule').value;
+      const compose = $('cron-invoke').value === 'compose';
+      $('run-minrank-field').hidden = source !== 'db';
+      $('cron-weekday-wrap').hidden = schedule !== 'weekly';
+      $('cron-time-wrap').hidden = schedule === 'custom';
+      $('cron-expr-wrap').hidden = schedule !== 'custom';
+      $('cron-compose-wrap').hidden = !compose;
+      $('cron-recalc-wrap').hidden = source !== 'db';
+      $('cron-recalc-months-wrap').hidden = source !== 'db' || !$('cron-recalc').checked;
+      $('cron-name-label').textContent = compose ? 'Service name' : 'Container name';
+
+      const prefix = dockerPrefix();
+      const preload = prefix + ' ' + buildPreloadArgv().map(shellQuote).join(' ');
+      let command = preload;
+      if (source === 'db' && $('cron-recalc').checked) {
+        const months = clampInt($('cron-recalc-months').value, 3, 1, 24);
+        const recalc = prefix + ' node scripts/manage-preload.js recalc --months ' + months;
+        command = '{ ' + recalc + ' && ' + preload + '; }';
+      }
+      const logFile = $('cron-log-file').value.trim();
+      const line = cronScheduleExpr() + ' ' + command + (logFile ? ' >> ' + shellQuote(logFile) + ' 2>&1' : '');
+      $('cron-output').textContent = '# FaviconAPI preload \u2014 ' + cronScheduleLabel() + '\n' + line;
+    }
+
+    function onCronRecommended() {
+      $('run-concurrency').value = 2;
+      $('run-timeout').value = 60000;
+      $('cron-schedule').value = 'weekly';
+      $('cron-weekday').value = '0';
+      $('cron-time').value = '03:00';
+      updateCronCommand();
+      toast('Set weekly Sunday 03:00, concurrency 2, timeout 60000');
+    }
+
+    async function onCopyCron() {
+      const text = $('cron-output').textContent;
+      try {
+        await navigator.clipboard.writeText(text);
+        toast('Copied crontab line');
+      } catch {
+        const range = document.createRange();
+        range.selectNodeContents($('cron-output'));
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+        toast('Select the command and copy it', true);
+      }
+    }
+
+    // --- tabs + wiring --------------------------------------------------------
+
+    const LOADERS = {
+      domains: loadDomains,
+      blocklist: loadBlocklist,
+      stats: loadStats,
+      csv: async () => {},
+      run: loadRun,
+    };
+
+    async function selectTab(name) {
+      state.tab = name;
+      document.querySelectorAll('.tab').forEach((tab) => {
+        tab.classList.toggle('active', tab.getAttribute('data-tab') === name);
+      });
+      document.querySelectorAll('.panel').forEach((panel) => {
+        panel.hidden = panel.id !== 'panel-' + name;
+      });
+      if (name !== 'run') stopRunPolling();
+      if (name === 'run') updateCronCommand();
+      try {
+        await LOADERS[name]();
+      } catch (err) {
+        toast(err.message, true);
+      }
+    }
+
+    async function onLogin(event) {
+      event.preventDefault();
+      const button = $('login-btn');
+      const box = $('login-error');
+      const username = $('login-user').value.trim();
+      const password = $('login-password').value;
+      const remember = $('login-remember').checked;
+      if (!username || !password) return;
+
+      button.disabled = true;
+      box.hidden = true;
+      try {
+        const res = await fetch('/admin/login', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', 'X-Admin-Request': '1' },
+          body: JSON.stringify({ username, password, remember }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Sign-in failed.');
+        $('login-password').value = '';
+        showApp({ sub: data.sub });
+        await selectTab('domains');
+      } catch (err) {
+        box.textContent = err.message;
+        box.hidden = false;
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    async function onSignOut() {
+      try {
+        await fetch('/admin/logout', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'X-Admin-Request': '1' },
+        });
+      } catch {
+        /* signing out locally is enough */
+      }
+      showLogin();
+    }
+
+    let debounceTimer = null;
+    function onFilterInput() {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        state.offset = 0;
+        loadDomains().catch((err) => toast(err.message, true));
+      }, 250);
+    }
+
+    document.querySelectorAll('.tab').forEach((tab) => {
+      tab.addEventListener('click', () => selectTab(tab.getAttribute('data-tab')));
+    });
+
+    $('login-form').addEventListener('submit', onLogin);
+    $('signout-btn').addEventListener('click', onSignOut);
+    $('add-form').addEventListener('submit', onAddDomain);
+    $('domains-body').addEventListener('click', onDomainAction);
+    $('domains-body').addEventListener('click', onDomainCheck);
+    $('domains-body').addEventListener('click', (event) => {
+      const badge = event.target.closest('[data-state-filter]');
+      if (!badge) return;
+      const value = badge.getAttribute('data-state-filter');
+      const select = $('filter-status');
+      select.value = select.value === value ? 'all' : value;
+      state.offset = 0;
+      loadDomains().catch((err) => toast(err.message, true));
+    });
+    document.querySelector('#panel-domains thead').addEventListener('click', (event) => {
+      const button = event.target.closest('.th-sort');
+      if (!button) return;
+      const field = button.closest('th').getAttribute('data-sort');
+      if (!SORT_FIELDS[field]) return;
+      if (state.sort === field) {
+        state.dir = state.dir === 'asc' ? 'desc' : 'asc';
+      } else {
+        state.sort = field;
+        state.dir = field === 'domain' || field === 'source' || field === 'icon' ? 'asc' : 'desc';
+      }
+      state.offset = 0;
+      saveTablePrefs();
+      loadDomains().catch((err) => toast(err.message, true));
+    });
+    $('columns-btn').addEventListener('click', (event) => {
+      event.stopPropagation();
+      const menu = $('columns-menu');
+      const open = menu.hidden;
+      menu.hidden = !open;
+      $('columns-btn').setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+    $('columns-menu').addEventListener('change', (event) => {
+      const input = event.target.closest('input[data-col]');
+      if (!input) return;
+      const id = input.getAttribute('data-col');
+      if (!DOMAIN_COLS.includes(id)) return;
+      if (input.checked) state.hiddenCols.delete(id);
+      else state.hiddenCols.add(id);
+      saveTablePrefs();
+      applyColumnVisibility();
+    });
+    document.addEventListener('click', (event) => {
+      if ($('columns-menu').hidden) return;
+      if (event.target.closest('#columns-menu') || event.target.closest('#columns-btn')) return;
+      closeColumnsMenu();
+    });
+    $('domains-select-all').addEventListener('change', onSelectAllDomains);
+    $('bulk-disable').addEventListener('click', () => onBulkDomains('disable'));
+    $('bulk-enable').addEventListener('click', () => onBulkDomains('enable'));
+    $('bulk-delete').addEventListener('click', () => onBulkDomains('delete'));
+    $('domains-refresh').addEventListener('click', () => loadDomains().catch((err) => toast(err.message, true)));
+    $('filter-query').addEventListener('input', onFilterInput);
+    $('filter-status').addEventListener('change', () => {
+      state.offset = 0;
+      loadDomains().catch((err) => toast(err.message, true));
+    });
+    $('filter-limit').addEventListener('change', () => {
+      state.limit = parseInt($('filter-limit').value, 10) || 50;
+      state.offset = 0;
+      loadDomains().catch((err) => toast(err.message, true));
+    });
+    $('page-prev').addEventListener('click', () => {
+      state.offset = Math.max(0, state.offset - state.limit);
+      loadDomains().catch((err) => toast(err.message, true));
+    });
+    $('page-next').addEventListener('click', () => {
+      if (state.offset + state.limit >= state.total) return;
+      state.offset += state.limit;
+      loadDomains().catch((err) => toast(err.message, true));
+    });
+    $('block-form').addEventListener('submit', onBlock);
+    $('blocklist-body').addEventListener('click', onBlockAction);
+    $('seed-btn').addEventListener('click', async () => {
+      if (!confirm('Add a wildcard block for every built-in service/infra domain?')) return;
+      try {
+        const data = await api('/blocklist/seed', { method: 'POST' });
+        toast('Seeded ' + data.added + ' patterns (' + data.disabled + ' domains disabled)');
+        await loadBlocklist();
+      } catch (err) {
+        toast(err.message, true);
+      }
+    });
+    $('recalc-btn').addEventListener('click', onRecalc);
+    $('import-btn').addEventListener('click', onImport);
+    $('import-file').addEventListener('change', onImportFile);
+    $('run-start').addEventListener('click', onStartRun);
+    $('run-stop').addEventListener('click', onStopRun);
+    $('run-refresh').addEventListener('click', () => loadRun().catch((err) => toast(err.message, true)));
+    $('preview-open').addEventListener('click', () => {
+      openPreview().catch((err) => toast(err.message, true));
+    });
+    $('preview-close').addEventListener('click', closePreview);
+    $('preview-dismiss').addEventListener('click', closePreview);
+    document.addEventListener('keydown', (event) => {
+      if (event.key !== 'Escape') return;
+      if (!$('columns-menu').hidden) {
+        closeColumnsMenu();
+        return;
+      }
+      if (!$('preview-modal').hidden) closePreview();
+    });
+    $('panel-run').addEventListener('input', updateCronCommand);
+    $('panel-run').addEventListener('change', updateCronCommand);
+    $('cron-recommended').addEventListener('click', onCronRecommended);
+    $('cron-copy').addEventListener('click', onCopyCron);
+
+    applyColumnVisibility();
+    syncSortHeaders();
+
+    (async function init() {
+      try {
+        const session = await api('/session');
+        showApp(session);
+        await selectTab('domains');
+      } catch {
+        showLogin();
+      }
+    })();
+  </script>
+</body>
+</html>
