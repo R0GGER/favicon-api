@@ -1,5 +1,9 @@
 FROM node:22-alpine AS deps
 WORKDIR /app
+# Keep npm's "new version available" banner out of build logs and out of the
+# output of `docker compose exec … npm run …`, where it buries the lines the
+# operator has to copy.
+ENV NPM_CONFIG_UPDATE_NOTIFIER=false
 # Build toolchain is only needed when prebuilt native binaries are unavailable
 # for the current arch (e.g. better-sqlite3 on alpine/musl). It is dropped
 # entirely in the final runtime image below.
@@ -27,6 +31,7 @@ RUN sed -i 's/\r$//' /docker-entrypoint.sh && chmod +x /docker-entrypoint.sh
 USER app
 ENV NODE_ENV=production
 ENV CACHE_DIR=/cache
+ENV NPM_CONFIG_UPDATE_NOTIFIER=false
 EXPOSE 3000
 ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["node", "--dns-result-order=ipv4first", "src/cluster.js"]
