@@ -48,6 +48,7 @@ This README is the getting-started guide. The full documentation set lives in
   - [Service-icon catalogs](#appservice-icon-catalogs)
   - [Sizes](#sizes)
 - [Custom profile URLs](#custom-profile-urls)
+- [License](#license)
 
 ---
 
@@ -446,3 +447,13 @@ Providers are any from the [favicon providers](#favicon-providers) / [catalogs](
 [Browser tools](https://github.com/R0GGER/favicon-api/blob/main/src/docs-content/tools.md) ·
 [Reverse proxy](https://github.com/R0GGER/favicon-api/blob/main/src/docs-content/proxy.md) —
 all in [`src/docs-content`](https://github.com/R0GGER/favicon-api/tree/main/src/docs-content).
+
+---
+
+## License
+
+FaviconAPI is released under the [MIT License](LICENSE).
+
+**Name and branding.** The MIT License covers the source code only. The name *FaviconAPI*, the logo, and the `faviconapi.com` domain are not part of the license — if you publish a fork or run a modified public instance, please give it its own name so users can tell the two apart.
+
+**Third-party icons.** FaviconAPI fetches icons from upstream providers and catalogs at runtime; it does not ship them. Those icons, logos, and brand marks remain the property of their respective owners and are covered by the terms of the source they come from — [selfh.st icons](https://github.com/selfhst/icons), [homarr dashboard-icons](https://github.com/homarr-labs/dashboard-icons), [LobeHub icons](https://www.npmjs.com/package/@lobehub/icons-static-svg), [SVGL](https://github.com/pheralb/svgl), [theSVG](https://thesvg.org/), and the favicon providers. Check those terms before using the results commercially.
