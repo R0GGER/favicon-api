@@ -9,9 +9,29 @@ FaviconAPI is a self-hosted favicon proxy with a browser-based UI that fetches w
 **Browser tools: [faviconapi.com/#tools](https://faviconapi.com/#tools)**
 
 - **Browser search** - add `/search?q=%s` as a custom search engine (Chrome, Edge, Firefox)
-- **Custom URL** - Build a shareable URL with your own preferred provider, fallbacks and minimum icon size. 
+- **Custom URL** - Build a shareable URL with your own preferred provider, fallbacks and minimum icon size.
 - **Bookmarklet** - drag **FaviconAPI Copy** to your bookmarks bar to copy a site's favicon URL
-- **Offline search page** - download a self-contained HTML file to look up favicons from your own computer
+
+## Source
+
+* Github: [R0GGER/favicon-api](https://github.com/R0GGER/favicon-api)
+* FaviconAPI - [CHANGELOG](CHANGELOG.md)
+
+---
+
+## Documentation
+
+This README is the getting-started guide. The full documentation set lives in
+[`src/docs-content`](https://github.com/R0GGER/favicon-api/tree/main/src/docs-content) and is also served at `/docs` on a running instance.
+
+| Document                                                                                     | Contents                                                                        |
+| -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| [Getting started](https://github.com/R0GGER/favicon-api/blob/main/src/docs-content/getting-started.md)   | Install, configure, and run FaviconAPI (this README)                            |
+| [API](https://github.com/R0GGER/favicon-api/blob/main/src/docs-content/api.md)                           | Full endpoint reference, API v1 JSON, API keys, quotas, caching headers         |
+| [Performance](https://github.com/R0GGER/favicon-api/blob/main/src/docs-content/performance.md)           | Cache TTL tuning, scraper latency, worker sizing, preloading popular sites      |
+| [Preload manager](https://github.com/R0GGER/favicon-api/blob/main/src/docs-content/preload-manager.md)   | Walkthrough of the `/admin` web interface                                       |
+| [Browser tools](https://github.com/R0GGER/favicon-api/blob/main/src/docs-content/tools.md)               | Custom search engine, custom URL builder, bookmarklet, offline search page      |
+| [Reverse proxy](https://github.com/R0GGER/favicon-api/blob/main/src/docs-content/proxy.md)               | nginx, Caddy, and Traefik setups, HTTPS headers, canonical URLs                 |
 
 ---
 
@@ -20,16 +40,14 @@ FaviconAPI is a self-hosted favicon proxy with a browser-based UI that fetches w
 - [Why FaviconAPI?](#why-faviconapi)
 - [How it works](#how-it-works)
 - [Quick start (Docker)](#quick-start-docker)
+- [Configuration (.env)](#configuration-env)
+- [Preload manager (/admin)](#preload-manager-admin)
+- [Browser tools](#browser-tools)
 - [Routes](#routes)
   - [Favicon providers](#favicon-providers)
-  - [Service-icon catalogs](#service-icon-catalogs)
+  - [Service-icon catalogs](#appservice-icon-catalogs)
   - [Sizes](#sizes)
 - [Custom profile URLs](#custom-profile-urls)
-- [API v1](#api-v1)
-- [Managing API keys (CLI)](#managing-api-keys-cli)
-- [Preload manager (/admin)](#preload-manager-admin)
-- [Configuration](#configuration)
-- [Performance](src/docs-content/performance.md)
 
 ---
 
@@ -60,7 +78,7 @@ So I built it. FaviconAPI brings 10+ favicon providers and 5 CDN-icon catalogs t
 
 ## Quick start (Docker)
 
-Clone the repository and start the stack. The bundled `docker-compose.yml` builds locally (`build: .`) and reads its settings from `.env.example`, with an optional `.env` on top for secrets.
+Clone the repository and start the stack. The bundled `docker-compose.yml` pulls the published image and reads its settings from [`.env.example`](.env.example).
 
 ```bash
 docker compose up -d
@@ -68,34 +86,29 @@ docker compose up -d
 
 The UI is at `http://localhost:3100` (host **3100** → container **3000**).
 
-### Published image
+### Local build
 
-To run the GHCR image instead of a local build:
+To build the image from this repository instead of pulling it, swap the two lines in `docker-compose.yml`: uncomment `build: .` and comment out `image: ghcr.io/r0gger/favicon-api:latest`.
 
 ```bash
 docker pull ghcr.io/r0gger/favicon-api:latest
 ```
 
-Then comment `build: .` and uncomment `image: ghcr.io/r0gger/favicon-api:latest` in `docker-compose.yml`.
-
 ### .env.example and .env
 
-The `favicon-api` service reads two files, in this order:
+[`.env.example`](.env.example) is a documented example of every setting, tracked in git — the shipped `docker-compose.yml` reads it directly, so the stack starts with working defaults. Every variable is documented with comments in that file; the tables under [Configuration (.env)](#configuration-env) cover the most-used ones.
 
-1. [`.env.example`](.env.example) — the defaults, tracked in git. Every variable is documented with comments here; the tables under [Configuration](#configuration) cover the most-used ones.
-2. `.env` — gitignored, optional, read second and therefore wins.
-
-Anything secret belongs in `.env`: `ADMIN_SESSION_SECRET`, `ADMIN_PASSWORD_HASH`, `LOGODEV_TOKEN`, `BRANDFETCH_CLIENT_ID`. That keeps them out of a file you might push.
+For your own settings — and for anything secret, such as `ADMIN_SESSION_SECRET`, `ADMIN_PASSWORD_HASH`, `LOGODEV_TOKEN`, and `BRANDFETCH_CLIENT_ID` — copy it to `.env` (gitignored) and point `env_file:` at that copy:
 
 ```bash
-# Minimal .env — only the keys you actually want to override
-ADMIN_SESSION_SECRET=9f2c…
-ADMIN_PASSWORD_HASH=scrypt:N=16384,r=8,p=1:…:…
+cp .env.example .env
 ```
 
-List only the keys you want to change. An **empty** value in `.env` still overrides a filled one in `.env.example`, so a stray `ADMIN_SESSION_SECRET=` there switches `/admin` off.
+```yaml
+    env_file: .env
+```
 
-`env_file` is read when the container is created, so after editing either file run `docker compose up -d` (which recreates it). A plain `docker compose restart` keeps the old environment.
+`env_file` is read when the container is created, so after editing it run `docker compose up -d` (which recreates the container). A plain `docker compose restart` keeps the old environment.
 
 The `besticon` sidecar does not use `env_file`. Compose interpolates its `BESTICON_*` values from a project `.env` or from the defaults in `docker-compose.yml`.
 
@@ -104,18 +117,15 @@ The `besticon` sidecar does not use `env_file`. Compose interpolates its `BESTIC
 ```yaml
 services:
   favicon-api:
-    build: .
-    #image: ghcr.io/r0gger/favicon-api:latest
+    #build: .
+    image: ghcr.io/r0gger/favicon-api:latest
     container_name: favicon-api
     restart: unless-stopped
     ports:
       - "3100:3000"
     volumes:
       - favicon-cache:/cache
-    env_file:
-      - .env.example
-      - path: .env
-        required: false
+    env_file: .env.example
     depends_on:
       besticon:
         condition: service_healthy
@@ -162,9 +172,143 @@ volumes:
 
 **Notes**
 
-- **besticon** has no `ports:` mapping — only the `favicon-api` service can reach it on `http://besticon:8080`. Set `BESTICON_URL=http://besticon:8080` in `.env.example`.
+- **besticon** has no `ports:` mapping — only the `favicon-api` service can reach it on `http://besticon:8080`. Set `BESTICON_URL=http://besticon:8080` in your env file.
 - **Without besticon:** remove the `besticon` service, `depends_on`, `networks`, and `BESTICON_URL`. The built-in HTML scraper is used instead.
 - **Host cache path:** use `- /path/to/cache:/cache` instead of the named volume; run `chown 100:101 /path/to/cache` and `chmod 755 /path/to/cache` so the container user can write.
+- **Behind a reverse proxy:** point nginx, Caddy, or Traefik at host port **3100** — see [Reverse proxy](https://github.com/R0GGER/favicon-api/blob/main/src/docs-content/proxy.md).
+
+---
+
+## Configuration (.env)
+
+All settings are documented in [`.env.example`](.env.example). Copy that file to `.env` and edit it (or set `environment:` entries in Compose).
+
+The tables below cover the most-used variables. For the complete list — including `UI_CARD_URL`, `UI_INCLUDE_APP_ICONS`, `SCRAPER_FALLBACK`, and tuning notes — see [`.env.example`](.env.example) and [Performance](https://github.com/R0GGER/favicon-api/blob/main/src/docs-content/performance.md).
+
+### Server & cache
+
+
+| Variable             | Default                        | Description                                                                                                      |
+| -------------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| `PORT`               | `3000`                         | TCP port the HTTP server listens on.                                                                             |
+| `CACHE_DIR`          | `./cache` (`/cache` in Docker) | Base directory for on-disk favicon cache files.                                                                  |
+| `MEMORY_CACHE_MAX`   | `2000`                         | Max favicons in the per-worker in-memory LRU cache.                                                              |
+| `MEMORY_CACHE_TTL`   | `86400`                        | In-memory cache entry lifetime (seconds). `.env.example` ships 1 day; the code fallback if unset is `3600`. |
+| `DISK_CACHE_TTL`     | `7`                            | On-disk cache entry lifetime (days).                                                                     |
+| `CACHE_STALE_RETENTION` | `30`                        | Days past `DISK_CACHE_TTL` an icon may still be served while it is refreshed in the background. `0` = hard expiry. |
+| `CACHE_SIZE_MB`      | `1024`                         | Max total disk cache size (MB). Oldest entries are evicted when exceeded. Code fallback `0` = no size cap (TTL eviction only). |
+| `UPSTREAM_TIMEOUT`   | `5000`                         | Upstream HTTP timeout (ms) for providers, besticon, and scrape targets.                                          |
+| `UV_THREADPOOL_SIZE` | `16`                           | Node libuv thread pool size for disk I/O, DNS, etc. Must be set before process start.                            |
+| `WORKERS`            | CPU core count                 | Number of cluster workers. Set explicitly in Docker when CPU is limited. `1` disables clustering.                |
+
+
+### Providers & scraper
+
+
+| Variable                   | Default                         | Description                                                                                                                                                                                                                                                                          |
+| -------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `DEFAULT_PROVIDER`         | `scraper`                       | Preferred provider for `/{domain}`. When set, it runs exclusively first; fallbacks only race after it fails. Values: `scraper`, `google`, `googlev2`, `duckduckgo`, `yandex`, `faviconso`, `vemetric`, `favicondev`, `faviconkit`, `faviconrun`, `twentyicons`, `ryanjc`, `logodev`, `brandfetch`, `selfhst`, `dashboardicons`, `lobehub`, `svgl`, `thesvg`. `logodev` requires `LOGODEV_TOKEN`; `brandfetch` requires `BRANDFETCH_CLIENT_ID`. |
+| `PICK_HEAD_START_MS`       | `150`                           | Head-start (ms) for the built-in first provider on `/{domain}` when `DEFAULT_PROVIDER` is unset.                                                                                                                                                                                                  |
+| `LOGODEV_TOKEN`            | *(unset)*                       | [logo.dev](https://www.logo.dev/) publishable key. Enables `/logodev/{size}/{domain}`; without it the route returns 503.                                                                                                                                                             |
+| `BRANDFETCH_CLIENT_ID`     | *(unset)*                       | [Brandfetch](https://docs.brandfetch.com/logo-api/overview) Logo API client ID. Enables `/brandfetch/{size}/{ext}/{domain}`; without it the route returns 503.                                                                                                                             |
+| `BESTICON_URL`             | *(unset)*                       | Base URL of a sidecar [besticon](https://github.com/mat/besticon) instance (e.g. `http://besticon:8080`). `/scraper/{domain}` asks besticon first, then falls back to the built-in scraper.                                                                                          |
+| `SCRAPER_PROBE_BATCH_SIZE` | `4`                             | HTML scraper icon candidates probed in parallel per batch (`/scraper/{domain}` and `/{domain}`).                                                                                                                                                                                     |
+| `SCRAPER_ICONS_CACHE_TTL`  | `604800`                        | TTL (seconds) for the in-memory cache of enriched scraper icon lists (`/{domain}/json`). Also used for scraper discovery disk cache entries when `SCRAPER_DISK_CACHE` is enabled. Unset → same as `DISK_CACHE_TTL`.                                                                 |
+| `SCRAPER_ICONS_CACHE_MAX`  | `500`                           | Max domains in that scraper-icons LRU cache.                                                                                                                                                                                                                                         |
+| `SCRAPER_DISK_CACHE`       | `true`                          | When `true`, persist scraper discovery (HTML, icon lists, besticon JSON, manifests, probes) under `{CACHE_DIR}/scraper-discovery`. Survives restarts; shared across workers.                                                                                                         |
+| `SCRAPER_DISK_CACHE_DIR`   | `{CACHE_DIR}/scraper-discovery` | Directory for that discovery cache. Only used when `SCRAPER_DISK_CACHE=true`.                                                                                                                                                                                                        |
+| `MANIFEST_PROBE_MAX`       | `12`                            | Max manifest URLs to probe per domain when HTML does not link one directly.                                                                                                                                                                                                          |
+| `SCRAPER_MAX_ICON_SIZE`    | `0`                             | Max output dimension for `/scraper/{domain}`. Larger sources are downscaled; when set, output is also PNG-recompressed (truecolor vs. palette — whichever is smaller, see `SCRAPER_PNG_*`). `0` = native resolution.                                                                    |
+| `SCRAPER_PNG_PALETTE`      | `true`                          | Enable the near-lossless indexed/palette PNG pass for capped scraper output (typically 25-55% smaller). `false` forces strict truecolor PNG.                                                                                                                                         |
+| `SCRAPER_PNG_MIN_PSNR`     | `40`                            | Minimum perceptual PSNR (dB, alpha-premultiplied) the palette PNG must reach to be used over truecolor. Higher = closer to lossless; `0` = always take the smaller file. Ignored when `SCRAPER_PNG_PALETTE=false`.                                                                    |
+
+
+### API v1 & quotas
+
+
+| Variable                | Default                  | Description                                                                                                         |
+| ----------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| `API_KEYS_DB`           | `/cache/api-keys.sqlite` | SQLite file for hashed API keys and monthly usage counters. Keep on the same volume as `CACHE_DIR`.                 |
+| `API_CACHE_DIR`         | `/cache/api`             | Directory for normalized 128×128 PNGs from `/api/v1/favicon`. Served via `/cdn/favicons/{domain}.png`.              |
+| `API_CACHE_TTL`         | `7`                      | How long a generated PNG counts as cached (days). Converted to seconds for `Cache-Control` max-age on the CDN route. |
+| `API_REQUIRE_KEY`       | `false`                  | `.env.example` makes `/api/v1/favicon` public. Code fallback if unset is `true` (key required, quotas enforced). A provided key is silently ignored when this is `false`. |
+| `PLAN_FREE_LIMIT`       | `25`                     | Monthly call quota for `free` plan keys. `0` = unlimited.                                                           |
+| `PLAN_PRO_LIMIT`        | `2500`                   | Monthly call quota for `pro` plan keys. `0` = unlimited.                                                            |
+| `PLAN_ENTERPRISE_LIMIT` | `0`                      | Monthly call quota for `enterprise` plan keys. `0` = unlimited.                                                     |
+
+Endpoint reference, authentication, error codes, and the API-key CLI: [API](https://github.com/R0GGER/favicon-api/blob/main/src/docs-content/api.md).
+
+### Preload database
+
+| Variable                     | Default                    | Description                                                                                                                         |
+| ---------------------------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `PRELOAD_DB`                 | `/cache/db/preload.sqlite` | SQLite file with the preload domain list, popularity counters and icon overrides. Keep it in a subdirectory: loose files in `CACHE_DIR` can be evicted by the disk-cache size cap. |
+| `PRELOAD_TRACK_HITS`         | `true`                     | Count successful domain lookups so `rank` reflects real usage. Preload-script requests are never counted. `false` disables all counting. |
+| `PRELOAD_HIT_FLUSH_MS`       | `15000`                    | How long each worker buffers hits before writing them. Counting never writes per request.                                           |
+| `PRELOAD_HIT_DEDUPE_MS`      | `60000`                    | Window in which the same visitor asking for the same domain counts once. Keeps one web-UI search from outweighing real usage. `0` counts every request. |
+| `PRELOAD_MIN_RANK`           | `3`                        | Minimum usage rank (hit count) for traffic-only domains in `preload-top-sites.js --source db`. List-imported domains still fill remaining slots, after real traffic. |
+| `PRELOAD_AUTO_DISABLE_AFTER` | `5`                        | Consecutive failed preload runs after which an automatically managed domain is switched off.                                        |
+| `PRELOAD_RANK_MONTHS`        | `3`                        | Rolling window (months) used by `manage-preload.js recalc` to recompute usage rank from monthly hit buckets.                      |
+| `PRELOAD_OVERRIDE_RELOAD_MS` | `30000`                    | How often a worker re-checks the database for changed icon overrides and blocklist patterns.                                        |
+
+Manage the list with `scripts/manage-preload.js` (`npm run preload:list`,
+`preload:add`, `preload:disable`, `preload:import`, `preload:export`,
+`preload:recalc`), or from the browser with the [preload manager](#preload-manager-admin).
+See [Performance §10](https://github.com/R0GGER/favicon-api/blob/main/src/docs-content/performance.md#10-preload-popular-sites-after-deploy) for the full workflow.
+
+### Preload manager
+
+| Variable                   | Default         | Description                                                                     |
+| -------------------------- | --------------- | --------------------------------------------------------------------------------- |
+| `ADMIN_SESSION_SECRET`     | *(unset)*       | Signing key for the `/admin` session cookie. Unset or shorter than 32 bytes keeps the page at 404. Legacy name `ADMIN_JWT_SECRET` still works. |
+| `ADMIN_PASSWORD_HASH`      | *(unset)*       | scrypt hash of the login password. Unset or malformed keeps the page at 404.     |
+| `ADMIN_USER`               | `admin`         | Login name.                                                                     |
+| `ADMIN_SESSION_TTL`        | `3600`          | Idle timeout (seconds) of a normal session; every action extends it.            |
+| `ADMIN_REMEMBER_TTL`       | `30d`           | Idle timeout when "Keep me signed in" was ticked.                               |
+| `ADMIN_LOGIN_MAX_ATTEMPTS` | `10`            | Failed sign-ins per IP per 15 minutes, counted per worker.                      |
+
+
+---
+
+## Preload manager (/admin)
+
+The first request for a domain is slow: FaviconAPI still has to discover icons and fetch them from upstream. **Preload** warms that cache in advance — for well-known sites, for domains your users actually look up, or for a list you curate — so later requests hit disk instead of the network.
+
+The **preload manager** is the password-protected web UI for that workflow, at `/admin`. It talks to the same SQLite database as the CLI (`scripts/manage-preload.js`): which domains are on the list, how often they are requested, which image to force for a given site, which hosts to block, and when to run a preload pass. From the browser you can import or export CSV, start a run and watch the log, or generate a crontab line — without a shell on the server.
+
+The page is off until you configure both a signing secret and a password. Without `ADMIN_SESSION_SECRET` and `ADMIN_PASSWORD_HASH`, `/admin` returns 404 and management stays CLI-only.
+
+```bash
+# 1. Generate the 512-bit signing key for the session cookie
+docker compose exec favicon-api npm run admin:secret
+
+# 2. Set the login password (asks twice, prints ADMIN_USER + ADMIN_PASSWORD_HASH)
+docker compose exec favicon-api npm run admin:password -- --user yourname
+
+# 3. Put both lines in .env, recreate the container, then sign in at /admin
+docker compose up -d
+```
+
+The key is always 512 bits and signs HS512. Only the scrypt hash of the password lands in `.env`. Sign-in issues an `HttpOnly`, `SameSite=Strict` session cookie whose TTL is an idle timeout — every action extends it — and **Keep me signed in** switches that window to `ADMIN_REMEMBER_TTL`. Rotating `ADMIN_SESSION_SECRET` signs everyone out at once.
+
+Full walkthrough: [Preload manager](https://github.com/R0GGER/favicon-api/blob/main/src/docs-content/preload-manager.md).
+
+---
+
+## Browser tools
+
+The **Tools** button on the homepage (and on `/api` and `/docs`) opens a side panel of browser helpers. You set a profile once — preferred provider, optional fallbacks, and a minimum icon size — and that profile powers every tool in the panel. The settings are encoded in the URL: no account, nothing stored on the server.
+
+From the panel you can:
+
+- Add FaviconAPI as a **custom search engine** (`/search?q=%s`) so typing a domain or app name in the address bar opens the homepage with results already loaded.
+- **Build a custom URL** that pins that provider chain for dashboards, password managers, and `<img>` tags (`/{id}/{domain}`).
+- Drag the **FaviconAPI Copy** bookmarklet to your bookmarks bar and copy a site's favicon URL from any page you visit.
+- **Download an HTML file** that searches using the same profile, from your own computer.
+
+Open it via **Tools** in the top navigation, or `https://your-host/#tools`.
+
+Full walkthrough: [Browser tools](https://github.com/R0GGER/favicon-api/blob/main/src/docs-content/tools.md).
 
 ---
 
@@ -190,7 +334,7 @@ https://your-host/svgl/0/svg/github
 https://your-host/thesvg/0/svg/github
 ```
 
-Full endpoint list, JSON discovery, and caching headers: [API](src/docs-content/api.md).
+Full endpoint list, JSON discovery, and caching headers: [API](https://github.com/R0GGER/favicon-api/blob/main/src/docs-content/api.md).
 
 ### Favicon providers
 
@@ -199,7 +343,7 @@ All providers run in parallel on `/{domain}`; each also has its own route.
 
 | Provider                                                                            | Route                         | Alias  | Notes                                                                                                                                                                                       |
 | ----------------------------------------------------------------------------------- | ----------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| HTML scraper                                                                        | `/scraper/{size}/{domain}`    | `/s/`  | `/scraper/{domain}` serves the largest available icon; parses `<link rel="icon">`, manifest, and fallbacks; optional [besticon](https://github.com/mat/besticon) sidecar via `BESTICON_URL` |
+| HTML scraper                                                                        | `/scraper/{size}/{domain}`    | `/s/`  | `/scraper/{domain}` serves the largest available icon; parses `<link rel="icon">`, `og:image` / `twitter:image` meta (near-square only), manifest, and fallbacks; optional [besticon](https://github.com/mat/besticon) sidecar via `BESTICON_URL` |
 | [Google](https://www.google.com/s2/favicons)                                        | `/google/{size}/{domain}`     | `/g/`  | Sizes 16, 32, 64, 128                                                                                                                                                                       |
 | [Google v2](https://developers.google.com/search/faviconapi/appearance/favicon-in-search) | `/googlev2/{size}/{domain}`   | `/g2/` | `faviconV2`; sizes 16, 32, 64, 128, 180, 256                                                                                                                                                |
 | [DuckDuckGo](https://icons.duckduckgo.com/)                                         | `/duckduckgo/{size}/{domain}` | `/d/`  | Resized server-side                                                                                                                                                                         |
@@ -246,7 +390,7 @@ Look up an icon by app/service name (e.g. `jellyfin`). All support `?variant=col
 | `/{domain}`                  | Best favicon (parallel provider race)                  |
 | `/{id}/{domain-or-appname}`  | Custom profile favicon |
 | `/{domain}/json`             | JSON list of all endpoint URLs for a domain            |
-| `/api/v1/favicon?url=`       | FaviconAPI-compatible JSON API — see [API v1](#api-v1) |
+| `/api/v1/favicon?url=`       | FaviconAPI-compatible JSON API — see [API v1](https://github.com/R0GGER/favicon-api/blob/main/src/docs-content/api.md#api-v1) |
 | `/cdn/favicons/{domain}.png` | Public CDN route for cached API v1 PNGs                |
 | `/providers`                 | JSON: which optional providers are enabled             |
 | `/services/resolve/{service}` | JSON: per-catalog slug matches for a service name     |
@@ -271,7 +415,7 @@ Build a shareable URL that pins your own **preferred provider**, an ordered list
 https://your-host/{id}/{domain-or-appname}
 ```
 
-The `{id}` is a URL-safe (base64url) string that *encodes* the whole configuration; there is no database. Generate one from **Tools → Build custom URL** on the homepage, then append any domain (`github.com`) or app name (`immich`).
+The `{id}` is a URL-safe (base64url) string that *encodes* the whole configuration; there is no database. Generate one from **Tools → Build custom URL** on the homepage, then append any domain (`github.com`) or app name (`immich`). See [Browser tools](https://github.com/R0GGER/favicon-api/blob/main/src/docs-content/tools.md).
 
 **How the icon is resolved**
 
@@ -294,205 +438,11 @@ Providers are any from the [favicon providers](#favicon-providers) / [catalogs](
 
 ---
 
-## API v1
+## More documentation
 
-`GET /api/v1/favicon?url=<website>` returns JSON (not image bytes) with a CDN URL to a normalized **128×128** PNG, a `sourceType`, and cache metadata. Clients fetch the image from the returned `url` via `/cdn/favicons/{domain}.png`.
-
-### Authentication
-
-When `API_REQUIRE_KEY=true` (default), pass the key as a Bearer header or `?key=`:
-
-```bash
-curl "https://your-host/api/v1/favicon?url=https://github.com" \
-  -H "Authorization: Bearer fa_your_key_here"
-```
-
-```bash
-curl "https://your-host/api/v1/favicon?url=https://github.com&key=fa_your_key_here"
-```
-
-On Windows PowerShell, use `curl.exe` or:
-
-```powershell
-Invoke-RestMethod "https://your-host/api/v1/favicon?url=https://github.com" `
-  -Headers @{ Authorization = "Bearer fa_your_key_here" }
-```
-
-Set `API_REQUIRE_KEY=false` for a fully public endpoint (no key, no quotas).
-
-### Response
-
-```json
-{
-  "url":        "https://your-host/cdn/favicons/github.com.png",
-  "domain":     "github.com",
-  "width":      128,
-  "height":     128,
-  "format":     "png",
-  "sourceType": "svg",
-  "cached":     true,
-  "cachedAt":   "2026-06-20T08:00:00.000Z"
-}
-```
-
-### Errors
-
-
-| Status | Code                                            | Meaning                                                           |
-| ------ | ----------------------------------------------- | ----------------------------------------------------------------- |
-| 400    | `missing_url` / `invalid_url`                   | Missing or invalid `url` parameter                                |
-| 401    | `missing_api_key` / `invalid_api_key`           | No key, or key not recognised / revoked                           |
-| 422    | `favicon_not_found` / `favicon_not_processable` | No usable icon, or decode failed                                  |
-| 429    | `quota_exceeded`                                | Monthly quota reached (`plan`, `limit`, `used`, `period` in body) |
-| 500    | `internal_error`                                | Internal error                                                    |
-
-
-Only `200` responses count toward the monthly quota. Quotas reset each calendar month (UTC).
-
-Full reference — source priority, CDN route, plans, PowerShell notes: [API v1](/docs/api#api-v1).
-
----
-
-## Managing API keys (CLI)
-
-Keys are stored in SQLite at `API_KEYS_DB` (default `/cache/api-keys.sqlite` on the cache volume). Only the SHA-256 hash is persisted; the raw key is shown once at creation.
-
-Run the commands inside the running container so the CLI uses the same database as the server:
-
-```bash
-# Create a key (raw key printed once)
-docker compose exec favicon-api npm run keys:create -- --label "customer A" --plan pro
-
-# List active keys with this month's usage
-docker compose exec favicon-api npm run keys:list
-
-# Include revoked keys
-docker compose exec favicon-api npm run keys:list -- --all
-
-# Revoke (stops validating immediately; row kept for audit)
-docker compose exec favicon-api npm run keys:revoke -- --prefix fa_abcdefgh
-
-# Permanently delete key and usage history
-docker compose exec favicon-api npm run keys:delete -- --prefix fa_abcdefgh
-```
-
-Plans: `free`, `pro`, `enterprise`. Monthly limits are set via `PLAN_*_LIMIT` env vars. Outside Docker, the same commands work via `npm run keys:create`, `keys:list`, `keys:revoke`, and `keys:delete`.
-
-See also [API v1 — Managing API keys](/docs/api#managing-api-keys).
-
----
-
-## Preload manager (/admin)
-
-A web interface for the preload database — domains, icon overrides, blocklist, popularity stats, CSV import/export and preload runs — behind a username and password you set yourself.
-
-It is disabled until you configure both a secret and a password: without `ADMIN_SESSION_SECRET` and `ADMIN_PASSWORD_HASH`, `/admin` returns 404 and management stays CLI-only.
-
-```bash
-# 1. Generate the 512-bit signing key for the session cookie
-docker compose exec favicon-api npm run admin:secret
-
-# 2. Set the login password (asks twice, prints ADMIN_USER + ADMIN_PASSWORD_HASH)
-docker compose exec favicon-api npm run admin:password -- --user yourname
-
-# 3. Put both lines in .env, recreate the container, then sign in at /admin
-docker compose up -d
-```
-
-The key is always 512 bits and signs HS512. Only the scrypt hash of the password lands in `.env`. Sign-in issues an `HttpOnly`, `SameSite=Strict` session cookie whose TTL is an idle timeout — every action extends it — and **Keep me signed in** switches that window to `ADMIN_REMEMBER_TTL`. Rotating `ADMIN_SESSION_SECRET` signs everyone out at once.
-
-| Variable                   | Default              | Description                                                                       |
-| -------------------------- | -------------------- | --------------------------------------------------------------------------------- |
-| `ADMIN_SESSION_SECRET`     | *(unset)*            | Signing key for the session cookie. Unset or shorter than 32 bytes keeps `/admin` at 404. Legacy name `ADMIN_JWT_SECRET` still works. |
-| `ADMIN_PASSWORD_HASH`      | *(unset)*            | scrypt hash of the login password. Unset or malformed keeps `/admin` at 404.       |
-| `ADMIN_USER`               | `admin`              | Login name.                                                                       |
-| `ADMIN_SESSION_TTL`        | `3600`               | Idle timeout (seconds) of a normal session.                                       |
-| `ADMIN_REMEMBER_TTL`       | `30d`                | Idle timeout when "Keep me signed in" was ticked.                                 |
-| `ADMIN_LOGIN_MAX_ATTEMPTS` | `10`                 | Failed sign-ins per IP per 15 minutes, counted per worker.                        |
-
-Full walkthrough: [Preload manager](/preload-manager.md).
-
----
-
-## Configuration
-
-All settings are documented in [`.env.example`](.env.example). Copy that file to `.env` and edit it (or set `environment:` entries in Compose).
-
-The tables below cover the most-used variables. For the complete list — including `UI_CARD_URL`, `UI_INCLUDE_APP_ICONS`, `SCRAPER_FALLBACK`, and tuning notes — see [`.env.example`](.env.example) and [Performance](src/docs-content/performance.md).
-
-### Server & cache
-
-
-| Variable             | Default                        | Description                                                                                                      |
-| -------------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
-| `PORT`               | `3000`                         | TCP port the HTTP server listens on.                                                                             |
-| `CACHE_DIR`          | `./cache` (`/cache` in Docker) | Base directory for on-disk favicon cache files.                                                                  |
-| `MEMORY_CACHE_MAX`   | `2000`                         | Max favicons in the per-worker in-memory LRU cache.                                                              |
-| `MEMORY_CACHE_TTL`   | `3600`                         | In-memory cache entry lifetime (seconds).                                                                        |
-| `DISK_CACHE_TTL`     | `1`                            | On-disk cache entry lifetime (days).                                                                             |
-| `CACHE_SIZE_MB`      | `0`                            | Max total disk cache size (MB). Oldest entries are evicted when exceeded. `0` = no size cap (TTL eviction only). |
-| `UPSTREAM_TIMEOUT`   | `5000`                         | Upstream HTTP timeout (ms) for providers, besticon, and scrape targets.                                          |
-| `UV_THREADPOOL_SIZE` | `16`                           | Node libuv thread pool size for disk I/O, DNS, etc. Must be set before process start.                            |
-| `WORKERS`            | CPU core count                 | Number of cluster workers. Set explicitly in Docker when CPU is limited. `1` disables clustering.                |
-
-
-### Providers & scraper
-
-
-| Variable                   | Default                         | Description                                                                                                                                                                                                                                                                          |
-| -------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `DEFAULT_PROVIDER`         | `scraper`                       | Preferred provider for `/{domain}` (gets the head-start). Values: `scraper`, `google`, `googlev2`, `duckduckgo`, `yandex`, `faviconso`, `vemetric`, `favicondev`, `faviconkit`, `faviconrun`, `twentyicons`, `ryanjc`, `logodev`, `brandfetch`, `selfhst`, `dashboardicons`, `lobehub`, `svgl`, `thesvg`. `logodev` requires `LOGODEV_TOKEN`; `brandfetch` requires `BRANDFETCH_CLIENT_ID`. |
-| `PICK_HEAD_START_MS`       | `150`                           | Head-start (ms) for `DEFAULT_PROVIDER` on `/{domain}` before other providers start.                                                                                                                                                                                                  |
-| `LOGODEV_TOKEN`            | *(unset)*                       | [logo.dev](https://www.logo.dev/) publishable key. Enables `/logodev/{size}/{domain}`; without it the route returns 503.                                                                                                                                                             |
-| `BRANDFETCH_CLIENT_ID`     | *(unset)*                       | [Brandfetch](https://docs.brandfetch.com/logo-api/overview) Logo API client ID. Enables `/brandfetch/{size}/{ext}/{domain}`; without it the route returns 503.                                                                                                                             |
-| `BESTICON_URL`             | *(unset)*                       | Base URL of a sidecar [besticon](https://github.com/mat/besticon) instance (e.g. `http://besticon:8080`). `/scraper/{domain}` asks besticon first, then falls back to the built-in scraper.                                                                                          |
-| `SCRAPER_PROBE_BATCH_SIZE` | `4`                             | HTML scraper icon candidates probed in parallel per batch (`/scraper/{domain}` and `/{domain}`).                                                                                                                                                                                     |
-| `SCRAPER_ICONS_CACHE_TTL`  | `3600`                          | TTL (seconds) for the in-memory cache of enriched scraper icon lists (`/{domain}/json`). Also used for scraper discovery disk cache entries when `SCRAPER_DISK_CACHE` is enabled.                                                                                                    |
-| `SCRAPER_ICONS_CACHE_MAX`  | `500`                           | Max domains in that scraper-icons LRU cache.                                                                                                                                                                                                                                         |
-| `SCRAPER_DISK_CACHE`       | `false`                         | When `true`, persist scraper discovery (HTML, icon lists, besticon JSON, manifests, probes) under `{CACHE_DIR}/scraper-discovery`. Survives restarts; shared across workers.                                                                                                         |
-| `SCRAPER_DISK_CACHE_DIR`   | `{CACHE_DIR}/scraper-discovery` | Directory for that discovery cache. Only used when `SCRAPER_DISK_CACHE=true`.                                                                                                                                                                                                        |
-| `MANIFEST_PROBE_MAX`       | `12`                            | Max manifest URLs to probe per domain when HTML does not link one directly.                                                                                                                                                                                                          |
-| `SCRAPER_MAX_ICON_SIZE`    | `0`                             | Max output dimension for `/scraper/{domain}`. Larger sources are downscaled; when set, output is also lossless PNG-compressed (alpha preserved). `0` = native resolution.                                                                                                               |
-
-
-### API v1 & quotas
-
-
-| Variable                | Default                  | Description                                                                                                         |
-| ----------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------- |
-| `API_KEYS_DB`           | `/cache/api-keys.sqlite` | SQLite file for hashed API keys and monthly usage counters. Keep on the same volume as `CACHE_DIR`.                 |
-| `API_CACHE_DIR`         | `/cache/api`             | Directory for normalized 128×128 PNGs from `/api/v1/favicon`. Served via `/cdn/favicons/{domain}.png`.              |
-| `API_CACHE_TTL`         | `7`                      | How long a generated PNG counts as cached (days). Converted to seconds for `Cache-Control` max-age on the CDN route. |
-| `API_REQUIRE_KEY`       | `true`                   | `false` makes `/api/v1/favicon` public: no key required, quotas not enforced. A provided key is silently ignored.   |
-| `PLAN_FREE_LIMIT`       | `25`                     | Monthly call quota for `free` plan keys. `0` = unlimited.                                                           |
-| `PLAN_PRO_LIMIT`        | `2500`                   | Monthly call quota for `pro` plan keys. `0` = unlimited.                                                            |
-| `PLAN_ENTERPRISE_LIMIT` | `0`                      | Monthly call quota for `enterprise` plan keys. `0` = unlimited.                                                     |
-
-
-### Preload database
-
-| Variable                     | Default                    | Description                                                                                                                         |
-| ---------------------------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `PRELOAD_DB`                 | `/cache/db/preload.sqlite` | SQLite file with the preload domain list, popularity counters and icon overrides. Keep it in a subdirectory: loose files in `CACHE_DIR` can be evicted by the disk-cache size cap. |
-| `PRELOAD_TRACK_HITS`         | `true`                     | Count successful domain lookups so `rank` reflects real usage. Preload-script requests are never counted. `false` disables all counting. |
-| `PRELOAD_HIT_FLUSH_MS`       | `15000`                    | How long each worker buffers hits before writing them. Counting never writes per request.                                           |
-| `PRELOAD_HIT_DEDUPE_MS`      | `60000`                    | Window in which the same visitor asking for the same domain counts once. Keeps one web-UI search from outweighing real usage. `0` counts every request. |
-| `PRELOAD_MIN_RANK`           | `3`                        | Minimum usage rank (hit count) for traffic-only domains in `preload-top-sites.js --source db`. List-imported domains still fill remaining slots, after real traffic. |
-| `PRELOAD_AUTO_DISABLE_AFTER` | `5`                        | Consecutive failed preload runs after which an automatically managed domain is switched off.                                        |
-| `PRELOAD_RANK_MONTHS`        | `3`                        | Rolling window (months) used by `manage-preload.js recalc` to recompute usage rank from monthly hit buckets.                      |
-| `PRELOAD_OVERRIDE_RELOAD_MS` | `30000`                    | How often a worker re-checks the database for changed icon overrides and blocklist patterns.                                        |
-
-Manage the list with `scripts/manage-preload.js` (`npm run preload:list`,
-`preload:add`, `preload:disable`, `preload:import`, `preload:export`,
-`preload:recalc`), or from the browser with the [preload manager](#preload-manager-admin).
-See [Performance §10](src/docs-content/performance.md#10-preload-popular-sites-after-deploy) for the full workflow.
-
-
----
-
-## Performance
-
-See [Performance](src/docs-content/performance.md) for cache TTL recommendations, scraper latency, and worker sizing.
-
----
-
+[API](https://github.com/R0GGER/favicon-api/blob/main/src/docs-content/api.md) ·
+[Performance](https://github.com/R0GGER/favicon-api/blob/main/src/docs-content/performance.md) ·
+[Preload manager](https://github.com/R0GGER/favicon-api/blob/main/src/docs-content/preload-manager.md) ·
+[Browser tools](https://github.com/R0GGER/favicon-api/blob/main/src/docs-content/tools.md) ·
+[Reverse proxy](https://github.com/R0GGER/favicon-api/blob/main/src/docs-content/proxy.md) —
+all in [`src/docs-content`](https://github.com/R0GGER/favicon-api/tree/main/src/docs-content).
