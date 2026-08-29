@@ -6,3 +6,4 @@ services.txt
 docker-compose_dev.yml
 /exports
 /temp
+/tmp
