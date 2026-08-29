@@ -33,6 +33,7 @@ FaviconAPI is a self-hosted favicon proxy with a browser-based UI that fetches w
 - [Custom profile URLs](#custom-profile-urls)
 - [API](api.md)
 - [Performance](performance.md)
+- [License](#license)
 
 ---
 
@@ -412,4 +413,11 @@ Providers are any from the [favicon providers](#favicon-providers) / [catalogs](
 
 ---
 
+## License
+
+FaviconAPI is released under the [MIT License](https://github.com/R0GGER/favicon-api/blob/main/LICENSE).
+
+**Name and branding.** The MIT License covers the source code only. The name *FaviconAPI*, the logo, and the `faviconapi.com` domain are not part of the license — if you publish a fork or run a modified public instance, please give it its own name so users can tell the two apart.
+
+**Third-party icons.** FaviconAPI fetches icons from upstream providers and catalogs at runtime; it does not ship them. Those icons, logos, and brand marks remain the property of their respective owners and are covered by the terms of the source they come from — [selfh.st icons](https://github.com/selfhst/icons), [homarr dashboard-icons](https://github.com/homarr-labs/dashboard-icons), [LobeHub icons](https://www.npmjs.com/package/@lobehub/icons-static-svg), [SVGL](https://github.com/pheralb/svgl), [theSVG](https://thesvg.org/), and the favicon providers. Check those terms before using the results commercially.
 
