@@ -1,6 +1,6 @@
 {
   "name": "favicon-proxy",
-  "version": "2.15.21",
+  "version": "3.0.0",
   "description": "Favicon proxy service - fetches favicons from Google, DuckDuckGo, and Yandex with caching",
   "main": "src/index.js",
   "scripts": {
@@ -9,7 +9,18 @@
     "keys:list": "node scripts/manage-keys.js list",
     "keys:revoke": "node scripts/manage-keys.js revoke",
     "keys:delete": "node scripts/manage-keys.js delete",
-    "preload:top-sites": "node scripts/preload-top-sites.js"
+    "admin:secret": "node scripts/manage-admin.js secret",
+    "admin:password": "node scripts/manage-admin.js password",
+    "admin:status": "node scripts/manage-admin.js status",
+    "preload:top-sites": "node scripts/preload-top-sites.js",
+    "preload:list": "node scripts/manage-preload.js list",
+    "preload:add": "node scripts/manage-preload.js add",
+    "preload:enable": "node scripts/manage-preload.js enable",
+    "preload:disable": "node scripts/manage-preload.js disable",
+    "preload:set": "node scripts/manage-preload.js set",
+    "preload:import": "node scripts/manage-preload.js import",
+    "preload:export": "node scripts/manage-preload.js export",
+    "preload:recalc": "node scripts/manage-preload.js recalc"
   },
   "dependencies": {
     "better-sqlite3": "^12.11.1",
