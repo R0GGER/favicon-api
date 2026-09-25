@@ -9,7 +9,7 @@ FaviconAPI is a self-hosted favicon proxy with a browser-based UI that fetches w
 **Browser tools: [faviconapi.com/#tools](https://faviconapi.com/#tools)**
 
 - **Browser search** - add `/search?q=%s` as a custom search engine (Chrome, Edge, Firefox)
-- **Custom URL** - Build a shareable URL with your own preferred provider, fallbacks and minimum icon size.
+- **Custom URL** - Build a shareable URL with your own preferred provider, fallbacks and preferred icon size.
 - **Bookmarklet** - drag **FaviconAPI Copy** to your bookmarks bar to copy a site's favicon URL
 
 ## Source
@@ -71,7 +71,7 @@ So I built it. FaviconAPI brings 10+ favicon providers and 5 CDN-icon catalogs t
 3. **Caches responses** in memory (LRU) and on disk to reduce upstream load and improve latency.
 4. **Normalizes icons** for the v1 JSON API into 128×128 PNG files served from a CDN route.
 5. **Looks up service icons** from the [selfh.st icons](https://github.com/selfhst/icons), [homarr dashboard-icons](https://github.com/homarr-labs/dashboard-icons), [LobeHub icons](https://www.npmjs.com/package/@lobehub/icons-static-svg), [SVGL](https://github.com/pheralb/svgl), and [theSVG](https://thesvg.org/) catalogs by service name.
-6. **Generates custom profile URLs** that encode a preferred provider, fallbacks, and a minimum size directly in the path — no account or storage required.
+6. **Generates custom profile URLs** that encode a preferred provider, fallbacks, and a preferred size directly in the path — no account or storage required.
 
 > Interactive API docs and a live playground are available at `/api` on a running instance.
 
@@ -298,7 +298,7 @@ Full walkthrough: [Preload manager](https://github.com/R0GGER/favicon-api/blob/m
 
 ## Browser tools
 
-The **Tools** button on the homepage (and on `/api` and `/docs`) opens a side panel of browser helpers. You set a profile once — preferred provider, optional fallbacks, and a minimum icon size — and that profile powers every tool in the panel. The settings are encoded in the URL: no account, nothing stored on the server.
+The **Tools** button on the homepage (and on `/api` and `/docs`) opens a side panel of browser helpers. You set a profile once — preferred provider, optional fallbacks, and a preferred icon size — and that profile powers every tool in the panel. The settings are encoded in the URL: no account, nothing stored on the server.
 
 From the panel you can:
 
@@ -410,7 +410,7 @@ Forces a fresh scrape by clearing the cached scraper entry (memory and disk) bef
 
 ## Custom profile URLs
 
-Build a shareable URL that pins your own **preferred provider**, an ordered list of up to **four fallbacks**, and a **minimum icon size** — without an account or any server-side storage:
+Build a shareable URL that pins your own **preferred provider**, an ordered list of up to **four fallbacks**, and a **preferred icon size** — without an account or any server-side storage:
 
 ```
 https://your-host/{id}/{domain-or-appname}
@@ -422,20 +422,21 @@ The `{id}` is a URL-safe (base64url) string that *encodes* the whole configurati
 
 The chain `[preferred, ...fallbacks]` is tried in order and the first usable icon wins:
 
-- A provider that returns an **SVG** satisfies any minimum (vector) and is served as-is (`image/svg+xml`).
-- A provider that returns a **raster** icon must have a source whose smaller side is **≥** the minimum size; it is then served as PNG at **exactly** that size.
-- If a provider returns nothing usable or a raster below the minimum, the next fallback is tried. If the whole chain fails, a transparent placeholder is returned with `404`.
+- A provider that returns an **SVG** satisfies any preferred size (vector) and is served as-is (`image/svg+xml`).
+- A provider that returns a **raster** icon must have a source whose smaller side is **≥** the preferred size; it is then served as PNG at **exactly** that size (larger sources are scaled down).
+- If a provider returns nothing usable or a raster below the preferred size, the next fallback is tried. If the whole chain fails, a transparent placeholder is returned with `404` — unless the profile's size fallback is set to **Use the largest smaller icon**: then the largest raster below the preferred size found along the chain (at least 16px) is served as PNG at its own size, without upscaling.
 
 **Encoding**
 
 The id is the base64url of a compact JSON array — keep this contract identical on both ends:
 
 ```js
-// [version, preferredProvider, [fallbacks...], minSize]
+// [version, preferredProvider, [fallbacks...], preferredSize, sizeFallback?]
 [1, "scraper", ["googlev2", "duckduckgo"], 128]
+[1, "scraper", ["googlev2", "duckduckgo"], 128, "smaller"]
 ```
 
-Providers are any from the [favicon providers](#favicon-providers) / [catalogs](#appservice-icon-catalogs) tables; minimum sizes are `16, 32, 64, 128`. `logodev`/`brandfetch` only resolve when their credentials are configured (otherwise that step is skipped). Domain-only providers (scraper, raster providers, brandfetch) are skipped for app-name targets.
+Providers are any from the [favicon providers](#favicon-providers) / [catalogs](#appservice-icon-catalogs) tables; preferred sizes are `16, 32, 64, 128` and the optional 5th element `"smaller"` enables the size fallback (omitted when off, so older ids stay valid). `logodev`/`brandfetch` only resolve when their credentials are configured (otherwise that step is skipped). Domain-only providers (scraper, raster providers, brandfetch) are skipped for app-name targets.
 
 ---
 
