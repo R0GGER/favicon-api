@@ -4,8 +4,8 @@
  * When a site's own favicon is unusable you can pin an exact image URL with
  * `scripts/manage-preload.js set {domain} --icon-url ...`. The override has to
  * win on every route that serves that domain's icon — the best-pick route, the
- * sized scraper routes, and the v1 API — otherwise the preload script would
- * happily cache the wrong icon for the routes that skip it.
+ * sized scraper routes, custom profile URLs, and the v1 API — otherwise the
+ * preload script would happily cache the wrong icon for the routes that skip it.
  *
  * Lookups happen in the request path, so they must be synchronous and free:
  * the whole table (tens of rows) is held in a Map and only re-read when the

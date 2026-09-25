@@ -14,6 +14,10 @@
  *     sizeFallback is "smaller", the largest smaller raster seen along the
  *     chain is served as PNG at its native size. Otherwise a not-found
  *     placeholder is returned with notFound: true.
+ *
+ * A manual icon override for a domain wins before the chain and before the
+ * profile cache. An SVG pin is served as-is; a larger raster is scaled down
+ * to the preferred size; a smaller raster is served at its own size.
  */
 const {
   fetchGoogle,
@@ -37,6 +41,7 @@ const {
   fetchScraper,
 } = require('./providers');
 const { fetchWithCache } = require('./bestPick');
+const { fetchOverrideEntry } = require('./iconOverride');
 const {
   looksLikeSvg,
   readImageDimensions,
@@ -212,7 +217,76 @@ async function finalizeCandidate(candidate, size) {
   }
 }
 
+const REUSE_STALE = { allowStale: true };
+
+// The pin replaces the chain even when the image is below the preferred size.
+// SVG is served as-is. A larger raster is scaled down to the preferred size.
+// A smaller raster is served at its own size, never upscaled, and never skipped.
+async function serveOverride(entry, size) {
+  if (isSvgEntry(entry)) {
+    return {
+      buffer: entry.buffer,
+      contentType: 'image/svg+xml',
+      provider: 'override',
+      url: entry.url,
+    };
+  }
+
+  const served = await finalizeCandidate(
+    { ...entry, isSvg: false, provider: 'override' },
+    size
+  );
+  if (!served) return null;
+
+  if (!served.tooSmall) {
+    return {
+      buffer: served.buffer,
+      contentType: served.contentType,
+      provider: 'override',
+      url: entry.url,
+    };
+  }
+
+  if (served.side >= 1) {
+    try {
+      return {
+        buffer: await resizeIcon(served.buffer, served.side),
+        contentType: 'image/png',
+        provider: 'override',
+        url: entry.url,
+      };
+    } catch {
+      /* serve the decoded bytes */
+    }
+  }
+
+  return {
+    buffer: served.buffer,
+    contentType: served.contentType || 'image/png',
+    provider: 'override',
+    url: entry.url,
+  };
+}
+
 async function resolveProfileIcon(target, profile, id) {
+  // Checked before the profile cache. That cache key has no override-URL hash,
+  // so a chain result (or a cached not-found) stored before the pin was set
+  // would keep winning until DISK_CACHE_TTL. The override has its own cache.
+  if (target.type === 'domain') {
+    try {
+      const pinned = await fetchOverrideEntry(target.value, null, fetchWithCache, REUSE_STALE);
+      if (pinned?.buffer?.length) {
+        const served = await serveOverride(pinned, profile.size);
+        if (served) return served;
+      }
+    } catch (err) {
+      console.error(
+        `Icon override failed for ${target.value}:`,
+        err && err.message ? err.message : err
+      );
+    }
+  }
+
   const { size } = profile;
   const cacheDomain = `${id}_${target.value}`;
 
