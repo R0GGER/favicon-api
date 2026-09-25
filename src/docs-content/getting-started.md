@@ -399,6 +399,7 @@ The chain `[preferred, ...fallbacks]` is tried in order and the first usable ico
 - A provider that returns an **SVG** satisfies any preferred size (vector) and is served as-is (`image/svg+xml`).
 - A provider that returns a **raster** icon must have a source whose smaller side is **≥** the preferred size; it is then served as PNG at **exactly** that size (larger sources are scaled down).
 - If a provider returns nothing usable or a raster below the preferred size, the next fallback is tried. If the whole chain fails, a transparent placeholder is returned with `404` — unless the profile's size fallback is set to **Use the largest smaller icon**: then the largest raster below the preferred size found along the chain (at least 16px) is served as PNG at its own size, without upscaling.
+- A manual icon override for that domain wins before the chain. An SVG pin is served as-is; a larger raster is scaled down to the preferred size; a smaller raster is served at its own size. App-name targets have no override.
 
 **Encoding**
 

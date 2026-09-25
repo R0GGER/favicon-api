@@ -591,8 +591,9 @@ freshly imported list that has no hits yet will reset those auto ranks to 0.
 
 **Icon overrides apply everywhere.** `set {domain} --icon-url https://...` pins
 an exact image for a domain when its own favicon is unusable. The override wins
-on the best-pick route, the sized scraper routes and the v1 API alike, so a
-preload run cannot cache the rejected icon on the routes that skip it.
+on the best-pick route, the sized scraper routes, custom profile URLs and the
+v1 API alike, so a preload run cannot cache the rejected icon on the routes
+that skip it.
 `X-Favicon-Source: override` marks the responses, and changing the URL takes
 effect immediately rather than after `DISK_CACHE_TTL`, because the URL is part
 of the cache key. Only `https:` URLs are accepted.

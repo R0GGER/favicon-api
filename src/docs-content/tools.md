@@ -121,6 +121,8 @@ The chain `[preferred, …fallbacks]` is tried in order; the first usable icon w
 
 Preferred sizes: `16`, `32`, `64`, `128`.
 
+A manual icon override for the domain wins before this chain. An SVG pin is served as-is; a larger raster is scaled down to the preferred size; a smaller raster is served at its own size. App-name targets have no override.
+
 **If no provider has the preferred size**
 
 | Option | Behaviour |
