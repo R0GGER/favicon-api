@@ -5,6 +5,12 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.1] — 2026-09-25
+
+### Fixed
+
+- **Custom URLs ignored icon overrides** — a domain pin (`alter_icon_url`) already won on best-pick, the scraper routes and `/api/v1/favicon`, but `/{profile}/{domain}` walked the provider chain anyway. For `mijnip.nl` that chain found nothing usable and returned the not-found placeholder, even though the scraper card showed the pinned SVG. The pin is now resolved before the chain and before the profile cache. An SVG pin is served as-is; a larger raster is scaled down to the preferred size; a smaller raster is served at its own size.
+
 ## [3.1.0] — 2026-09-25
 
 ### Added
