@@ -5,6 +5,16 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.0] — 2026-09-25
+
+### Added
+
+- **Custom URLs — size fallback** — new Browser Tools option **If no provider has the preferred size**: *Show not found* (default, previous behaviour) or *Use the largest smaller icon*. With the latter, once the whole chain (preferred provider and fallbacks) has failed to reach the preferred size, the largest raster below it found along the chain (at least 16px) is served as PNG at its own size, without upscaling. Encoded as an optional 5th element `"smaller"` in the profile id; it is omitted when off, so existing custom URLs keep working and keep the same id.
+
+### Changed
+
+- **Browser Tools — "Minimum icon size" renamed to "Preferred icon size"** — in the profile builder, the docs and the page descriptions. Larger sources are still scaled down to exactly that size.
+
 ## [3.0.1] — 2026-08-30
 
 ### Added
