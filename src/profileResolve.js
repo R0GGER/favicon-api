@@ -2,16 +2,18 @@
  * Resolver for stateless favicon profiles (see src/customProfile.js).
  *
  * Given a parsed target (domain or service) and a decoded profile
- * ({ preferred, fallbacks, size }), walk the provider chain and return the
- * first usable icon:
+ * ({ preferred, fallbacks, size, sizeFallback }), walk the provider chain and
+ * return the first usable icon:
  *
- *   - A provider that yields an SVG satisfies any minimum size and is served
+ *   - A provider that yields an SVG satisfies any preferred size and is served
  *     as-is (image/svg+xml).
  *   - A provider that yields a raster icon must have a source whose smaller
- *     side is >= the minimum size; it is then resized to exactly that size and
- *     served as PNG.
- *   - Otherwise fall through to the next entry. If the whole chain fails, a
- *     not-found placeholder is returned with notFound: true.
+ *     side is >= the preferred size; it is then resized to exactly that size
+ *     and served as PNG.
+ *   - Otherwise fall through to the next entry. If the whole chain fails and
+ *     sizeFallback is "smaller", the largest smaller raster seen along the
+ *     chain is served as PNG at its native size. Otherwise a not-found
+ *     placeholder is returned with notFound: true.
  */
 const {
   fetchGoogle,
@@ -173,8 +175,12 @@ async function fetchCandidate(provider, target, size) {
   }
 }
 
-// Turn a raw candidate into the bytes to serve, or null when a raster source is
-// below the minimum size (caller then falls through to the next provider).
+// Smallest native side accepted by the "smaller" size fallback.
+const MIN_FALLBACK_SIDE = 16;
+
+// Turn a raw candidate into the bytes to serve, or null when it is unusable.
+// A raster source below the preferred size yields { tooSmall: true, side,
+// buffer, contentType } so the caller can keep it for the size fallback.
 async function finalizeCandidate(candidate, size) {
   if (candidate.isSvg) {
     return { buffer: candidate.buffer, contentType: 'image/svg+xml' };
@@ -196,7 +202,7 @@ async function finalizeCandidate(candidate, size) {
   const dims = await readImageDimensions(buffer, { contentType, url: candidate.url });
   if (!dims) return null;
   const side = Math.min(dims.width || 0, dims.height || dims.width || 0);
-  if (side < size) return null;
+  if (side < size) return { tooSmall: true, side, buffer, contentType };
 
   try {
     const resized = await resizeIcon(buffer, size);
@@ -231,8 +237,21 @@ async function resolveProfileIcon(target, profile, id) {
 
 /** Walk the provider chain, store the first usable icon, and return it. */
 async function resolveFromProviders(target, profile, cacheDomain) {
-  const { preferred, fallbacks, size } = profile;
+  const { preferred, fallbacks, size, sizeFallback } = profile;
   const chain = [preferred, ...fallbacks];
+  let bestSmaller = null;
+
+  const store = async (served, candidate, provider) => {
+    const entry = {
+      buffer: served.buffer,
+      contentType: served.contentType,
+      provider: candidate.provider || provider,
+    };
+    if (candidate.url) entry.url = candidate.url;
+    await cache.set('profile', cacheDomain, size, entry);
+    return entry;
+  };
+
   for (const provider of chain) {
     let candidate = null;
     try {
@@ -244,15 +263,28 @@ async function resolveFromProviders(target, profile, cacheDomain) {
 
     const served = await finalizeCandidate(candidate, size);
     if (!served) continue;
+    if (served.tooSmall) {
+      if (
+        sizeFallback === 'smaller' &&
+        served.side >= MIN_FALLBACK_SIDE &&
+        (!bestSmaller || served.side > bestSmaller.served.side)
+      ) {
+        bestSmaller = { served, candidate, provider };
+      }
+      continue;
+    }
 
-    const entry = {
-      buffer: served.buffer,
-      contentType: served.contentType,
-      provider: candidate.provider || provider,
-    };
-    if (candidate.url) entry.url = candidate.url;
-    await cache.set('profile', cacheDomain, size, entry);
-    return entry;
+    return store(served, candidate, provider);
+  }
+
+  if (bestSmaller) {
+    const { served, candidate, provider } = bestSmaller;
+    try {
+      const resized = await resizeIcon(served.buffer, served.side);
+      return store({ buffer: resized, contentType: 'image/png' }, candidate, provider);
+    } catch {
+      /* fall through to not-found */
+    }
   }
 
   return notFoundEntry(size);

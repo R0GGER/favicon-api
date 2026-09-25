@@ -1,13 +1,17 @@
 /**
  * Stateless, user-generated favicon "profiles".
  *
- * A profile encodes a preferred provider, up to 4 fallbacks, and a minimum
- * icon size directly into a URL-safe id (no database). The id is the
- * base64url of a compact JSON array:
+ * A profile encodes a preferred provider, up to 4 fallbacks, a preferred
+ * icon size and an optional size fallback directly into a URL-safe id (no
+ * database). The id is the base64url of a compact JSON array:
  *
- *   [version, preferredProvider, [fallbacks...], minSize]
+ *   [version, preferredProvider, [fallbacks...], preferredSize, sizeFallback?]
  *
  * e.g. [1, "scraper", ["googlev2", "duckduckgo"], 128]
+ *      [1, "scraper", ["googlev2"], 128, "smaller"]
+ *
+ * The 5th element is omitted when there is no size fallback, so ids created
+ * before it existed stay valid and unchanged.
  *
  * The resolve route baseurl/{id}/{domain-or-appname} decodes the id back into
  * a profile and serves the icon following the chain. Keep the encode/decode
@@ -41,11 +45,16 @@ const PROFILE_PROVIDERS = [
 
 const PROFILE_PROVIDER_SET = new Set(PROFILE_PROVIDERS);
 
-// Allowed minimum sizes. SVG sources are treated as unlimited (always satisfy
-// the minimum); raster sources must be >= the minimum and are then served at
-// exactly this size.
+// Allowed preferred sizes. SVG sources are treated as unlimited (always satisfy
+// the preferred size); raster sources must be >= the preferred size and are
+// then served at exactly this size.
 const PROFILE_SIZES = [16, 32, 64, 128];
 const PROFILE_SIZE_SET = new Set(PROFILE_SIZES);
+
+// "smaller": when no provider in the chain reaches the preferred size, serve
+// the largest smaller raster found along the chain at its native size.
+const PROFILE_SIZE_FALLBACKS = ['smaller'];
+const PROFILE_SIZE_FALLBACK_SET = new Set(PROFILE_SIZE_FALLBACKS);
 
 const PROFILE_VERSION = 1;
 const MAX_FALLBACKS = 4;
@@ -81,9 +90,9 @@ function normalizeSize(value) {
 
 /**
  * Encode a profile into a URL-safe id. Returns null when the input is invalid
- * (unknown provider, too many fallbacks, bad size).
+ * (unknown provider, too many fallbacks, bad size, unknown size fallback).
  */
-function encodeProfile({ preferred, fallbacks = [], size } = {}) {
+function encodeProfile({ preferred, fallbacks = [], size, sizeFallback = null } = {}) {
   const p = normalizeProvider(preferred);
   if (!p) return null;
 
@@ -98,12 +107,17 @@ function encodeProfile({ preferred, fallbacks = [], size } = {}) {
   const s = normalizeSize(size);
   if (!s) return null;
 
-  const json = JSON.stringify([PROFILE_VERSION, p, f, s]);
-  return base64urlEncode(json);
+  const arr = [PROFILE_VERSION, p, f, s];
+  if (sizeFallback) {
+    if (!PROFILE_SIZE_FALLBACK_SET.has(sizeFallback)) return null;
+    arr.push(sizeFallback);
+  }
+  return base64urlEncode(JSON.stringify(arr));
 }
 
 /**
- * Decode a profile id back into { preferred, fallbacks, size } or null when the
+ * Decode a profile id back into { preferred, fallbacks, size, sizeFallback }
+ * (sizeFallback is null when absent) or null when the
  * id is not a valid profile (bad length/charset/JSON/version/values). A null
  * result lets the resolve route fall through to other routes.
  */
@@ -118,8 +132,8 @@ function decodeProfile(id) {
     return null;
   }
 
-  if (!Array.isArray(parsed) || parsed.length !== 4) return null;
-  const [version, rawPreferred, rawFallbacks, rawSize] = parsed;
+  if (!Array.isArray(parsed) || (parsed.length !== 4 && parsed.length !== 5)) return null;
+  const [version, rawPreferred, rawFallbacks, rawSize, rawSizeFallback] = parsed;
   if (version !== PROFILE_VERSION) return null;
 
   const preferred = normalizeProvider(rawPreferred);
@@ -136,12 +150,19 @@ function decodeProfile(id) {
   const size = normalizeSize(rawSize);
   if (!size) return null;
 
-  return { preferred, fallbacks, size };
+  let sizeFallback = null;
+  if (parsed.length === 5) {
+    if (!PROFILE_SIZE_FALLBACK_SET.has(rawSizeFallback)) return null;
+    sizeFallback = rawSizeFallback;
+  }
+
+  return { preferred, fallbacks, size, sizeFallback };
 }
 
 module.exports = {
   PROFILE_PROVIDERS,
   PROFILE_SIZES,
+  PROFILE_SIZE_FALLBACKS,
   PROFILE_VERSION,
   MAX_FALLBACKS,
   encodeProfile,

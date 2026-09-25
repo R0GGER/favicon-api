@@ -2317,7 +2317,7 @@ app.get('/:domain/json', async (req, res) => {
 });
 
 // Custom profile favicon: /:id/:target where :id is a base64url-encoded profile
-// (preferred provider + fallbacks + min size; see src/customProfile.js). When
+// (preferred provider + fallbacks + preferred size; see src/customProfile.js). When
 // :id is not a valid profile, fall through so other routes / the 404 handler
 // take over. Registered after /:domain/json so the literal */json route wins.
 app.get('/:cfg/:target', async (req, res, next) => {
