@@ -1,6 +1,6 @@
 # Browser tools
 
-The **Tools** button on the homepage (and on `/api` and `/docs`) opens a side panel of helpers for using FaviconAPI from the browser. You configure a profile once — preferred provider, optional fallbacks, and a minimum icon size — and that profile powers every tool below. Preferences are encoded in the URL; there is no account and nothing is stored on the server.
+The **Tools** button on the homepage (and on `/api` and `/docs`) opens a side panel of helpers for using FaviconAPI from the browser. You configure a profile once — preferred provider, optional fallbacks, and a preferred icon size — and that profile powers every tool below. Preferences are encoded in the URL; there is no account and nothing is stored on the server.
 
 Open the panel from **Tools** in the top navigation, or go to `https://your-host/#tools`.
 
@@ -63,7 +63,7 @@ On iPhone/iPad Safari, only built-in search engines are available.
 
 ## Build custom URL
 
-Build a **shareable URL template** that returns favicons and service icons with *your* preferred provider order, fallbacks, and minimum size — encoded in the URL itself. No account, no database, no per-site configuration on the server.
+Build a **shareable URL template** that returns favicons and service icons with *your* preferred provider order, fallbacks, and preferred size — encoded in the URL itself. No account, no database, no per-site configuration on the server.
 
 ```
 https://your-host/{id}/{domain-or-appname}
@@ -76,7 +76,7 @@ Generate `{id}` once from **Tools → Build custom URL** on the homepage (live p
 The default `GET /{domain}` endpoint picks the best icon from all providers. A custom URL lets you **pin a resolution strategy** instead:
 
 - Prefer your own HTML scraper, then fall back to Google and DuckDuckGo.
-- Require at least 64×64 so dashboard tiles never look blurry.
+- Prefer 64×64 so dashboard tiles never look blurry — and optionally fall back to a smaller icon instead of showing nothing.
 - Prefer self-hosted icon catalogs (`selfhst`, `dashboardicons`, `lobehub`) for homelab app names like `immich` or `jellyfin`.
 - Share one URL pattern with your team — everyone gets the same icon quality and fallback behaviour.
 
@@ -86,19 +86,19 @@ Because settings live in the path, you can paste a single base URL into config f
 
 | Scenario | How it helps |
 |---|---|
-| **Dashboards** ([Mafl+](https://maflplus.eu/), Homer, Heimdall, Dashy, …) | One icon URL pattern for every tile: `/{id}/github.com`. Swap the domain per link; provider order and minimum size stay fixed. |
+| **Dashboards** ([Mafl+](https://maflplus.eu/), Homer, Heimdall, Dashy, …) | One icon URL pattern for every tile: `/{id}/github.com`. Swap the domain per link; provider order and preferred size stay fixed. |
 | **Password managers** (Bitwarden, Vaultwarden, KeePass plugins) | Attach consistent, high-quality icons to login entries without hunting for each site's favicon manually. |
 | **Homelab / self-hosted launchers** | Mix website domains (`nextcloud.example.com`) and catalog app names (`immich`, `plex`) in the same template when fallbacks include service-icon providers. |
 | **Status & monitoring** (Uptime Kuma, Grafana, …) | Uniform icon size and fallback chain across dozens of monitored endpoints. |
 | **RSS readers & feed lists** | Stable icon URLs next to feed titles; no per-feed icon upload. |
-| **Internal portals & wikis** | Link lists, service catalogs, and "quick links" pages with matching icons at a chosen minimum size. |
+| **Internal portals & wikis** | Link lists, service catalogs, and "quick links" pages with matching icons at a chosen preferred size. |
 | **Browser start pages & bookmark tools** | Custom new-tab pages or bookmark extensions that load icons from one predictable URL shape. |
 | **Apps & integrations** | Bots, mobile widgets, or scripts that need a favicon URL without calling the JSON API or hard-coding provider paths. |
 
 ### Quick start
 
 1. Open the homepage → **Tools** → **Build custom URL**.
-2. Choose a **preferred provider**, up to **four fallbacks** (numbered 1–4), and a **minimum size** (`16`, `32`, `64`, or `128`).
+2. Choose a **preferred provider**, up to **four fallbacks** (numbered 1–4), a **preferred size** (`16`, `32`, `64`, or `128`), and what to do when no provider has that size.
 3. Preview with a sample domain or app name, then **Copy URL**.
 4. Replace the sample target with any domain (`github.com`) or app name (`immich`):
 
@@ -115,20 +115,30 @@ The chain `[preferred, …fallbacks]` is tried in order; the first usable icon w
 
 | Source type | Rule |
 |---|---|
-| **SVG** | Satisfies any minimum size; served as-is (`image/svg+xml`). |
-| **Raster** | Source must be ≥ the minimum size on its smaller side; output is PNG at exactly that size. |
-| **Failure** | Try the next fallback; if the whole chain fails → transparent `404`. |
+| **SVG** | Satisfies any preferred size; served as-is (`image/svg+xml`). |
+| **Raster** | Source must be ≥ the preferred size on its smaller side; output is PNG at exactly that size (larger sources are scaled down). |
+| **Failure** | Try the next fallback; if the whole chain fails → size fallback (below), otherwise transparent `404`. |
 
-Minimum sizes: `16`, `32`, `64`, `128`.
+Preferred sizes: `16`, `32`, `64`, `128`.
+
+**If no provider has the preferred size**
+
+| Option | Behaviour |
+|---|---|
+| **Show not found** (default) | Transparent `404` placeholder. |
+| **Use the largest smaller icon** | Only after the whole chain failed: the largest raster below the preferred size found along the chain (at least 16px) is served as PNG at its own size, without upscaling. |
 
 ### Encoding
 
 The id is base64url of a compact JSON array:
 
 ```js
-// [version, preferredProvider, [fallbacks...], minSize]
+// [version, preferredProvider, [fallbacks...], preferredSize, sizeFallback?]
 [1, "scraper", ["googlev2", "duckduckgo"], 128]
+[1, "scraper", ["googlev2", "duckduckgo"], 128, "smaller"]
 ```
+
+The optional 5th element `"smaller"` enables the size fallback. It is omitted when the fallback is off, so ids generated before this option existed keep working unchanged.
 
 **Providers** — any from the **favicon providers** or **service-icon** catalogs tables.
 
@@ -138,14 +148,14 @@ The id is base64url of a compact JSON array:
 
 ## Offline search page
 
-Download a **self-contained HTML file** that lets you look up favicons from your own computer — no need to visit the FaviconAPI website every time. The file uses the provider chain and minimum size from your profile, baked directly into the page.
+Download a **self-contained HTML file** that lets you look up favicons from your own computer — no need to visit the FaviconAPI website every time. The file uses the provider chain and preferred size from your profile, baked directly into the page.
 
 ### How it works
 
 The downloaded `faviconapi-search.html` file contains:
 
 - Your FaviconAPI server URL.
-- Your profile configuration (preferred provider, fallbacks, minimum size).
+- Your profile configuration (preferred provider, fallbacks, preferred size).
 - A search box where you type a domain (`github.com`) or app name (`immich`).
 - A favicon preview with a copyable URL.
 
@@ -154,7 +164,7 @@ When you search, the page fetches the icon from your FaviconAPI server using the
 ### Download
 
 1. Open the homepage and click **Tools** in the top navigation.
-2. Configure your **preferred provider**, **fallbacks**, and **minimum size** in the profile builder.
+2. Configure your **preferred provider**, **fallbacks**, and **preferred size** in the profile builder.
 3. Click **Download HTML** under **Offline search page**.
 
 The file is generated in your browser with the current profile settings. To change providers or size, download a new copy.

@@ -1468,9 +1468,17 @@
               </div>
             </div>
             <div class="profile-field">
-              <label for="tools-size">Minimum icon size</label>
+              <label for="tools-size">Preferred icon size</label>
               <select id="tools-size"></select>
-              <span class="profile-hint">SVG = unlimited (vector, served as-is). PNG = served at exactly this size; smaller sources are skipped.</span>
+              <span class="profile-hint">SVG = unlimited (vector, served as-is). PNG = served at exactly this size; larger sources are scaled down, smaller sources are skipped.</span>
+            </div>
+            <div class="profile-field">
+              <label for="tools-size-fallback">If no provider has the preferred size</label>
+              <select id="tools-size-fallback">
+                <option value="">Show not found</option>
+                <option value="smaller">Use the largest smaller icon</option>
+              </select>
+              <span class="profile-hint">Only applies after the whole chain (preferred provider and fallbacks) failed. The smaller icon is served at its own size, without upscaling.</span>
             </div>
             <div class="profile-field">
               <label for="tools-test">Test URL (domain or app name)</label>
@@ -1553,7 +1561,7 @@
         <div class="tool-card">
           <div>
             <strong><iconify-icon icon="material-symbols:link-2" aria-hidden="true"></iconify-icon> Custom URL</strong>
-            <p>Build a shareable URL with your own preferred provider, fallbacks and minimum icon size. The settings are encoded in the URL &mdash; no account needed.</p>
+            <p>Build a shareable URL with your own preferred provider, fallbacks and preferred icon size. The settings are encoded in the URL &mdash; no account needed.</p>
           </div>
           <button type="button" class="bookmarklet-btn tool-action" aria-expanded="false" aria-controls="tool-details-custom" onclick="toggleToolDetails('custom')">
             <iconify-icon icon="material-symbols:link-2" aria-hidden="true"></iconify-icon>
@@ -1952,12 +1960,18 @@
     let toolsBuilderReady = false;
     let profileCopyUrl = '';
 
-    function encodeProfileClient(preferred, fallbacks, size) {
-      const json = JSON.stringify([1, preferred, fallbacks, size]);
+    function encodeProfileClient(preferred, fallbacks, size, sizeFallback) {
+      const arr = [1, preferred, fallbacks, size];
+      if (sizeFallback) arr.push(sizeFallback);
+      const json = JSON.stringify(arr);
       return btoa(unescape(encodeURIComponent(json)))
         .replace(/\+/g, '-')
         .replace(/\//g, '_')
         .replace(/=+$/, '');
+    }
+
+    function getProfileSizeFallback() {
+      return document.getElementById('tools-size-fallback')?.value || '';
     }
 
     function profileOptionDisabled(opt) {
@@ -2019,6 +2033,7 @@
           preferred,
           [1, 2, 3, 4].map((i) => document.getElementById(`tools-fb-${i}`)?.value).filter(Boolean),
           parseInt(document.getElementById('tools-size')?.value, 10) || PROFILE_DEFAULT_SIZE,
+          getProfileSizeFallback(),
         ))
         : buildDefaultBookmarkletCode();
       document.querySelectorAll('#bookmarklet-link, [data-bookmarklet]').forEach((link) => {
@@ -2073,6 +2088,7 @@
       const inputs = [
         preferred,
         sizeSelect,
+        document.getElementById('tools-size-fallback'),
         document.getElementById('tools-test'),
         ...[1, 2, 3, 4].map((i) => document.getElementById(`tools-fb-${i}`)),
       ];
@@ -2092,7 +2108,7 @@
         .filter(Boolean);
       const size = parseInt(document.getElementById('tools-size')?.value, 10) || PROFILE_DEFAULT_SIZE;
 
-      const id = encodeProfileClient(preferred, fallbacks, size);
+      const id = encodeProfileClient(preferred, fallbacks, size, getProfileSizeFallback());
       const base = `${location.origin}/${id}/`;
 
       profileCopyUrl = base;
