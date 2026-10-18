@@ -441,7 +441,7 @@ app.get('/sitemap.xml', (req, res) => {
     '  <url>\n' +
     `    <loc>${baseUrl}/api</loc>\n` +
     '    <changefreq>monthly</changefreq>\n' +
-    '    <priority>0.8</priority>\n' +
+    '    <priority>0.6</priority>\n' +
     '  </url>\n' +
     docsEntries +
     '</urlset>\n';
