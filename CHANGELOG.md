@@ -5,6 +5,12 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.2] — 2026-10-18
+
+### Changed
+
+- **SEO — homepage is the landing page for "Favicon API"** — searching for *Favicon API* landed on `/api` instead of the homepage, because the homepage only spelled the name as one word (*FaviconAPI*) while `/api` carried "API" in its URL, title and first keyword. The homepage title now leads with *Favicon API*, its meta description is shortened to fit a search snippet, and a `WebSite` JSON-LD block declares *Favicon API* as alternate site name. `/api` is retitled *JSON API Reference & Playground*, its keywords no longer lead with *favicon api*, it gains a `BreadcrumbList` back to the homepage, and its sitemap priority drops from 0.8 to 0.6.
+
 ## [3.1.1] — 2026-09-25
 
 ### Fixed
