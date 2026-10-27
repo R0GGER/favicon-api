@@ -1,6 +1,6 @@
 {
   "name": "favicon-proxy",
-  "version": "3.1.2",
+  "version": "3.1.3",
   "description": "Favicon proxy service - fetches favicons from Google, DuckDuckGo, and Yandex with caching",
   "license": "MIT",
   "main": "src/index.js",
