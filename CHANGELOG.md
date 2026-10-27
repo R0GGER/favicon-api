@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **High CPU load at idle** — every cluster worker re-walked the whole cache directory every 60 seconds (a `readdir` plus four `stat` calls per icon), and once `CACHE_SIZE_MB` was reached eviction only trimmed back to the limit itself, so the next new icon pushed it over again and triggered another full walk. The periodic walk is now claimed through a lock file (`cache-index.lock`), so one worker does it per `CACHE_RESCAN_INTERVAL` (default 600 s) for the whole cluster, and eviction trims to 90% of the limit.
+- **CPU spike at startup** — all workers walked the cache directory at the same moment on boot, and the walk stat'ed `.orig` and `.origsvg` for every icon even though most icons have neither, so each icon cost two thrown errors. Only the first worker now walks the directory at boot, and sidecars are looked up in the directory listing instead of stat'ed blindly.
 - **Thread oversubscription in cluster mode** — sharp/libvips sized its thread pool to the core count in every worker, so 8 workers ran 64 image threads on 8 cores. Each worker now gets `cores / WORKERS` threads, overridable with `SHARP_CONCURRENCY`.
 
 ## [3.1.2] — 2026-10-18
