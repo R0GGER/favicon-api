@@ -13,5 +13,11 @@ if (cluster.isPrimary && WORKERS > 1) {
     cluster.fork();
   });
 } else {
+  if (cluster.isWorker) {
+    // libvips sizes its thread pool to the core count in every process, so
+    // N workers would otherwise run N x cores image threads on N cores.
+    const share = Math.max(1, Math.floor(os.cpus().length / WORKERS));
+    require('sharp').concurrency(parseInt(process.env.SHARP_CONCURRENCY || String(share), 10));
+  }
   require('./index.js');
 }

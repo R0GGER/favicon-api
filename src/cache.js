@@ -19,7 +19,16 @@ const DISK_TTL = DISK_CACHE_TTL_SECONDS * 1000;
 const MAX_AGE_MS = SERVE_STALE ? DISK_TTL + STALE_RETENTION_SECONDS * 1000 : DISK_TTL;
 const DISK_MAX_BYTES =
   Math.max(0, parseInt(process.env.CACHE_SIZE_MB || '0', 10)) * 1024 * 1024;
-const DISK_RESCAN_INTERVAL_MS = 60 * 1000;
+// How often the shared cache directory is re-walked. Claimed through a lock
+// file's mtime so the walk happens once per interval for the whole cluster,
+// not once per worker: every entry costs a readdir slot plus four stat calls.
+const DISK_RESCAN_INTERVAL_MS =
+  Math.max(1, parseInt(process.env.CACHE_RESCAN_INTERVAL || '600', 10)) * 1000;
+const RESCAN_LOCK_FILE = path.join(CACHE_DIR, 'cache-index.lock');
+// Eviction stops at this fraction of CACHE_SIZE_MB. Evicting only down to the
+// limit itself left the next write over it again, so a full cache re-walked
+// the whole directory on nearly every new icon.
+const EVICT_LOW_WATER = 0.9;
 
 const memoryCache = new LRUCache({
   max: MEMORY_MAX,
@@ -162,8 +171,9 @@ async function evictIfOverLimit() {
     (a, b) => a[1].mtimeMs - b[1].mtimeMs
   );
 
+  const target = DISK_MAX_BYTES * EVICT_LOW_WATER;
   for (const [key, info] of sorted) {
-    if (diskTotal <= DISK_MAX_BYTES) break;
+    if (diskTotal <= target) break;
     diskIndex.delete(key);
     diskTotal = Math.max(0, diskTotal - info.size);
     memoryCache.delete(key);
@@ -361,15 +371,33 @@ async function del(provider, domain, size) {
   await unlinkEntryFiles(key);
 }
 
+async function claimRescan() {
+  try {
+    const stat = await fs.stat(RESCAN_LOCK_FILE);
+    if (Date.now() - stat.mtimeMs < DISK_RESCAN_INTERVAL_MS) return false;
+  } catch {
+    // No lock yet: first scan on this volume.
+  }
+  try {
+    await ensureCacheDir();
+    await fs.writeFile(RESCAN_LOCK_FILE, new Date().toISOString());
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 if (DISK_MAX_BYTES) {
+  // Every worker needs its own index once at boot; after that one worker per
+  // interval re-walks the volume and evicts on behalf of the cluster.
   scanDiskCache()
     .then(() => evictIfOverLimit())
     .catch(() => {});
   setInterval(() => {
-    scanDiskCache()
-      .then(() => evictIfOverLimit())
+    claimRescan()
+      .then((claimed) => (claimed ? scanDiskCache().then(() => evictIfOverLimit()) : null))
       .catch(() => {});
-  }, DISK_RESCAN_INTERVAL_MS).unref();
+  }, Math.min(60 * 1000, DISK_RESCAN_INTERVAL_MS)).unref();
 }
 
 /**
