@@ -1,4 +1,5 @@
 const { LRUCache } = require('lru-cache');
+const cluster = require('cluster');
 const fs = require('fs/promises');
 const path = require('path');
 const {
@@ -122,6 +123,9 @@ async function scanDiskCache() {
     try {
       await ensureCacheDir();
       const entries = await fs.readdir(CACHE_DIR);
+      // Sidecars are looked up in the listing instead of stat'ed blindly: most
+      // entries have no .orig/.origsvg, and every failed stat is a thrown error.
+      const present = new Set(entries);
       const next = new Map();
       let total = 0;
       for (const name of entries) {
@@ -132,12 +136,13 @@ async function scanDiskCache() {
           if (!stat.isFile()) continue;
           let size = stat.size;
           // Sidecar originals belong to this entry's budget.
-          for (const side of [metaPath(name), originalPath(name), originalSvgPath(name)]) {
+          for (const side of [`${name}.meta`, `${name}.orig`, `${name}.origsvg`]) {
+            if (!present.has(side)) continue;
             try {
-              const sideStat = await fs.stat(side);
+              const sideStat = await fs.stat(path.join(CACHE_DIR, side));
               if (sideStat.isFile()) size += sideStat.size;
             } catch {
-              /* missing sidecar */
+              /* removed since readdir */
             }
           }
           next.set(name, { size, mtimeMs: stat.mtimeMs });
@@ -388,11 +393,14 @@ async function claimRescan() {
 }
 
 if (DISK_MAX_BYTES) {
-  // Every worker needs its own index once at boot; after that one worker per
-  // interval re-walks the volume and evicts on behalf of the cluster.
-  scanDiskCache()
-    .then(() => evictIfOverLimit())
-    .catch(() => {});
+  // One worker walks the volume at boot and evicts on behalf of the cluster;
+  // all workers starting together would otherwise each walk it at once. The
+  // others only track their own writes and leave the rest to the lock below.
+  if (!cluster.isWorker || cluster.worker.id === 1) {
+    scanDiskCache()
+      .then(() => evictIfOverLimit())
+      .catch(() => {});
+  }
   setInterval(() => {
     claimRescan()
       .then((claimed) => (claimed ? scanDiskCache().then(() => evictIfOverLimit()) : null))
