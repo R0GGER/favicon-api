@@ -3966,6 +3966,7 @@
     const PROFILE_DEFAULT_SIZE = 128;
 
     let toolsBuilderReady = false;
+    let toolsBuilderStarted = false;
     let profileCopyUrl = '';
     let searchEngineUrl = '';
 
@@ -4090,7 +4091,8 @@
     }
 
     async function initToolsProfileBuilder() {
-      if (toolsBuilderReady) return;
+      if (toolsBuilderStarted) return;
+      toolsBuilderStarted = true;
       await providersReady;
 
       const preferred = document.getElementById('tools-pref');
@@ -4259,7 +4261,8 @@
       function handleToolsHash() {
         if (location.hash === '#tools') openToolsOffcanvas();
       }
-      handleToolsHash();
+      // Deferred: the builder depends on bindings declared further down this script.
+      document.addEventListener('DOMContentLoaded', handleToolsHash);
       window.addEventListener('hashchange', handleToolsHash);
     })();
 

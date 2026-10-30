@@ -1901,7 +1901,8 @@
       function handleToolsHash() {
         if (location.hash === '#tools') openToolsOffcanvas();
       }
-      handleToolsHash();
+      // Deferred: the builder depends on bindings declared further down this script.
+      document.addEventListener('DOMContentLoaded', handleToolsHash);
       window.addEventListener('hashchange', handleToolsHash);
     })();
 
@@ -1958,6 +1959,7 @@
       .finally(() => profileProvidersReadyResolve());
 
     let toolsBuilderReady = false;
+    let toolsBuilderStarted = false;
     let profileCopyUrl = '';
 
     function encodeProfileClient(preferred, fallbacks, size, sizeFallback) {
@@ -2062,7 +2064,8 @@
     }
 
     async function initToolsProfileBuilder() {
-      if (toolsBuilderReady) return;
+      if (toolsBuilderStarted) return;
+      toolsBuilderStarted = true;
       await profileProvidersReady;
 
       const preferred = document.getElementById('tools-pref');
