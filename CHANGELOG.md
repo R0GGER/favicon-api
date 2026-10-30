@@ -5,6 +5,12 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.4] — 2026-10-30
+
+### Fixed
+
+- **Empty Tools form on `/#tools`** — opening `/#tools` directly (homepage, `/api`, `/docs`) showed the custom URL builder with empty provider and size dropdowns, while opening Tools from the navigation worked. The hash check ran while the page script was still executing, before the provider bindings further down were initialised, so the builder failed silently. The check now waits for `DOMContentLoaded`, and the builder can no longer fill its dropdowns twice when opened again while still loading.
+
 ## [3.1.3] — 2026-10-28
 
 ### Fixed
